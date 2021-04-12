@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/TylerBrock/colorjson"
 	api "github.com/authzed/authzed-go/arrakisapi/api"
@@ -12,6 +13,7 @@ import (
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -47,7 +49,7 @@ func describeCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if cobrautil.MustGetBool(cmd, "json") {
+	if cobrautil.MustGetBool(cmd, "json") || terminal.IsTerminal(int(os.Stdin.Fd())) {
 		prettyProto, err := prettyProto(resp)
 		if err != nil {
 			return err

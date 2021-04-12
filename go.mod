@@ -12,6 +12,7 @@ require (
 	github.com/keybase/go-keychain v0.0.0-20201121013009-976c83ec27a6
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/spf13/cobra v1.1.3
+	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	google.golang.org/grpc v1.35.0
 	google.golang.org/protobuf v1.25.1-0.20201020201750-d3470999428b
 	tailscale.com v1.6.0
