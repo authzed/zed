@@ -49,7 +49,7 @@ func describeCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if cobrautil.MustGetBool(cmd, "json") || terminal.IsTerminal(int(os.Stdin.Fd())) {
+	if cobrautil.MustGetBool(cmd, "json") || !terminal.IsTerminal(int(os.Stdout.Fd())) {
 		prettyProto, err := prettyProto(resp)
 		if err != nil {
 			return err

@@ -114,6 +114,18 @@ func main() {
 
 	rootCmd.AddCommand(describeCmd)
 
+	var checkCmd = &cobra.Command{
+		Use:               "check <user:id> <object:id> <relation>",
+		Short:             "check a relation between a user and an object",
+		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+		RunE:              checkCmdFunc,
+	}
+
+	checkCmd.Flags().Bool("json", false, "output as JSON")
+	checkCmd.Flags().String("revision", "", "optional revision at which to check")
+
+	rootCmd.AddCommand(checkCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
