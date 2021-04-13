@@ -18,7 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/jzelinskie/zed/internal/config"
-	"github.com/jzelinskie/zed/internal/treeprint"
+	"github.com/jzelinskie/zed/internal/printers"
 )
 
 func describeCmdFunc(cmd *cobra.Command, args []string) error {
@@ -60,7 +60,7 @@ func describeCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	tp := treeprinter.New()
-	treeprint.Namespace(tp, resp.GetConfig())
+	printers.NamespaceTree(tp, resp.GetConfig())
 	fmt.Println(tp.String())
 
 	return nil

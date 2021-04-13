@@ -33,6 +33,10 @@ func main() {
 		Long:  "A client for managing authzed from your command line.",
 	}
 
+	rootCmd.PersistentFlags().String("endpoint", "grpc.authzed.com:443", "authzed API gRPC endpoint")
+	rootCmd.PersistentFlags().String("tenant", "", "tenant to query")
+	rootCmd.PersistentFlags().String("token", "", "token used to authenticate to authzed")
+
 	var configCmd = &cobra.Command{
 		Use:   "config <command> [args...]",
 		Short: "configure client contexts and credentials",
@@ -43,9 +47,9 @@ func main() {
 		RunE: setTokenCmdFunc,
 	}
 
-	var listTokensCmd = &cobra.Command{
-		Use:  "list-tokens",
-		RunE: listTokensCmdFunc,
+	var getTokensCmd = &cobra.Command{
+		Use:  "get-tokens",
+		RunE: getTokensCmdFunc,
 	}
 
 	var setContextCmd = &cobra.Command{
@@ -53,9 +57,9 @@ func main() {
 		RunE: setContextCmdFunc,
 	}
 
-	var listContextsCmd = &cobra.Command{
-		Use:  "list-contexts",
-		RunE: listContextsCmdFunc,
+	var getContextsCmd = &cobra.Command{
+		Use:  "get-contexts",
+		RunE: getContextsCmdFunc,
 	}
 
 	var useContextCmd = &cobra.Command{
@@ -64,10 +68,11 @@ func main() {
 	}
 
 	configCmd.AddCommand(setTokenCmd)
-	configCmd.AddCommand(listTokensCmd)
+	configCmd.AddCommand(getTokensCmd)
 	configCmd.AddCommand(setContextCmd)
-	configCmd.AddCommand(listContextsCmd)
+	configCmd.AddCommand(getContextsCmd)
 	configCmd.AddCommand(useContextCmd)
+
 	rootCmd.AddCommand(configCmd)
 
 	var describeCmd = &cobra.Command{
@@ -79,10 +84,6 @@ func main() {
 	}
 
 	describeCmd.Flags().Bool("json", false, "output as JSON")
-
-	describeCmd.PersistentFlags().String("tenant", "", "tenant to query")
-	describeCmd.PersistentFlags().String("token", "", "token used to authenticate to authzed")
-	describeCmd.PersistentFlags().String("endpoint", "grpc.authzed.com:443", "authzed API gRPC endpoint")
 
 	rootCmd.AddCommand(describeCmd)
 
