@@ -47,14 +47,36 @@ func main() {
 		RunE: setTokenCmdFunc,
 	}
 
+	var deleteTokenCmd = &cobra.Command{
+		Use:  "delete-token <name>",
+		RunE: deleteTokenCmdFunc,
+	}
+
+	var renameTokenCmd = &cobra.Command{
+		Use:  "rename-token <old> <new>",
+		RunE: renameTokenCmdFunc,
+	}
+
 	var getTokensCmd = &cobra.Command{
 		Use:  "get-tokens",
 		RunE: getTokensCmdFunc,
 	}
 
+	getTokensCmd.Flags().Bool("reveal-tokens", false, "display secrets in results")
+
 	var setContextCmd = &cobra.Command{
 		Use:  "set-context <name> <tenant> <key name>",
 		RunE: setContextCmdFunc,
+	}
+
+	var deleteContextCmd = &cobra.Command{
+		Use:  "delete-context <name>",
+		RunE: deleteContextCmdFunc,
+	}
+
+	var renameContextCmd = &cobra.Command{
+		Use:  "rename-context <old> <new>",
+		RunE: renameContextCmdFunc,
 	}
 
 	var getContextsCmd = &cobra.Command{
@@ -67,10 +89,15 @@ func main() {
 		RunE: useContextCmdFunc,
 	}
 
-	configCmd.AddCommand(setTokenCmd)
 	configCmd.AddCommand(getTokensCmd)
-	configCmd.AddCommand(setContextCmd)
+	configCmd.AddCommand(setTokenCmd)
+	configCmd.AddCommand(renameTokenCmd)
+	configCmd.AddCommand(deleteTokenCmd)
+
 	configCmd.AddCommand(getContextsCmd)
+	configCmd.AddCommand(setContextCmd)
+	configCmd.AddCommand(renameContextCmd)
+	configCmd.AddCommand(deleteContextCmd)
 	configCmd.AddCommand(useContextCmd)
 
 	rootCmd.AddCommand(configCmd)

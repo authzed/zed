@@ -119,10 +119,10 @@ func CurrentCredentials(tenantOverride, tokenOverride string) (tenant, token str
 		return "", "", err
 	}
 
-	tokenBytes, err := keychain.Get("authzed.com", context.TokenName)
+	item, err := keychain.Get(context.TokenName, "zed token", true)
 	if err != nil {
 		return "", "", err
 	}
 
-	return context.Tenant, string(tokenBytes), nil
+	return context.Tenant, string(item.Data), nil
 }
