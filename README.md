@@ -49,11 +49,26 @@ rbac_example/document
            └── TUPLE_OBJECT: writer
 ```
 
-Checking a relation:
+Checking, creating, deleting a relation:
 
 ```sh
 $ zed check user:tom document:firstdoc writer
 true
+
+$ zed check user:jimmy document:firstdoc writer
+false
+
+$ zed create user:jimmy document:firstdoc writer
+CAESAwiLBA==
+
+$ zed check user:jimmy document:firstdoc writer
+true
+
+$ zed delete user:jimmy document:firstdoc writer
+CAESAwiMBA==
+
+$ zed check user:jimmy document:firstdoc writer
+false
 ```
 
 Piping into JSON tooling:

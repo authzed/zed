@@ -131,6 +131,37 @@ func main() {
 
 	rootCmd.AddCommand(checkCmd)
 
+	var createCmd = &cobra.Command{
+		Use:               "create <user:id> <object:id> relation",
+		Short:             "create a relationship between a user and an object",
+		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+		RunE:              writeCmdFunc(api.RelationTupleUpdate_CREATE),
+	}
+
+	createCmd.Flags().Bool("json", false, "output as JSON")
+
+	var touchCmd = &cobra.Command{
+		Use:               "touch <user:id> <object:id> relation",
+		Short:             "touch a relationship between a user and an object",
+		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+		RunE:              writeCmdFunc(api.RelationTupleUpdate_TOUCH),
+	}
+
+	touchCmd.Flags().Bool("json", false, "output as JSON")
+
+	rootCmd.AddCommand(touchCmd)
+
+	var deleteCmd = &cobra.Command{
+		Use:               "delete <user:id> <object:id> relation",
+		Short:             "delete a relationship between a user and an object",
+		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+		RunE:              writeCmdFunc(api.RelationTupleUpdate_DELETE),
+	}
+
+	deleteCmd.Flags().Bool("json", false, "output as JSON")
+
+	rootCmd.AddCommand(deleteCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
