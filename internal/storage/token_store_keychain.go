@@ -1,41 +1,43 @@
 package storage
 
 import (
-	"github.com/keybase/go-keychain"
+	"github.com/99designs/keyring"
 )
 
-const keychainLabel = "zed token"
+const keychainSvcName = "zed tokens"
 
 type KeychainTokenStore struct{}
 
 var _ TokenStore = KeychainTokenStore{}
 
 func (ks KeychainTokenStore) List(redactTokens bool) ([]Token, error) {
-	query := keychain.NewItem()
-	query.SetSecClass(keychain.SecClassGenericPassword)
-	query.SetLabel(keychainLabel)
-	query.SetMatchLimit(keychain.MatchLimitAll)
-	query.SetReturnAttributes(true)
+	ring, err := keyring.Open(keyring.Config{
+		ServiceName: keychainSvcName,
+	})
+	if err != nil {
+		return nil, err
+	}
 
-	items, err := keychain.QueryItem(query)
+	keys, err := ring.Keys()
 	if err != nil {
 		return nil, err
 	}
 
 	var tokens []Token
-	for _, item := range items {
+	for _, key := range keys {
+		item, err := ring.Get(key)
+		if err != nil {
+			return nil, err
+		}
+
 		token := "<redacted>"
 		if !redactTokens {
-			tokenWithToken, err := ks.Get(item.Account, false)
-			if err != nil {
-				return nil, err
-			}
-			token = tokenWithToken.Token
+			token = string(item.Data)
 		}
 
 		tokens = append(tokens, Token{
-			Name:     item.Account,
-			Endpoint: item.Service,
+			Name:     item.Key,
+			Endpoint: item.Label,
 			Token:    token,
 		})
 	}
@@ -43,56 +45,57 @@ func (ks KeychainTokenStore) List(redactTokens bool) ([]Token, error) {
 	return tokens, nil
 }
 
-func (ks KeychainTokenStore) Get(name string, redactedTokens bool) (Token, error) {
-	query := keychain.NewItem()
-	query.SetSecClass(keychain.SecClassGenericPassword)
-	query.SetAccount(name)
-	query.SetLabel(keychainLabel)
-	query.SetMatchLimit(keychain.MatchLimitOne)
-	query.SetReturnAttributes(true)
-	query.SetReturnData(!redactedTokens)
-
-	results, err := keychain.QueryItem(query)
+func (ks KeychainTokenStore) Get(name string, redactTokens bool) (Token, error) {
+	ring, err := keyring.Open(keyring.Config{
+		ServiceName: keychainSvcName,
+	})
 	if err != nil {
 		return Token{}, err
 	}
 
-	if len(results) > 1 {
-		return Token{}, ErrMultipleTokens
-	}
-
-	if len(results) == 1 {
-		token := "<redacted>"
-		if !redactedTokens {
-			token = string(results[0].Data)
+	item, err := ring.Get(name)
+	if err != nil {
+		if err == keyring.ErrKeyNotFound {
+			return Token{}, ErrTokenDoesNotExist
 		}
-		return Token{
-			Name:     name,
-			Endpoint: results[0].Service,
-			Token:    token,
-		}, nil
+		return Token{}, err
 	}
 
-	return Token{}, ErrTokenDoesNotExist
+	token := "<redacted>"
+	if !redactTokens {
+		token = string(item.Data)
+	}
+
+	return Token{
+		Name:     item.Key,
+		Endpoint: item.Label,
+		Token:    token,
+	}, nil
 }
 
 func (ks KeychainTokenStore) Put(t Token) error {
-	item := keychain.NewGenericPassword(t.Endpoint, t.Name, keychainLabel, []byte(t.Token), "")
-	err := keychain.AddItem(item)
-	if err == keychain.ErrorDuplicateItem {
-		err := keychain.DeleteGenericPasswordItem(t.Endpoint, t.Name)
-		if err != nil {
-			return err
-		}
-		return ks.Put(t)
+	ring, err := keyring.Open(keyring.Config{
+		ServiceName: keychainSvcName,
+	})
+	if err != nil {
+		return err
 	}
+
+	err = ring.Set(keyring.Item{
+		Key:   t.Name,
+		Data:  []byte(t.Token),
+		Label: t.Endpoint,
+	})
 	return err
 }
 
 func (ks KeychainTokenStore) Delete(name string) error {
-	item := keychain.NewItem()
-	item.SetSecClass(keychain.SecClassGenericPassword)
-	item.SetAccount(name)
-	item.SetLabel(keychainLabel)
-	return keychain.DeleteItem(item)
+	ring, err := keyring.Open(keyring.Config{
+		ServiceName: keychainSvcName,
+	})
+	if err != nil {
+		return err
+	}
+
+	return ring.Remove(name)
 }

@@ -15,8 +15,8 @@ var ErrTokenDoesNotExist = errors.New("token does not exist")
 var ErrMultipleTokens = errors.New("multiple tokens with the same name")
 
 type TokenStore interface {
-	List(redactedTokens bool) ([]Token, error)
-	Get(name string, redactedTokens bool) (Token, error)
+	List(redactTokens bool) ([]Token, error)
+	Get(name string, redactTokens bool) (Token, error)
 	Put(Token) error
 	Delete(name string) error
 }
