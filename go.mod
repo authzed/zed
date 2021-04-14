@@ -1,4 +1,4 @@
-module github.com/jzelinskie/zed
+module github.com/authzed/zed
 
 go 1.15
 

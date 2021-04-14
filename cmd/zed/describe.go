@@ -17,8 +17,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/jzelinskie/zed/internal/printers"
-	"github.com/jzelinskie/zed/internal/storage"
+	"github.com/authzed/zed/internal/printers"
+	"github.com/authzed/zed/internal/storage"
 )
 
 func describeCmdFunc(cmd *cobra.Command, args []string) error {

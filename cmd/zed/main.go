@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/jzelinskie/zed/internal/storage"
+	"github.com/authzed/zed/internal/storage"
 )
 
 var tokenStore = storage.KeychainTokenStore{}

@@ -9,8 +9,8 @@ import (
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
 
-	"github.com/jzelinskie/zed/internal/printers"
-	"github.com/jzelinskie/zed/internal/storage"
+	"github.com/authzed/zed/internal/printers"
+	"github.com/authzed/zed/internal/storage"
 )
 
 func setTokenCmdFunc(cmd *cobra.Command, args []string) error {

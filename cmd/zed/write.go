@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
-	"github.com/jzelinskie/zed/internal/storage"
+	"github.com/authzed/zed/internal/storage"
 )
 
 func SplitObject(s string) (nsName, id string, err error) {
