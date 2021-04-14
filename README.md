@@ -15,6 +15,7 @@ Please use [releases] instead of the master branch in order to get stable binari
 
 A client for managing [authzed] or any API-compatible system from your command line.
 
+[releases]: https://github.com/authzed/zed/releases
 [authzed]: https://authzed.com
 
 ## Example Usage
@@ -29,7 +30,7 @@ If both `$ZED_TENANT` and `$ZED_TOKEN` are set, these values are used instead of
 
 API Tokens are stored in the system keychain.
 
-```sh
+```
 $ zed config set-token jimmy@authzed.com tu_zed_hanazawa_deadbeefdeadbeefdeadbeefdeadbeef
 NAME             	ENDPOINT            	TOKEN     	MODIFIED
 jimmy@authzed.com	grpc.authzed.com:443	<redacted>	now
@@ -41,7 +42,7 @@ jimmy@authzed.com	grpc.authzed.com:443	<redacted>	2 minutes ago
 
 Context data is stored in `$XDG_CONFIG_HOME/zed` falling back to `~/.zed` if that environment variable is not set.
 
-```sh
+```
 $ zed config set-context rbac rbac_example jimmy@authzed.com
 NAME	TENANT      	TOKEN NAME       	ENDPOINT            	CURRENT
 rbac	rbac_example	jimmy@authzed.com	grpc.authzed.com:443
@@ -51,9 +52,9 @@ NAME	TENANT      	TOKEN NAME       	ENDPOINT            	CURRENT
 rbac	rbac_example	jimmy@authzed.com	grpc.authzed.com:443	true
 ```
 
-### Managing namespaces
+### Explore relationships
 
-```sh
+```
 $ zed describe document
 rbac_example/document
  ├── writer
@@ -62,6 +63,13 @@ rbac_example/document
            ├── _this
            └── TUPLE_OBJECT: writer
 
+
+$ zed expand document:firstdoc reader
+document:firstdoc reader
+ └── union
+      ├── user:fred
+      └── document:firstdoc writer
+           └── user:tom
 ```
 
 When piped or provided the `--json` flag, API responses are converted into JSON.
@@ -71,21 +79,10 @@ $ zed describe document | jq '.config.relation[0].name'
 "writer"
 ```
 
-### Managing relationships
+### Modify relationships
 
-```sh
-$ zed check user:tom document:firstdoc writer
-true
-
-$ zed check user:tom document:firstdoc writer | jq
-{
-  "isMember": true,
-  "revision": {
-    "token": "CAESAwiKBA=="
-  }
-}
-
-$ zed check user:jimmy document:firstdoc writer
+```
+$ zed check user:jimmy document:firstdoc reader
 false
 
 $ zed create user:jimmy document:firstdoc writer
@@ -94,8 +91,14 @@ CAESAwiLBA==
 $ zed check user:jimmy document:firstdoc writer
 true
 
+$ zed check user:jimmy document:firstdoc reader
+true
+
 $ zed delete user:jimmy document:firstdoc writer
 CAESAwiMBA==
+
+$ zed check user:jimmy document:firstdoc reader
+false
 
 $ zed check user:jimmy document:firstdoc writer
 false
