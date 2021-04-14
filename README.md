@@ -1,19 +1,33 @@
 # zed
 
+<!-- Uncomment when we setup CI
+[![Build Status](https://github.com/jzelinskie/zed/workflows/CI/badge.svg)](https://github.com/jzelinskie/zed/actions)
+[![Docker Repository on Quay.io](https://quay.io/repository/jzelinskie/zed/status "Docker Repository on Quay.io")](https://quay.io/repository/jzelinskie/zed)
+-->
+[![Go Report Card](https://goreportcard.com/badge/github.com/jzelinskie/zed)](https://goreportcard.com/report/github.com/jzelinskie/zed)
+[![GoDoc](https://godoc.org/github.com/jzelinskie/zed?status.svg)](https://godoc.org/github.com/jzelinskie/zed)
+![Lines of Code](https://tokei.rs/b1/github/jzelinskie/zed)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
+[![IRC Channel](https://img.shields.io/badge/freenode-%23authzed-blue.svg "IRC Channel")](http://webchat.freenode.net/?channels=authzed)
+
+**Note:** The master branch may be in an unstable or even broken state during development.
+Please use [releases] instead of the master branch in order to get stable binaries.
+
 A client for managing [authzed] or any API-compatible system from your command line.
 
 [authzed]: https://authzed.com
 
-## Getting Started
+## Example Usage
+
+### Managing credentials
 
 Configuring credentials is similar to [kubeconfig] in [kubectl].
-API Tokens are stored in the system keychain and context data is stored in `$XDG_CONFIG_HOME/zed` falling back to `~/.zed` if that environment variable is not set.
 If both `$ZED_TENANT` and `$ZED_TOKEN` are set, these values are used instead of the current context.
 
 [kubeconfig]: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
 [kubectl]: https://kubernetes.io/docs/reference/kubectl/overview/
 
-Managing tokens:
+API Tokens are stored in the system keychain.
 
 ```sh
 $ zed config set-token jimmy@authzed.com tu_zed_hanazawa_deadbeefdeadbeefdeadbeefdeadbeef
@@ -25,7 +39,7 @@ NAME             	ENDPOINT            	TOKEN     	MODIFIED
 jimmy@authzed.com	grpc.authzed.com:443	<redacted>	2 minutes ago
 ```
 
-Managing contexts:
+Context data is stored in `$XDG_CONFIG_HOME/zed` falling back to `~/.zed` if that environment variable is not set.
 
 ```sh
 $ zed config set-context rbac rbac_example jimmy@authzed.com
@@ -37,7 +51,7 @@ NAME	TENANT      	TOKEN NAME       	ENDPOINT            	CURRENT
 rbac	rbac_example	jimmy@authzed.com	grpc.authzed.com:443	true
 ```
 
-Viewing a namespace
+### Managing namespaces
 
 ```sh
 $ zed describe document
@@ -47,13 +61,29 @@ rbac_example/document
       └── union
            ├── _this
            └── TUPLE_OBJECT: writer
+
 ```
 
-Checking, creating, deleting a relation:
+When piped or provided the `--json` flag, API responses are converted into JSON.
+
+```
+$ zed describe document | jq '.config.relation[0].name'
+"writer"
+```
+
+### Managing relationships
 
 ```sh
 $ zed check user:tom document:firstdoc writer
 true
+
+$ zed check user:tom document:firstdoc writer | jq
+{
+  "isMember": true,
+  "revision": {
+    "token": "CAESAwiKBA=="
+  }
+}
 
 $ zed check user:jimmy document:firstdoc writer
 false
@@ -69,19 +99,4 @@ CAESAwiMBA==
 
 $ zed check user:jimmy document:firstdoc writer
 false
-```
-
-Piping into JSON tooling:
-
-```sh
-$ zed describe document | jq '.config.relation[0].name'
-"writer"
-
-$ zed check user:tom document:firstdoc writer | jq
-{
-  "isMember": true,
-  "revision": {
-    "token": "CAESAwiKBA=="
-  }
-}
 ```
