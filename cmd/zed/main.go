@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"os"
 
 	api "github.com/authzed/authzed-go/arrakisapi/api"
@@ -13,23 +14,11 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/authzed/zed/internal/storage"
+	"github.com/authzed/zed/internal/version"
 )
 
 var tokenStore = storage.KeychainTokenStore{}
 var contextConfigStore = storage.LocalFsContextConfigStore{}
-
-func rootCmdFunc(cmd *cobra.Command, args []string) error {
-	print("root")
-	return nil
-}
-
-func persistentPreRunE(cmd *cobra.Command, args []string) error {
-	if err := cobrautil.SyncViperPreRunE("zed")(cmd, args); err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func main() {
 	var rootCmd = &cobra.Command{
@@ -41,6 +30,19 @@ func main() {
 	rootCmd.PersistentFlags().String("endpoint", "grpc.authzed.com:443", "authzed API gRPC endpoint")
 	rootCmd.PersistentFlags().String("tenant", "", "tenant to query")
 	rootCmd.PersistentFlags().String("token", "", "token used to authenticate to authzed")
+
+	var versionCmd = &cobra.Command{
+		Use:               "version",
+		Short:             "display zed version information",
+		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(version.UsageVersion(cobrautil.MustGetBool(cmd, "include-deps")))
+		},
+	}
+
+	versionCmd.Flags().Bool("include-deps", false, "include dependencies' versions")
+
+	rootCmd.AddCommand(versionCmd)
 
 	var configCmd = &cobra.Command{
 		Use:   "config <command> [args...]",
