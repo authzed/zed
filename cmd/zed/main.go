@@ -154,6 +154,8 @@ func main() {
 
 	createCmd.Flags().Bool("json", false, "output as JSON")
 
+	rootCmd.AddCommand(createCmd)
+
 	var touchCmd = &cobra.Command{
 		Use:               "touch <user:id> <object:id> relation",
 		Short:             "touch a relationship between a user and an object",
