@@ -26,37 +26,38 @@ func prettyUser(user *api.User) string {
 }
 
 func TreeNodeTree(tp treeprinter.Node, treeNode *api.RelationTupleTreeNode) {
-	root := tp.Child(fmt.Sprintf(
-		"%s:%s %s",
-		stringz.TrimPrefixIndex(treeNode.Expanded.Namespace, "/"),
-		treeNode.Expanded.ObjectId,
-		treeNode.Expanded.Relation,
-	))
-
+	if treeNode.Expanded != nil {
+		tp = tp.Child(fmt.Sprintf(
+			"%s:%s %s",
+			stringz.TrimPrefixIndex(treeNode.Expanded.Namespace, "/"),
+			treeNode.Expanded.ObjectId,
+			treeNode.Expanded.Relation,
+		))
+	}
 	switch typed := treeNode.NodeType.(type) {
 	case *api.RelationTupleTreeNode_IntermediateNode:
 		switch typed.IntermediateNode.Operation {
 		case api.SetOperationUserset_UNION:
-			root.Child("union")
+			union := tp.Child("union")
 			for _, child := range typed.IntermediateNode.ChildNodes {
-				TreeNodeTree(tp, child)
+				TreeNodeTree(union, child)
 			}
 		case api.SetOperationUserset_INTERSECTION:
-			root.Child("intersection")
+			intersection := tp.Child("intersection")
 			for _, child := range typed.IntermediateNode.ChildNodes {
-				TreeNodeTree(tp, child)
+				TreeNodeTree(intersection, child)
 			}
 		case api.SetOperationUserset_EXCLUSION:
-			root.Child("exclusion")
+			exclusion := tp.Child("exclusion")
 			for _, child := range typed.IntermediateNode.ChildNodes {
-				TreeNodeTree(tp, child)
+				TreeNodeTree(exclusion, child)
 			}
 		default:
 			panic("unknown expand operation")
 		}
 	case *api.RelationTupleTreeNode_LeafNode:
 		for _, user := range typed.LeafNode.Users {
-			root.Child(prettyUser(user))
+			tp.Child(prettyUser(user))
 		}
 	default:
 		panic("unknown TreeNode type")
