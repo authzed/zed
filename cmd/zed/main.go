@@ -11,7 +11,12 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+
+	"github.com/jzelinskie/zed/internal/storage"
 )
+
+var tokenStore = storage.KeychainTokenStore{}
+var contextConfigStore = storage.LocalFsContextConfigStore{}
 
 func rootCmdFunc(cmd *cobra.Command, args []string) error {
 	print("root")

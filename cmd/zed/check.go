@@ -10,9 +10,10 @@ import (
 	api "github.com/authzed/authzed-go/arrakisapi/api"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
-	"github.com/jzelinskie/zed/internal/config"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
+
+	"github.com/jzelinskie/zed/internal/storage"
 )
 
 func checkCmdFunc(cmd *cobra.Command, args []string) error {
@@ -30,7 +31,9 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return errors.New(`user must be in format "mytenant/objectnamespace:objectid"`)
 	}
 
-	tenant, token, err := config.CurrentCredentials(
+	tenant, token, err := storage.CurrentCredentials(
+		contextConfigStore,
+		tokenStore,
 		cobrautil.MustGetString(cmd, "tenant"),
 		cobrautil.MustGetString(cmd, "token"),
 	)
