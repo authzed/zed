@@ -133,6 +133,18 @@ func main() {
 
 	rootCmd.AddCommand(checkCmd)
 
+	var expandCmd = &cobra.Command{
+		Use:               "expand <object:id> <relation>",
+		Short:             "expand a relation on an object",
+		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+		RunE:              expandCmdFunc,
+	}
+
+	expandCmd.Flags().Bool("json", false, "output as JSON")
+	expandCmd.Flags().String("revision", "", "optional revision at which to check")
+
+	rootCmd.AddCommand(expandCmd)
+
 	var createCmd = &cobra.Command{
 		Use:               "create <user:id> <object:id> relation",
 		Short:             "create a relationship between a user and an object",

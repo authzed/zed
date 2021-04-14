@@ -9,7 +9,7 @@ require (
 	github.com/cockroachdb/cockroach v20.1.13+incompatible
 	github.com/hokaccha/go-prettyjson v0.0.0-20210113012101-fb4e108d2519 // indirect
 	github.com/jzelinskie/cobrautil v0.0.0-20210330205530-45d5fbfe45dd
-	github.com/jzelinskie/stringz v0.0.0-20210413012450-6d92f7dd1bdb
+	github.com/jzelinskie/stringz v0.0.0-20210414224931-d6a8ce844a70
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/spf13/cobra v1.1.3

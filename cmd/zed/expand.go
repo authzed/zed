@@ -7,30 +7,28 @@ import (
 	"os"
 
 	api "github.com/authzed/authzed-go/arrakisapi/api"
+	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
+	"github.com/authzed/zed/internal/printers"
 	"github.com/authzed/zed/internal/storage"
 )
 
-func checkCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) != 3 {
+// <object:id> relation
+func expandCmdFunc(cmd *cobra.Command, args []string) error {
+	if len(args) != 2 {
 		return errors.New("invalid number of arguments")
 	}
 
-	userNS, userID, err := SplitObject(args[0])
+	objectNS, objectID, err := SplitObject(args[0])
 	if err != nil {
 		return err
 	}
 
-	objectNS, objectID, err := SplitObject(args[1])
-	if err != nil {
-		return err
-	}
-
-	relation := args[2]
+	relation := args[1]
 
 	tenant, token, err := storage.CurrentCredentials(
 		contextConfigStore,
@@ -50,26 +48,19 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	request := &api.CheckRequest{
-		TestUserset: &api.ObjectAndRelation{
+	request := &api.ExpandRequest{
+		Userset: &api.ObjectAndRelation{
 			Namespace: stringz.Join("/", tenant, objectNS),
 			ObjectId:  objectID,
 			Relation:  relation,
 		},
-		User: &api.User{UserOneof: &api.User_Userset{
-			Userset: &api.ObjectAndRelation{
-				Namespace: stringz.Join("/", tenant, userNS),
-				ObjectId:  userID,
-				Relation:  "...",
-			},
-		}},
 	}
 
 	if zookie := cobrautil.MustGetString(cmd, "revision"); zookie != "" {
 		request.AtRevision = &api.Zookie{Token: zookie}
 	}
 
-	resp, err := client.Check(context.Background(), request)
+	resp, err := client.Expand(context.Background(), request)
 	if err != nil {
 		return err
 	}
@@ -84,7 +75,9 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Println(resp.IsMember)
+	tp := treeprinter.New()
+	printers.TreeNodeTree(tp, resp.GetTreeNode())
+	fmt.Println(tp.String())
 
 	return nil
 }

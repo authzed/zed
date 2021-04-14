@@ -254,8 +254,8 @@ github.com/jtolds/gls v4.20.0+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfV
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/jzelinskie/cobrautil v0.0.0-20210330205530-45d5fbfe45dd h1:yeJ5T5xCviaOi5l78nqJbMQcfZ/iKXQnjvi6fGpY6/w=
 github.com/jzelinskie/cobrautil v0.0.0-20210330205530-45d5fbfe45dd/go.mod h1:R07/oqfH6QaEv51rKe7Ot95f82hQgsiQnN4luAwd57w=
-github.com/jzelinskie/stringz v0.0.0-20210413012450-6d92f7dd1bdb h1:x1za+af8DjI0c89OWIiQZg7UlGaqgPdkQE+PicCxdsw=
-github.com/jzelinskie/stringz v0.0.0-20210413012450-6d92f7dd1bdb/go.mod h1:hHYbgxJuNLRw91CmpuFsYEOyQqpDVFg8pvEh23vy4P0=
+github.com/jzelinskie/stringz v0.0.0-20210414224931-d6a8ce844a70 h1:thTca5Eyouk5CEcJ75Cbw9CSAGE7TAc6rIi+WgHWpOE=
+github.com/jzelinskie/stringz v0.0.0-20210414224931-d6a8ce844a70/go.mod h1:hHYbgxJuNLRw91CmpuFsYEOyQqpDVFg8pvEh23vy4P0=
 github.com/keybase/go-keychain v0.0.0-20190712205309-48d3d31d256d h1:Z+RDyXzjKE0i2sTjZ/b1uxiGtPhFy34Ou/Tk0qwN0kM=
 github.com/keybase/go-keychain v0.0.0-20190712205309-48d3d31d256d/go.mod h1:JJNrCn9otv/2QP4D7SMJBgaleKpOf66PnW6F5WGNRIc=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
