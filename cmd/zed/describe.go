@@ -18,7 +18,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/authzed/zed/internal/printers"
-	"github.com/authzed/zed/internal/storage"
 )
 
 func describeCmdFunc(cmd *cobra.Command, args []string) error {
@@ -26,19 +25,14 @@ func describeCmdFunc(cmd *cobra.Command, args []string) error {
 		return errors.New("invalid number of arguments")
 	}
 
-	tenant, token, err := storage.CurrentCredentials(
-		contextConfigStore,
-		tokenStore,
-		cobrautil.MustGetString(cmd, "tenant"),
-		cobrautil.MustGetString(cmd, "token"),
-	)
+	tenant, token, endpoint, err := CurrentContext(cmd, contextConfigStore, tokenStore)
 	if err != nil {
 		return err
 	}
 
 	client, err := NewClient(
 		token,
-		cobrautil.MustGetString(cmd, "endpoint"),
+		endpoint,
 		cobrautil.MustGetBool(cmd, "insecure"),
 	)
 	if err != nil {

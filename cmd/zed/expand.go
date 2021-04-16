@@ -14,7 +14,6 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/authzed/zed/internal/printers"
-	"github.com/authzed/zed/internal/storage"
 )
 
 // <object:id> relation
@@ -30,19 +29,14 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 
 	relation := args[1]
 
-	tenant, token, err := storage.CurrentCredentials(
-		contextConfigStore,
-		tokenStore,
-		cobrautil.MustGetString(cmd, "tenant"),
-		cobrautil.MustGetString(cmd, "token"),
-	)
+	tenant, token, endpoint, err := CurrentContext(cmd, contextConfigStore, tokenStore)
 	if err != nil {
 		return err
 	}
 
 	client, err := NewClient(
 		token,
-		cobrautil.MustGetString(cmd, "endpoint"),
+		endpoint,
 		cobrautil.MustGetBool(cmd, "insecure"),
 	)
 	if err != nil {

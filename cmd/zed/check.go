@@ -11,8 +11,6 @@ import (
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
-
-	"github.com/authzed/zed/internal/storage"
 )
 
 func checkCmdFunc(cmd *cobra.Command, args []string) error {
@@ -32,19 +30,17 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 
 	relation := args[2]
 
-	tenant, token, err := storage.CurrentCredentials(
-		contextConfigStore,
-		tokenStore,
-		cobrautil.MustGetString(cmd, "tenant"),
-		cobrautil.MustGetString(cmd, "token"),
-	)
+	tenant, token, endpoint, err := CurrentContext(cmd, contextConfigStore, tokenStore)
+	if err != nil {
+		return err
+	}
 	if err != nil {
 		return err
 	}
 
 	client, err := NewClient(
 		token,
-		cobrautil.MustGetString(cmd, "endpoint"),
+		endpoint,
 		cobrautil.MustGetBool(cmd, "insecure"),
 	)
 	if err != nil {

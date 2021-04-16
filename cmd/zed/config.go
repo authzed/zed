@@ -14,34 +14,28 @@ import (
 )
 
 func setTokenCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) != 2 {
-		return fmt.Errorf("must provide only 2 arguments: name and token")
-	}
+	var name, token string
+	stringz.Unpack(args, &name, &token)
+	endpoint := stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "endpoint"), "grpc.authzed.com:443")
 
-	token := storage.Token{
-		Name:     args[0],
-		Endpoint: cobrautil.MustGetString(cmd, "endpoint"),
-		Token:    args[1],
-	}
-
-	if err := tokenStore.Put(token); err != nil {
+	if err := tokenStore.Put(storage.Token{
+		Name:     name,
+		Endpoint: endpoint,
+		Token:    token,
+	}); err != nil {
 		return err
 	}
 
 	printers.PrintTable(
 		os.Stdout,
 		[]string{"name", "endpoint", "token"},
-		[][]string{{token.Name, token.Endpoint, "<redacted>"}},
+		[][]string{{name, endpoint, "<redacted>"}},
 	)
 
 	return nil
 }
 
 func renameTokenCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) != 2 {
-		return fmt.Errorf("must provide only 2 arguments: old name and new name")
-	}
-
 	var oldName, newName string
 	stringz.Unpack(args, &oldName, &newName)
 
@@ -88,9 +82,6 @@ func renameTokenCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func deleteTokenCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("must provide only 1 argument: name")
-	}
 	tokenName := args[0]
 
 	cfg, err := contextConfigStore.Get()
@@ -180,9 +171,6 @@ func getContextsCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func renameContextCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) != 2 {
-		return fmt.Errorf("must provide only 2 arguments: old name and new name")
-	}
 	var oldName, newName string
 	stringz.Unpack(args, &oldName, &newName)
 
@@ -236,10 +224,6 @@ func renameContextCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func deleteContextCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("must provide only 1 argument: name")
-	}
-
 	cfg, err := contextConfigStore.Get()
 	if err != nil {
 		return err
@@ -266,9 +250,6 @@ func deleteContextCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func setContextCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) != 3 {
-		return fmt.Errorf("must provide only 3 arguments: name, tenant, and token name")
-	}
 	var newContext storage.Context
 	stringz.Unpack(args, &newContext.Name, &newContext.Tenant, &newContext.TokenName)
 
@@ -308,9 +289,6 @@ func setContextCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func useContextCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("must provide only 1 argument: name")
-	}
 	name := args[0]
 
 	cfg, err := contextConfigStore.Get()

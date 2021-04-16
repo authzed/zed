@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -12,8 +11,6 @@ import (
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
-
-	"github.com/authzed/zed/internal/storage"
 )
 
 func SplitObject(s string) (nsName, id string, err error) {
@@ -26,10 +23,6 @@ func SplitObject(s string) (nsName, id string, err error) {
 
 func writeCmdFunc(operation api.RelationTupleUpdate_Operation) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		if len(args) != 3 {
-			return errors.New("invalid number of arguments")
-		}
-
 		userNS, userID, err := SplitObject(args[0])
 		if err != nil {
 			return err
@@ -42,19 +35,14 @@ func writeCmdFunc(operation api.RelationTupleUpdate_Operation) func(cmd *cobra.C
 
 		relation := args[2]
 
-		tenant, token, err := storage.CurrentCredentials(
-			contextConfigStore,
-			tokenStore,
-			cobrautil.MustGetString(cmd, "tenant"),
-			cobrautil.MustGetString(cmd, "token"),
-		)
+		tenant, token, endpoint, err := CurrentContext(cmd, contextConfigStore, tokenStore)
 		if err != nil {
 			return err
 		}
 
 		client, err := NewClient(
 			token,
-			cobrautil.MustGetString(cmd, "endpoint"),
+			endpoint,
 			cobrautil.MustGetBool(cmd, "insecure"),
 		)
 		if err != nil {

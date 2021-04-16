@@ -9,6 +9,7 @@ import (
 
 	api "github.com/authzed/authzed-go/arrakisapi/api"
 	"github.com/jzelinskie/cobrautil"
+	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -27,7 +28,7 @@ func main() {
 		Long:  "A client for managing authzed from your command line.",
 	}
 
-	rootCmd.PersistentFlags().String("endpoint", "grpc.authzed.com:443", "authzed API gRPC endpoint")
+	rootCmd.PersistentFlags().String("endpoint", "", "authzed API gRPC endpoint")
 	rootCmd.PersistentFlags().String("tenant", "", "tenant to query")
 	rootCmd.PersistentFlags().String("token", "", "token used to authenticate to authzed")
 	rootCmd.PersistentFlags().Bool("insecure", false, "do not attempt to verify the server's certificate chain and host name")
@@ -53,21 +54,25 @@ func main() {
 	var setTokenCmd = &cobra.Command{
 		Use:  "set-token <name> <key>",
 		RunE: setTokenCmdFunc,
+		Args: cobra.ExactArgs(2),
 	}
 
 	var deleteTokenCmd = &cobra.Command{
 		Use:  "delete-token <name>",
 		RunE: deleteTokenCmdFunc,
+		Args: cobra.ExactArgs(1),
 	}
 
 	var renameTokenCmd = &cobra.Command{
 		Use:  "rename-token <old> <new>",
 		RunE: renameTokenCmdFunc,
+		Args: cobra.ExactArgs(2),
 	}
 
 	var getTokensCmd = &cobra.Command{
 		Use:  "get-tokens",
 		RunE: getTokensCmdFunc,
+		Args: cobra.ExactArgs(0),
 	}
 
 	getTokensCmd.Flags().Bool("reveal-tokens", false, "display secrets in results")
@@ -75,26 +80,31 @@ func main() {
 	var setContextCmd = &cobra.Command{
 		Use:  "set-context <name> <tenant> <key name>",
 		RunE: setContextCmdFunc,
+		Args: cobra.ExactArgs(3),
 	}
 
 	var deleteContextCmd = &cobra.Command{
 		Use:  "delete-context <name>",
 		RunE: deleteContextCmdFunc,
+		Args: cobra.ExactArgs(1),
 	}
 
 	var renameContextCmd = &cobra.Command{
 		Use:  "rename-context <old> <new>",
 		RunE: renameContextCmdFunc,
+		Args: cobra.ExactArgs(2),
 	}
 
 	var getContextsCmd = &cobra.Command{
 		Use:  "get-contexts",
 		RunE: getContextsCmdFunc,
+		Args: cobra.ExactArgs(0),
 	}
 
 	var useContextCmd = &cobra.Command{
 		Use:  "use-context <name>",
 		RunE: useContextCmdFunc,
+		Args: cobra.ExactArgs(1),
 	}
 
 	configCmd.AddCommand(getTokensCmd)
@@ -114,6 +124,7 @@ func main() {
 		Use:               "describe <namespace>",
 		Short:             "Describe a namespace",
 		Long:              "Describe the relations that form the provided namespace.",
+		Args:              cobra.ExactArgs(1),
 		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 		RunE:              describeCmdFunc,
 	}
@@ -125,6 +136,7 @@ func main() {
 	var checkCmd = &cobra.Command{
 		Use:               "check <user:id> <object:id> <relation>",
 		Short:             "check a relation between a user and an object",
+		Args:              cobra.ExactArgs(3),
 		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 		RunE:              checkCmdFunc,
 	}
@@ -137,6 +149,7 @@ func main() {
 	var expandCmd = &cobra.Command{
 		Use:               "expand <object:id> <relation>",
 		Short:             "expand a relation on an object",
+		Args:              cobra.ExactArgs(2),
 		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 		RunE:              expandCmdFunc,
 	}
@@ -149,6 +162,7 @@ func main() {
 	var createCmd = &cobra.Command{
 		Use:               "create <user:id> <object:id> relation",
 		Short:             "create a relationship between a user and an object",
+		Args:              cobra.ExactArgs(3),
 		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 		RunE:              writeCmdFunc(api.RelationTupleUpdate_CREATE),
 	}
@@ -160,6 +174,7 @@ func main() {
 	var touchCmd = &cobra.Command{
 		Use:               "touch <user:id> <object:id> relation",
 		Short:             "touch a relationship between a user and an object",
+		Args:              cobra.ExactArgs(3),
 		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 		RunE:              writeCmdFunc(api.RelationTupleUpdate_TOUCH),
 	}
@@ -171,6 +186,7 @@ func main() {
 	var deleteCmd = &cobra.Command{
 		Use:               "delete <user:id> <object:id> relation",
 		Short:             "delete a relationship between a user and an object",
+		Args:              cobra.ExactArgs(3),
 		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 		RunE:              writeCmdFunc(api.RelationTupleUpdate_DELETE),
 	}
@@ -220,4 +236,21 @@ func NewClient(token, endpoint string, insecure bool) (*Client, error) {
 		api.NewACLServiceClient(conn),
 		api.NewNamespaceServiceClient(conn),
 	}, nil
+}
+
+func CurrentContext(
+	cmd *cobra.Command,
+	ccs storage.ContextConfigStore,
+	ts storage.TokenStore,
+) (tenant, token, endpoint string, err error) {
+	currentTenant, currentToken, currentEndpoint, err := storage.CurrentCredentials(contextConfigStore, tokenStore)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	tenant = stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "tenant"), currentTenant)
+	token = stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "token"), currentToken)
+	endpoint = stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "endpoint"), currentEndpoint)
+
+	return
 }

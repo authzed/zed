@@ -48,24 +48,16 @@ func CurrentContext(store ContextConfigStore) (*Context, error) {
 	return nil, fmt.Errorf("current context does not exist")
 }
 
-func CurrentCredentials(
-	ccStore ContextConfigStore,
-	tokenStore TokenStore,
-	tenantOverride, tokenOverride string,
-) (tenant, token string, err error) {
-	if tenantOverride != "" && tokenOverride != "" {
-		return tenantOverride, tokenOverride, nil
-	}
-
+func CurrentCredentials(ccStore ContextConfigStore, tokenStore TokenStore) (tenant, token, endpoint string, err error) {
 	context, err := CurrentContext(ccStore)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	t, err := tokenStore.Get(context.TokenName, false)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	return context.Tenant, t.Token, nil
+	return context.Tenant, t.Token, t.Endpoint, nil
 }
