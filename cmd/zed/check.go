@@ -45,6 +45,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	client, err := NewClient(
 		token,
 		cobrautil.MustGetString(cmd, "endpoint"),
+		cobrautil.MustGetBool(cmd, "insecure"),
 	)
 	if err != nil {
 		return err

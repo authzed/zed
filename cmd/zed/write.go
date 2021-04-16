@@ -55,6 +55,7 @@ func writeCmdFunc(operation api.RelationTupleUpdate_Operation) func(cmd *cobra.C
 		client, err := NewClient(
 			token,
 			cobrautil.MustGetString(cmd, "endpoint"),
+			cobrautil.MustGetBool(cmd, "insecure"),
 		)
 		if err != nil {
 			return err

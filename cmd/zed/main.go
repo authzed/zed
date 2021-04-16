@@ -30,6 +30,7 @@ func main() {
 	rootCmd.PersistentFlags().String("endpoint", "grpc.authzed.com:443", "authzed API gRPC endpoint")
 	rootCmd.PersistentFlags().String("tenant", "", "tenant to query")
 	rootCmd.PersistentFlags().String("token", "", "token used to authenticate to authzed")
+	rootCmd.PersistentFlags().Bool("insecure", false, "do not attempt to verify the server's certificate chain and host name")
 
 	var versionCmd = &cobra.Command{
 		Use:               "version",
@@ -195,18 +196,25 @@ func (gmc GrpcMetadataCredentials) GetRequestMetadata(ctx context.Context, uri .
 	return gmc, nil
 }
 
-func NewClient(token, endpoint string) (*Client, error) {
+func NewClient(token, endpoint string, insecure bool) (*Client, error) {
 	certPool, err := x509.SystemCertPool()
 	if err != nil {
 		return nil, err
 	}
 
-	creds := credentials.NewTLS(&tls.Config{RootCAs: certPool})
+	creds := credentials.NewTLS(&tls.Config{
+		RootCAs:            certPool,
+		InsecureSkipVerify: insecure,
+	})
+
 	conn, err := grpc.Dial(
 		endpoint,
 		grpc.WithTransportCredentials(creds),
 		grpc.WithPerRPCCredentials(GrpcMetadataCredentials{"authorization": "Bearer " + token}),
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Client{
 		api.NewACLServiceClient(conn),
