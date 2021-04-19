@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 
@@ -22,10 +21,6 @@ import (
 )
 
 func describeCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return errors.New("invalid number of arguments")
-	}
-
 	tenant, token, endpoint, err := CurrentContext(cmd, contextConfigStore, tokenStore)
 	if err != nil {
 		return err

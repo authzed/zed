@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -15,10 +14,6 @@ import (
 )
 
 func checkCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) != 3 {
-		return errors.New("invalid number of arguments")
-	}
-
 	userNS, userID, err := SplitObject(args[0])
 	if err != nil {
 		return err

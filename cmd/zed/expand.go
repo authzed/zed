@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -17,12 +16,7 @@ import (
 	"github.com/authzed/zed/internal/printers"
 )
 
-// <object:id> relation
 func expandCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) != 2 {
-		return errors.New("invalid number of arguments")
-	}
-
 	objectNS, objectID, err := SplitObject(args[0])
 	if err != nil {
 		return err
