@@ -10,10 +10,10 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 [![IRC Channel](https://img.shields.io/badge/freenode-%23authzed-blue.svg "IRC Channel")](http://webchat.freenode.net/?channels=authzed)
 
+A client for managing [authzed] or any API-compatible system from your command line.
+
 **Note:** The master branch may be in an unstable or even broken state during development.
 Please use [releases] instead of the master branch in order to get stable binaries.
-
-A client for managing [authzed] or any API-compatible system from your command line.
 
 [releases]: https://github.com/authzed/zed/releases
 [authzed]: https://authzed.com
