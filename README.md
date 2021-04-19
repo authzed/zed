@@ -56,7 +56,7 @@ rbac	rbac_example	jimmy@authzed.com	grpc.authzed.com:443	true
 
 ```
 $ zed describe document
-rbac_example/document
+document
  ├── writer
  └── reader
       └── union
