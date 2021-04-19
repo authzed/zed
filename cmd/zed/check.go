@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/authzed/authzed-go"
 	api "github.com/authzed/authzed-go/arrakisapi/api"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
@@ -38,10 +39,15 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := NewClient(
-		token,
+	tlsOpt := authzed.SystemCerts(authzed.VerifyCA)
+	if cobrautil.MustGetBool(cmd, "insecure") {
+		tlsOpt = authzed.SystemCerts(authzed.SkipVerifyCA)
+	}
+
+	client, err := authzed.NewClient(
 		endpoint,
-		cobrautil.MustGetBool(cmd, "insecure"),
+		authzed.Token(token),
+		tlsOpt,
 	)
 	if err != nil {
 		return err

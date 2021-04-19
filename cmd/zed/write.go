@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/authzed/authzed-go"
 	api "github.com/authzed/authzed-go/arrakisapi/api"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
@@ -40,10 +41,15 @@ func writeCmdFunc(operation api.RelationTupleUpdate_Operation) func(cmd *cobra.C
 			return err
 		}
 
-		client, err := NewClient(
-			token,
+		tlsOpt := authzed.SystemCerts(authzed.VerifyCA)
+		if cobrautil.MustGetBool(cmd, "insecure") {
+			tlsOpt = authzed.SystemCerts(authzed.SkipVerifyCA)
+		}
+
+		client, err := authzed.NewClient(
 			endpoint,
-			cobrautil.MustGetBool(cmd, "insecure"),
+			authzed.Token(token),
+			tlsOpt,
 		)
 		if err != nil {
 			return err

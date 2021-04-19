@@ -1,9 +1,6 @@
 package main
 
 import (
-	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"os"
 
@@ -11,8 +8,6 @@ import (
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 
 	"github.com/authzed/zed/internal/storage"
 	"github.com/authzed/zed/internal/version"
@@ -198,44 +193,6 @@ func main() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
-}
-
-type Client struct {
-	api.ACLServiceClient
-	api.NamespaceServiceClient
-}
-
-type GrpcMetadataCredentials map[string]string
-
-func (gmc GrpcMetadataCredentials) RequireTransportSecurity() bool { return true }
-func (gmc GrpcMetadataCredentials) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
-	return gmc, nil
-}
-
-func NewClient(token, endpoint string, insecure bool) (*Client, error) {
-	certPool, err := x509.SystemCertPool()
-	if err != nil {
-		return nil, err
-	}
-
-	creds := credentials.NewTLS(&tls.Config{
-		RootCAs:            certPool,
-		InsecureSkipVerify: insecure,
-	})
-
-	conn, err := grpc.Dial(
-		endpoint,
-		grpc.WithTransportCredentials(creds),
-		grpc.WithPerRPCCredentials(GrpcMetadataCredentials{"authorization": "Bearer " + token}),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Client{
-		api.NewACLServiceClient(conn),
-		api.NewNamespaceServiceClient(conn),
-	}, nil
 }
 
 func CurrentContext(
