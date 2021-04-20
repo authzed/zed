@@ -217,11 +217,12 @@ func CurrentContext(
 
 func ClientFromFlags(cmd *cobra.Command, endpoint, token string) (*authzed.Client, error) {
 	var opts []grpc.DialOption
-	opts = append(opts, authzed.Token(token))
 
 	if cobrautil.MustGetBool(cmd, "insecure") {
 		opts = append(opts, grpc.WithInsecure())
 	} else {
+		opts = append(opts, authzed.Token(token)) // Tokens are only used for secure endpoints.
+
 		tlsOpt := authzed.SystemCerts(authzed.VerifyCA)
 		if cobrautil.MustGetBool(cmd, "no-verify-ca") {
 			tlsOpt = authzed.SystemCerts(authzed.SkipVerifyCA)
