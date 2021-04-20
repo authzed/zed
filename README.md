@@ -23,7 +23,6 @@ Please use [releases] instead of the master branch in order to get stable binari
 ### Managing credentials
 
 Configuring credentials is similar to [kubeconfig] in [kubectl].
-If both `$ZED_TENANT` and `$ZED_TOKEN` are set, these values are used instead of the current context.
 
 [kubeconfig]: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
 [kubectl]: https://kubernetes.io/docs/reference/kubectl/overview/
@@ -52,7 +51,11 @@ NAME	TENANT      	TOKEN NAME       	ENDPOINT            	CURRENT
 rbac	rbac_example	jimmy@authzed.com	grpc.authzed.com:443	true
 ```
 
+The environment variables `$ZED_TENANT`, `$ZED_TOKEN`, and `$ZED_ENDPOINT` can be used to override their respective values in the current context.
+
 ### Explore relationships
+
+The `describe` command provides a tree view of a namespace definition.
 
 ```
 $ zed describe document
@@ -62,8 +65,11 @@ document
       └── union
            ├── _this
            └── TUPLE_OBJECT: writer
+```
 
+The `expand` command provides a tree view of a relation of a particular object.
 
+```
 $ zed expand document:firstdoc reader
 document:firstdoc reader
  └── union
