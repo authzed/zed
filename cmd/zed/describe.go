@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/TylerBrock/colorjson"
-	"github.com/authzed/authzed-go"
 	api "github.com/authzed/authzed-go/arrakisapi/api"
 	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/cobrautil"
@@ -26,16 +25,7 @@ func describeCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	tlsOpt := authzed.SystemCerts(authzed.VerifyCA)
-	if cobrautil.MustGetBool(cmd, "insecure") {
-		tlsOpt = authzed.SystemCerts(authzed.SkipVerifyCA)
-	}
-
-	client, err := authzed.NewClient(
-		endpoint,
-		authzed.Token(token),
-		tlsOpt,
-	)
+	client, err := ClientFromFlags(cmd, endpoint, token)
 	if err != nil {
 		return err
 	}

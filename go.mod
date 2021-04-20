@@ -14,6 +14,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/spf13/cobra v1.1.3
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
+	google.golang.org/grpc v1.37.0
 	google.golang.org/protobuf v1.25.1-0.20201020201750-d3470999428b
 	tailscale.com v1.6.0
 )

@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/authzed/authzed-go"
 	api "github.com/authzed/authzed-go/arrakisapi/api"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
 
 	"github.com/authzed/zed/internal/storage"
 	"github.com/authzed/zed/internal/version"
@@ -26,7 +28,8 @@ func main() {
 	rootCmd.PersistentFlags().String("endpoint", "", "authzed API gRPC endpoint")
 	rootCmd.PersistentFlags().String("tenant", "", "tenant to query")
 	rootCmd.PersistentFlags().String("token", "", "token used to authenticate to authzed")
-	rootCmd.PersistentFlags().Bool("insecure", false, "do not attempt to verify the server's certificate chain and host name")
+	rootCmd.PersistentFlags().Bool("insecure", false, "connect over a plaintext connection")
+	rootCmd.PersistentFlags().Bool("no-verify-ca", false, "do not attempt to verify the server's certificate chain and host name")
 
 	var versionCmd = &cobra.Command{
 		Use:               "version",
@@ -210,4 +213,19 @@ func CurrentContext(
 	endpoint = stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "endpoint"), currentEndpoint)
 
 	return
+}
+
+func ClientFromFlags(cmd *cobra.Command, endpoint, token string) (*authzed.Client, error) {
+	var opts []grpc.DialOption
+	if !cobrautil.MustGetBool(cmd, "insecure") {
+		tlsOpt := authzed.SystemCerts(authzed.VerifyCA)
+		if cobrautil.MustGetBool(cmd, "no-verify-ca") {
+			tlsOpt = authzed.SystemCerts(authzed.SkipVerifyCA)
+		}
+		opts = append(opts, tlsOpt)
+	}
+
+	opts = append(opts, authzed.Token(token))
+
+	return authzed.NewClient(endpoint, opts...)
 }
