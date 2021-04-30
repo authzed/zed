@@ -12,11 +12,17 @@
 
 A client for managing [authzed] or any API-compatible system from your command line.
 
-**Note:** The master branch may be in an unstable or even broken state during development.
-Please use [releases] instead of the master branch in order to get stable binaries.
-
-[releases]: https://github.com/authzed/zed/releases
 [authzed]: https://authzed.com
+
+## Installation
+
+zed is currently packaged by as a _head-only_ [Homebrew] Formula for both macOS and Linux.
+
+[Homebrew]: https://brew.sh
+
+```sh
+$ brew install --HEAD authzed/tap/zed
+```
 
 ## Example Usage
 
@@ -31,12 +37,12 @@ API Tokens are stored in the system keychain.
 
 ```
 $ zed config set-token jimmy@authzed.com tu_zed_hanazawa_deadbeefdeadbeefdeadbeefdeadbeef
-NAME             	ENDPOINT            	TOKEN     	MODIFIED
-jimmy@authzed.com	grpc.authzed.com:443	<redacted>	now
+NAME             	ENDPOINT            	TOKEN
+jimmy@authzed.com	grpc.authzed.com:443	<redacted>
 
 $ zed config get-tokens
-NAME             	ENDPOINT            	TOKEN     	MODIFIED
-jimmy@authzed.com	grpc.authzed.com:443	<redacted>	2 minutes ago
+NAME             	ENDPOINT            	TOKEN
+jimmy@authzed.com	grpc.authzed.com:443	<redacted>
 ```
 
 Context data is stored in `$XDG_CONFIG_HOME/zed` falling back to `~/.zed` if that environment variable is not set.
