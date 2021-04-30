@@ -193,6 +193,21 @@ func main() {
 
 	rootCmd.AddCommand(deleteCmd)
 
+	plugins := []struct{ name, description string }{
+		{"testserver", "local testing server"},
+	}
+	for _, plugin := range plugins {
+		binaryName := fmt.Sprintf("zed-%s", plugin.name)
+		if commandIsAvailable(binaryName) {
+			rootCmd.AddCommand(&cobra.Command{
+				Use:                plugin.name,
+				Short:              plugin.description,
+				RunE:               pluginCmdFunc(binaryName),
+				DisableFlagParsing: true, // Passes flags as args to the subcommand.
+			})
+		}
+	}
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
