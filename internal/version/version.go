@@ -28,7 +28,7 @@ func UsageVersion(includeDeps bool) string {
 		if Version == "(devel)" {
 			return "zed development build (unknown exact version)"
 		}
-		return "zed v" + Version
+		return "zed " + Version
 	}
 
 	var b strings.Builder
