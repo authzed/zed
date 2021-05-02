@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/99designs/keyring"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 const keychainSvcName = "zed tokens"
@@ -30,7 +30,7 @@ func openKeyring() (keyring.Keyring, error) {
 			}
 
 			fmt.Fprintf(os.Stderr, "%s: ", prompt)
-			b, err := terminal.ReadPassword(int(os.Stdin.Fd()))
+			b, err := term.ReadPassword(int(os.Stdin.Fd()))
 			if err != nil {
 				return "", err
 			}

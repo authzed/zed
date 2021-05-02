@@ -10,7 +10,7 @@ import (
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 func SplitObject(s string) (nsName, id string, err error) {
@@ -66,7 +66,7 @@ func writeCmdFunc(operation api.RelationTupleUpdate_Operation) func(cmd *cobra.C
 			return err
 		}
 
-		if cobrautil.MustGetBool(cmd, "json") || !terminal.IsTerminal(int(os.Stdout.Fd())) {
+		if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
 			prettyProto, err := prettyProto(resp)
 			if err != nil {
 				return err
