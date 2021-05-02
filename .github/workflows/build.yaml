@@ -1,0 +1,60 @@
+name: "build"
+on:
+  push:
+    branches:
+    - "!dependabot/*"
+    - "*"
+  pull_request:
+    branches:
+    - "*"
+jobs:
+  lint: 
+    name: "Lint"
+    runs-on: "ubuntu-latest"
+    steps:
+    - uses: "actions/checkout@v2"
+    - uses: "actions/setup-go@v2"
+      with:
+        go-version: ^1.16
+    - name: "go fmt"
+      run: |
+        GOFMT_OUTPUT="$(gofmt -l `find ./ -name '*.go' | grep -v vendor` 2>&1)"
+
+        if [ -n "$GOFMT_OUTPUT" ]; then
+          echo "All the following files are not correctly formatted"
+          echo "${GOFMT_OUTPUT}"
+          exit 1
+        fi
+    - name: "go imports"
+      run: |
+        exec 5>&1
+        GOIMPORTS_OUTPUT="$(goimports -l -w `find ./ -name '*.go' | grep -v vendor` | tee /dev/fd/5)"
+
+        if [ -n "$GOIMPORTS_OUTPUT" ]; then
+          echo "All following has imports not properly ordered"
+          echo "${GOIMPORTS_OUTPUT}"
+
+          exit 1
+        fi
+    - name: "go mod tidy"
+      run: |
+        GO_MOD_OUPUT="$(go mod tidy -v 2>&1)"
+
+        if [[ $GO_MOD_OUPUT == *"unused"* ]]; then
+          echo "${GO_MOD_OUPUT}"
+          exit 1
+        fi
+    - uses: golangci/golangci-lint-action@v2
+
+  test:
+    name: "Test"
+    runs-on: "ubuntu-latest"
+    steps:
+    - uses: "actions/checkout@v2"
+    - uses: "actions/setup-go@v2"
+      with:
+        go-version: ^1.16
+    - name: "go build"
+      run: "go build ./cmd/zed"
+    - name: "go test"
+      run: "go test ./..."
