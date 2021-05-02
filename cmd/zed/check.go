@@ -9,7 +9,7 @@ import (
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 func checkCmdFunc(cmd *cobra.Command, args []string) error {
@@ -62,7 +62,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if cobrautil.MustGetBool(cmd, "json") || !terminal.IsTerminal(int(os.Stdout.Fd())) {
+	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
 		prettyProto, err := prettyProto(resp)
 		if err != nil {
 			return err
