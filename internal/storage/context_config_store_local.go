@@ -13,23 +13,23 @@ type LocalFsContextConfigStore struct{}
 
 func localConfigPath() (string, error) {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "zed", "config.json"), nil
+		return filepath.Join(xdg, "zed"), nil
 	}
 
 	home, err := homedir.Dir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".zed", "config.json"), nil
+	return filepath.Join(home, ".zed"), nil
 }
 
 func (s LocalFsContextConfigStore) Get() (*ContextConfig, error) {
-	filepath, err := localConfigPath()
+	path, err := localConfigPath()
 	if err != nil {
 		return nil, err
 	}
 
-	cfgBytes, err := os.ReadFile(filepath)
+	cfgBytes, err := os.ReadFile(filepath.Join(path, "config.json"))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &ContextConfig{}, nil
@@ -50,7 +50,7 @@ func (s LocalFsContextConfigStore) Put(cfg *ContextConfig) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0774); err != nil {
+	if err := os.MkdirAll(path, 0774); err != nil {
 		return err
 	}
 
@@ -59,5 +59,5 @@ func (s LocalFsContextConfigStore) Put(cfg *ContextConfig) error {
 		return err
 	}
 
-	return atomicfile.WriteFile(path, cfgBytes, 0774)
+	return atomicfile.WriteFile(filepath.Join(path, "config.json"), cfgBytes, 0774)
 }
