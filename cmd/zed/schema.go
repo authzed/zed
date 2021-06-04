@@ -19,19 +19,34 @@ import (
 	"github.com/authzed/zed/internal/printers"
 )
 
-func describeCmdFunc(cmd *cobra.Command, args []string) error {
-	tenant, token, endpoint, err := CurrentContext(cmd, contextConfigStore, tokenStore)
+var schemaCmd = &cobra.Command{
+	Use:   "schema <subcommand>",
+	Short: "read and write to a permission system's schema",
+}
+
+var schemaReadCmd = &cobra.Command{
+	Use:               "read <object type>",
+	Short:             "read the schema of current permission system",
+	Args:              cobra.ExactArgs(1),
+	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+	RunE:              schemaReadCmdFunc,
+}
+
+// TODO(jzelinskie): eventually make a variant that takes 0 args and returns
+// all object definitions in the schema.
+func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
+	token, err := TokenFromFlags(cmd)
 	if err != nil {
 		return err
 	}
 
-	client, err := ClientFromFlags(cmd, endpoint, token)
+	client, err := ClientFromFlags(cmd, token.Endpoint, token.ApiToken)
 	if err != nil {
 		return err
 	}
 
 	resp, err := client.ReadConfig(context.Background(), &api.ReadConfigRequest{
-		Namespace: stringz.Join("/", tenant, args[0]),
+		Namespace: stringz.Join("/", token.Name, args[0]),
 	})
 	if err != nil {
 		return err
