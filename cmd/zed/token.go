@@ -49,7 +49,7 @@ var tokenUseCmd = &cobra.Command{
 }
 
 func tokenListCmdFunc(cmd *cobra.Command, args []string) error {
-	tokens, err := tokenStore.List(!cobrautil.MustGetBool(cmd, "reveal-tokens"))
+	tokens, err := storage.DefaultTokenStore.List(!cobrautil.MustGetBool(cmd, "reveal-tokens"))
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func tokenSaveCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	endpoint := stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "endpoint"), "grpc.authzed.com:443")
 
-	if err := tokenStore.Put(storage.Token{
+	if err := storage.DefaultTokenStore.Put(storage.Token{
 		Name:     name,
 		Endpoint: endpoint,
 		ApiToken: token,
@@ -90,12 +90,12 @@ func tokenSaveCmdFunc(cmd *cobra.Command, args []string) error {
 		[][]string{{name, endpoint, "<redacted>"}},
 	)
 
-	return storage.SetCurrentToken(name, configStore, tokenStore)
+	return storage.SetCurrentToken(name, storage.DefaultConfigStore, storage.DefaultTokenStore)
 }
 
 func tokenDeleteCmdFunc(cmd *cobra.Command, args []string) error {
 	// If the token is what's currently being used, remove it from the config.
-	cfg, err := configStore.Get()
+	cfg, err := storage.DefaultConfigStore.Get()
 	if err != nil {
 		return err
 	}
@@ -103,14 +103,14 @@ func tokenDeleteCmdFunc(cmd *cobra.Command, args []string) error {
 	if cfg.CurrentToken == args[0] {
 		cfg.CurrentToken = ""
 	}
-	err = configStore.Put(cfg)
+	err = storage.DefaultConfigStore.Put(cfg)
 	if err != nil {
 		return err
 	}
 
-	return tokenStore.Delete(args[0])
+	return storage.DefaultTokenStore.Delete(args[0])
 }
 
 func tokenUseCmdFunc(cmd *cobra.Command, args []string) error {
-	return storage.SetCurrentToken(args[0], configStore, tokenStore)
+	return storage.SetCurrentToken(args[0], storage.DefaultConfigStore, storage.DefaultTokenStore)
 }

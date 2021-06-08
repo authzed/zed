@@ -10,6 +10,8 @@ import (
 	"golang.org/x/term"
 )
 
+var DefaultTokenStore = KeychainTokenStore{}
+
 type Token struct {
 	Name     string
 	Endpoint string

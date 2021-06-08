@@ -10,6 +10,10 @@ import (
 	"tailscale.com/atomicfile"
 )
 
+const configFile = "config.json"
+
+var DefaultConfigStore = HomeJSONConfigStore{}
+
 type Config struct {
 	Version      string
 	CurrentToken string
@@ -73,7 +77,7 @@ func (s HomeJSONConfigStore) Get() (Config, error) {
 		return Config{}, err
 	}
 
-	cfgBytes, err := os.ReadFile(filepath.Join(path, "config.json"))
+	cfgBytes, err := os.ReadFile(filepath.Join(path, configFile))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Config{}, ErrConfigNotFound
@@ -102,5 +106,5 @@ func (s HomeJSONConfigStore) Put(cfg Config) error {
 		return err
 	}
 
-	return atomicfile.WriteFile(filepath.Join(path, "config.json"), cfgBytes, 0774)
+	return atomicfile.WriteFile(filepath.Join(path, configFile), cfgBytes, 0774)
 }

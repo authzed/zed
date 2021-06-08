@@ -15,13 +15,8 @@ import (
 	"github.com/authzed/zed/internal/version"
 )
 
-var (
-	tokenStore  = storage.KeychainTokenStore{}
-	configStore = storage.HomeJSONConfigStore{}
-)
-
 func TokenFromFlags(cmd *cobra.Command) (storage.Token, error) {
-	token, err := storage.CurrentToken(configStore, tokenStore)
+	token, err := storage.CurrentToken(storage.DefaultConfigStore, storage.DefaultTokenStore)
 	if err != nil {
 		if errors.Is(err, storage.ErrConfigNotFound) {
 			return storage.Token{}, errors.New("must first save a token: see `zed token save --help`")
