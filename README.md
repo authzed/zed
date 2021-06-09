@@ -26,92 +26,92 @@ $ brew install --HEAD authzed/tap/zed
 
 ## Example Usage
 
-### Managing credentials
+### Logging into a permission system
 
-Configuring credentials is similar to [kubeconfig] in [kubectl].
-
-[kubeconfig]: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-[kubectl]: https://kubernetes.io/docs/reference/kubectl/overview/
-
-API Tokens are stored in the system keychain.
+In order to interact with a permission system, zed first needs an API token.
+Zed stores API Tokens in the system keychain and all other non-sensitive data is stored in `$XDG_CONFIG_HOME/zed` falling back to `~/.zed`.
 
 ```
-$ zed config set-token jimmy@authzed.com tu_zed_hanazawa_deadbeefdeadbeefdeadbeefdeadbeef
-NAME             	ENDPOINT            	TOKEN
-jimmy@authzed.com	grpc.authzed.com:443	<redacted>
+$ zed token save exampledocs tu_zed_hanazawa_deadbeefdeadbeefdeadbeefdeadbeef
+NAME       	ENDPOINT            	TOKEN
+exampledocs	grpc.authzed.com:443	<redacted>
 
-$ zed config get-tokens
-NAME             	ENDPOINT            	TOKEN
-jimmy@authzed.com	grpc.authzed.com:443	<redacted>
+$ zed token list
+NAME       	ENDPOINT            	TOKEN
+exampledocs	grpc.authzed.com:443	<redacted>
 ```
 
-Context data is stored in `$XDG_CONFIG_HOME/zed` falling back to `~/.zed` if that environment variable is not set.
+
+The environment variables `$ZED_SYSTEM`, `$ZED_ENDPOINT`, and `$ZED_TOKEN` can be used to override their respective values in the current context.
+
+### Schemas
+
+The `schema read` command prints a tree view the object definitions in a permission system.
 
 ```
-$ zed config set-context rbac rbac_example jimmy@authzed.com
-NAME	TENANT      	TOKEN NAME       	ENDPOINT            	CURRENT
-rbac	rbac_example	jimmy@authzed.com	grpc.authzed.com:443
-
-$ zed config use-context rbac
-NAME	TENANT      	TOKEN NAME       	ENDPOINT            	CURRENT
-rbac	rbac_example	jimmy@authzed.com	grpc.authzed.com:443	true
-```
-
-The environment variables `$ZED_TENANT`, `$ZED_TOKEN`, and `$ZED_ENDPOINT` can be used to override their respective values in the current context.
-
-### Explore relationships
-
-The `describe` command provides a tree view of a namespace definition.
-
-```
-$ zed describe document
+$ zed schema read document
 document
  ├── writer
  └── reader
       └── union
            ├── _this
            └── TUPLE_OBJECT: writer
+
+$ zed schema read user
+user
 ```
 
-The `expand` command provides a tree view of a relation of a particular object.
+### Relationships
+
+Once you've got a Schema, you fill them with Relationships -- think of them like unique rows in a database.
 
 ```
-$ zed expand document:firstdoc reader
-document:firstdoc reader
- └── union
-      ├── user:fred
-      └── document:firstdoc writer
-           └── user:tom
-```
-
-When piped or provided the `--json` flag, API responses are converted into JSON.
-
-```
-$ zed describe document | jq '.config.relation[0].name'
-"writer"
-```
-
-### Modify relationships
-
-```
-$ zed check user:jimmy document:firstdoc reader
-false
-
-$ zed create user:jimmy document:firstdoc writer
+$ zed relationship create user:jimmy writer document:firstdoc
 CAESAwiLBA==
 
-$ zed check user:jimmy document:firstdoc writer
-true
-
-$ zed check user:jimmy document:firstdoc reader
-true
-
-$ zed delete user:jimmy document:firstdoc writer
+$ zed relationship delete user:joey writer document:firstdoc
 CAESAwiMBA==
 
-$ zed check user:jimmy document:firstdoc reader
-false
+$ zed relationship create user:joey reader document:firstdoc
+CAESAwiMBA==
+```
 
-$ zed check user:jimmy document:firstdoc writer
+### Permissions
+
+After there are Relationships within a Schema, you can start performing operations on Permissions.
+
+The `permission check` command determines whether or not an Object has a particular Permission.
+
+```
+$ zed permission check user:jimmy writer document:firstdoc
+true
+
+$ zed permission check user:jimmy reader document:firstdoc
+true
+
+$ zed permission check user:joey reader document:firstdoc
+true
+
+$ zed permission check user:joey writer document:firstdoc
 false
+```
+
+The `permission expand` command provides a tree view of the expanded structure of a particular Permission.
+
+```
+$ zed permission expand reader document:firstdoc
+document:firstdoc reader
+ └── union
+      ├── user:joey
+      └── document:firstdoc writer
+           └── user:jimmy
+```
+
+### Misc
+
+For ease of scripting, most commands when piped or provided the `--json` flag have their API responses are converted into JSON.
+
+```
+$ zed schema read document | jq '.config.relation[0].name'
+"writer"
 ```
