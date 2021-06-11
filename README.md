@@ -1,14 +1,11 @@
 # zed
 
-<!-- Uncomment when we setup CI
-[![Build Status](https://github.com/authzed/zed/workflows/CI/badge.svg)](https://github.com/authzed/zed/actions)
-[![Docker Repository on Quay.io](https://quay.io/repository/authzed/zed/status "Docker Repository on Quay.io")](https://quay.io/repository/authzed/zed)
--->
-[![Go Report Card](https://goreportcard.com/badge/github.com/authzed/zed)](https://goreportcard.com/report/github.com/authzed/zed)
 [![GoDoc](https://godoc.org/github.com/authzed/zed?status.svg)](https://godoc.org/github.com/authzed/zed)
-![Lines of Code](https://tokei.rs/b1/github/authzed/zed)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
-[![IRC Channel](https://img.shields.io/badge/freenode-%23authzed-blue.svg "IRC Channel")](http://webchat.freenode.net/?channels=authzed)
+![Lines of Code](https://tokei.rs/b1/github/authzed/zed)
+[![Discord Server](https://img.shields.io/discord/844600078504951838?color=7289da&logo=discord "Discord Server")](https://discord.gg/jTysUaxXzM)
+[![Build Status](https://github.com/authzed/zed/workflows/build/badge.svg)](https://github.com/authzed/zed/actions)
+[![Docker Repository on Quay.io](https://quay.io/repository/authzed/zed/status "Docker Repository on Quay.io")](https://quay.io/repository/authzed/zed)
 
 A client for managing [authzed] or any API-compatible system from your command line.
 
