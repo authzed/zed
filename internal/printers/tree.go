@@ -18,7 +18,7 @@ func prettyUser(user *api.User) string {
 		)
 	}
 	return fmt.Sprintf(
-		"%s:%s %s",
+		"%s:%s->%s",
 		stringz.TrimPrefixIndex(userset.Namespace, "/"),
 		userset.ObjectId,
 		userset.Relation,
@@ -28,7 +28,7 @@ func prettyUser(user *api.User) string {
 func TreeNodeTree(tp treeprinter.Node, treeNode *api.RelationTupleTreeNode) {
 	if treeNode.Expanded != nil {
 		tp = tp.Child(fmt.Sprintf(
-			"%s:%s %s",
+			"%s:%s->%s",
 			stringz.TrimPrefixIndex(treeNode.Expanded.Namespace, "/"),
 			treeNode.Expanded.ObjectId,
 			treeNode.Expanded.Relation,
