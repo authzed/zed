@@ -21,12 +21,12 @@ import (
 
 var schemaCmd = &cobra.Command{
 	Use:   "schema <subcommand>",
-	Short: "read and write to a permission system's schema",
+	Short: "read and write to a Schema for a Permissions System",
 }
 
 var schemaReadCmd = &cobra.Command{
 	Use:               "read <object type>",
-	Short:             "read the schema of current permission system",
+	Short:             "read the Schema of current Permissions System",
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 	RunE:              schemaReadCmdFunc,
 }

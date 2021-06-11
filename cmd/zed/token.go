@@ -13,12 +13,12 @@ import (
 
 var tokenCmd = &cobra.Command{
 	Use:   "token <subcommand>",
-	Short: "manage the API tokens stored in your keychain",
+	Short: "manage the API Tokens stored on your machine",
 }
 
 var tokenListCmd = &cobra.Command{
 	Use:               "list",
-	Short:             "list all the API Tokens from your keychain",
+	Short:             "list all the API Tokens",
 	Args:              cobra.ExactArgs(0),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 	RunE:              tokenListCmdFunc,
@@ -26,7 +26,7 @@ var tokenListCmd = &cobra.Command{
 
 var tokenSaveCmd = &cobra.Command{
 	Use:               "save <system> <token>",
-	Short:             "save an API Token to your keychain",
+	Short:             "save an API Token",
 	Args:              cobra.ExactArgs(2),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 	RunE:              tokenSaveCmdFunc,
@@ -34,7 +34,7 @@ var tokenSaveCmd = &cobra.Command{
 
 var tokenDeleteCmd = &cobra.Command{
 	Use:               "delete <system>",
-	Short:             "delete an API Token from your keychain",
+	Short:             "delete an API Token",
 	Args:              cobra.ExactArgs(1),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 	RunE:              tokenDeleteCmdFunc,
@@ -42,7 +42,7 @@ var tokenDeleteCmd = &cobra.Command{
 
 var tokenUseCmd = &cobra.Command{
 	Use:               "use <system>",
-	Short:             "use an API Token for future commands",
+	Short:             "use an API Token",
 	Args:              cobra.ExactArgs(1),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 	RunE:              tokenUseCmdFunc,

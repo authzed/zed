@@ -17,12 +17,12 @@ import (
 
 var permissionCmd = &cobra.Command{
 	Use:   "permission <subcommand>",
-	Short: "perform queries on the permissions in a permission system",
+	Short: "perform queries on the Permissions in a Permissions System",
 }
 
 var checkCmd = &cobra.Command{
-	Use:               "check <user:id> <permission> <object:id>",
-	Short:             "check that a permission exists between a user and an object",
+	Use:               "check <subject:id> <permission> <object:id>",
+	Short:             "check that a Permission exists for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 	RunE:              checkCmdFunc,
@@ -30,7 +30,7 @@ var checkCmd = &cobra.Command{
 
 var expandCmd = &cobra.Command{
 	Use:               "expand <permission> <object:id>",
-	Short:             "expand a relation on an object",
+	Short:             "expand the structure of a Permission",
 	Args:              cobra.ExactArgs(2),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 	RunE:              expandCmdFunc,
@@ -76,8 +76,8 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		}},
 	}
 
-	if zookie := cobrautil.MustGetString(cmd, "revision"); zookie != "" {
-		request.AtRevision = &api.Zookie{Token: zookie}
+	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
+		request.AtRevision = &api.Zookie{Token: zedToken}
 	}
 
 	resp, err := client.Check(context.Background(), request)
@@ -127,8 +127,8 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 		},
 	}
 
-	if zookie := cobrautil.MustGetString(cmd, "revision"); zookie != "" {
-		request.AtRevision = &api.Zookie{Token: zookie}
+	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
+		request.AtRevision = &api.Zookie{Token: zedToken}
 	}
 
 	resp, err := client.Expand(context.Background(), request)

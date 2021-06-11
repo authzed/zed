@@ -14,12 +14,12 @@ import (
 
 var relationshipCmd = &cobra.Command{
 	Use:   "relationship <subcommand>",
-	Short: "perform CRUD operations on the relationships in a permission system",
+	Short: "perform CRUD operations on the Relationships in a Permissions System",
 }
 
 var createCmd = &cobra.Command{
 	Use:               "create <subject:id> relation <object:id>",
-	Short:             "create a relationship between a user and an object",
+	Short:             "create a Relationship for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 	RunE:              writeRelationshipCmdFunc(api.RelationTupleUpdate_CREATE),
@@ -27,7 +27,7 @@ var createCmd = &cobra.Command{
 
 var touchCmd = &cobra.Command{
 	Use:               "touch <subject:id> relation <object:id>",
-	Short:             "touch a relationship between a user and an object",
+	Short:             "idempotently update a Relationship for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 	RunE:              writeRelationshipCmdFunc(api.RelationTupleUpdate_TOUCH),
@@ -35,7 +35,7 @@ var touchCmd = &cobra.Command{
 
 var deleteCmd = &cobra.Command{
 	Use:               "delete <subject:id> relation <object:id>",
-	Short:             "delete a relationship between a user and an object",
+	Short:             "delete a Relationship",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 	RunE:              writeRelationshipCmdFunc(api.RelationTupleUpdate_DELETE),

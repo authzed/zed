@@ -60,7 +60,7 @@ func main() {
 	}
 
 	rootCmd.PersistentFlags().String("endpoint", "", "authzed gRPC API endpoint")
-	rootCmd.PersistentFlags().String("permissions-system", "", "permission system to query")
+	rootCmd.PersistentFlags().String("permissions-system", "", "permissions system to query")
 	rootCmd.PersistentFlags().String("token", "", "token used to authenticate to authzed")
 	rootCmd.PersistentFlags().Bool("insecure", false, "connect over a plaintext connection")
 	rootCmd.PersistentFlags().Bool("no-verify-ca", false, "do not attempt to verify the server's certificate chain and host name")
@@ -120,7 +120,7 @@ func main() {
 	relationshipCmd.AddCommand(deleteCmd)
 
 	plugins := []struct{ name, description string }{
-		{"testserver", "local testing server"},
+		{"testserver", "run a test server"},
 	}
 	for _, plugin := range plugins {
 		binaryName := fmt.Sprintf("zed-%s", plugin.name)

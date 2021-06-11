@@ -53,9 +53,9 @@ document
 
 ### Relationships
 
-Once a Permissions System has a Schema, it can be populated with Relationships -- think of them like unique rows in a database.
+Once a Permissions System has a Schema that defines Relations for its Objects, it can be populated with Relationships -- think of them like unique rows in a database.
 
-```
+```sh
 $ zed relationship create user:emilia writer document:firstdoc
 CAESAwiLBA==
 
@@ -68,11 +68,11 @@ CAESAwiMBA==
 
 ### Permissions
 
-After there are Relationships within a Schema, you can start performing operations on Permissions.
+After there are Relationships within a Permissions System, you can start performing operations on Permissions.
 
 The `permission check` command determines whether or not the Subject has a Permission on a particular Object.
 
-```
+```sh
 $ zed permission check user:emilia writer document:firstdoc
 true
 
