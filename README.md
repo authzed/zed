@@ -27,7 +27,7 @@ $ brew install --HEAD authzed/tap/zed
 
 In order to interact with a Permissions System, zed first needs an API token.
 zed stores API Tokens in your OS's keychain; all other non-sensitive data is stored in `$XDG_CONFIG_HOME/zed` with a fallback of `$HOME/.zed`.
-The environment variables `$ZED_SYSTEM`, `$ZED_ENDPOINT`, and `$ZED_TOKEN` can be used to override their respective values in the current context.
+The environment variables `$ZED_PERMISSIONS_SYSTEM`, `$ZED_ENDPOINT`, and `$ZED_TOKEN` can be used to override their respective values in the current context.
 
 ```sh
 $ zed token save my_perms_system tu_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef

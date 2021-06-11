@@ -25,7 +25,7 @@ func TokenFromFlags(cmd *cobra.Command) (storage.Token, error) {
 	}
 
 	token = storage.Token{
-		Name:     stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "system"), token.Name),
+		Name:     stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "permissions-system"), token.Name),
 		Endpoint: stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "endpoint"), token.Endpoint),
 		Prefix:   "",
 		Secret:   stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "token"), token.Secret),
@@ -60,7 +60,7 @@ func main() {
 	}
 
 	rootCmd.PersistentFlags().String("endpoint", "", "authzed gRPC API endpoint")
-	rootCmd.PersistentFlags().String("system", "", "permission system to query")
+	rootCmd.PersistentFlags().String("permissions-system", "", "permission system to query")
 	rootCmd.PersistentFlags().String("token", "", "token used to authenticate to authzed")
 	rootCmd.PersistentFlags().Bool("insecure", false, "connect over a plaintext connection")
 	rootCmd.PersistentFlags().Bool("no-verify-ca", false, "do not attempt to verify the server's certificate chain and host name")
