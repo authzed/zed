@@ -54,7 +54,7 @@ func tokenListCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	usingToken, err := storage.CurrentToken(storage.DefaultConfigStore, storage.DefaultTokenStore)
+	cfg, err := storage.DefaultConfigStore.Get()
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func tokenListCmdFunc(cmd *cobra.Command, args []string) error {
 	var rows [][]string
 	for _, token := range tokens {
 		using := ""
-		if token.Name == usingToken.Name {
+		if token.Name == cfg.CurrentToken {
 			using = "true"
 		}
 
