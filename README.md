@@ -23,29 +23,25 @@ $ brew install --HEAD authzed/tap/zed
 
 ## Example Usage
 
-### Logging into a permission system
+### Authenticating with a Permissions System
 
-In order to interact with a permission system, zed first needs an API token.
-Zed stores API Tokens in the system keychain and all other non-sensitive data is stored in `$XDG_CONFIG_HOME/zed` falling back to `~/.zed`.
-
-```
-$ zed token save exampledocs tu_zed_hanazawa_deadbeefdeadbeefdeadbeefdeadbeef
-NAME       	ENDPOINT            	TOKEN
-exampledocs	grpc.authzed.com:443	<redacted>
-
-$ zed token list
-NAME       	ENDPOINT            	TOKEN
-exampledocs	grpc.authzed.com:443	<redacted>
-```
-
-
+In order to interact with a Permissions System, zed first needs an API token.
+zed stores API Tokens in your OS's keychain; all other non-sensitive data is stored in `$XDG_CONFIG_HOME/zed` with a fallback of `$HOME/.zed`.
 The environment variables `$ZED_SYSTEM`, `$ZED_ENDPOINT`, and `$ZED_TOKEN` can be used to override their respective values in the current context.
+
+```sh
+$ zed token save my_perms_system tu_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
+$ zed token use  my_perms_system # `token save` does this, but we'll be explicit
+$ zed token list
+NAME           	ENDPOINT            	TOKEN                      	USING
+my_perms_system	grpc.authzed.com:443	tu_zed_my_laptop_<redacted>	true
+```
 
 ### Schemas
 
-The `schema read` command prints a tree view the object definitions in a permission system.
+The `schema read` command prints a tree view of the Object Definitions in a Permissions System.
 
-```
+```sh
 $ zed schema read document
 document
  ├── writer
@@ -53,23 +49,20 @@ document
       └── union
            ├── _this
            └── TUPLE_OBJECT: writer
-
-$ zed schema read user
-user
 ```
 
 ### Relationships
 
-Once you've got a Schema, you fill them with Relationships -- think of them like unique rows in a database.
+Once a Permissions System has a Schema, it can be populated with Relationships -- think of them like unique rows in a database.
 
 ```
-$ zed relationship create user:jimmy writer document:firstdoc
+$ zed relationship create user:emilia writer document:firstdoc
 CAESAwiLBA==
 
-$ zed relationship delete user:joey writer document:firstdoc
+$ zed relationship delete user:beatrice writer document:firstdoc
 CAESAwiMBA==
 
-$ zed relationship create user:joey reader document:firstdoc
+$ zed relationship create user:beatrice reader document:firstdoc
 CAESAwiMBA==
 ```
 
@@ -77,31 +70,31 @@ CAESAwiMBA==
 
 After there are Relationships within a Schema, you can start performing operations on Permissions.
 
-The `permission check` command determines whether or not an Object has a particular Permission.
+The `permission check` command determines whether or not the Subject has a Permission on a particular Object.
 
 ```
-$ zed permission check user:jimmy writer document:firstdoc
+$ zed permission check user:emilia writer document:firstdoc
 true
 
-$ zed permission check user:jimmy reader document:firstdoc
+$ zed permission check user:emilia reader document:firstdoc
 true
 
-$ zed permission check user:joey reader document:firstdoc
+$ zed permission check user:beatrice reader document:firstdoc
 true
 
-$ zed permission check user:joey writer document:firstdoc
+$ zed permission check user:beatrice writer document:firstdoc
 false
 ```
 
 The `permission expand` command provides a tree view of the expanded structure of a particular Permission.
 
 ```
-$ zed permission expand reader document:firstdoc
-document:firstdoc reader
+$ zed permission expand document:firstdoc reader
+document:firstdoc->reader
  └── union
-      ├── user:joey
-      └── document:firstdoc writer
-           └── user:jimmy
+      ├── user:beatrice
+      └── document:firstdoc->writer
+           └── user:emilia
 ```
 
 ### Misc
