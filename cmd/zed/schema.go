@@ -27,7 +27,6 @@ var schemaCmd = &cobra.Command{
 var schemaReadCmd = &cobra.Command{
 	Use:               "read <object type>",
 	Short:             "read the schema of current permission system",
-	Args:              cobra.ExactArgs(1),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
 	RunE:              schemaReadCmdFunc,
 }
@@ -45,26 +44,27 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	resp, err := client.ReadConfig(context.Background(), &api.ReadConfigRequest{
-		Namespace: stringz.Join("/", token.Name, args[0]),
-	})
-	if err != nil {
-		return err
-	}
-
-	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
-		prettyProto, err := prettyProto(resp)
+	for _, objectType := range args {
+		resp, err := client.ReadConfig(context.Background(), &api.ReadConfigRequest{
+			Namespace: stringz.Join("/", token.Name, objectType),
+		})
 		if err != nil {
 			return err
 		}
 
-		fmt.Println(string(prettyProto))
-		return nil
-	}
+		if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+			prettyProto, err := prettyProto(resp)
+			if err != nil {
+				return err
+			}
 
-	tp := treeprinter.New()
-	printers.NamespaceTree(tp, resp.GetConfig())
-	fmt.Println(tp.String())
+			fmt.Println(string(prettyProto))
+		} else {
+			tp := treeprinter.New()
+			printers.NamespaceTree(tp, resp.GetConfig())
+			fmt.Println(tp.String())
+		}
+	}
 
 	return nil
 }
