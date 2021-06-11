@@ -27,7 +27,8 @@ func TokenFromFlags(cmd *cobra.Command) (storage.Token, error) {
 	token = storage.Token{
 		Name:     stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "system"), token.Name),
 		Endpoint: stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "endpoint"), token.Endpoint),
-		ApiToken: stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "token"), token.ApiToken),
+		Prefix:   "",
+		Secret:   stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "token"), token.Secret),
 	}
 
 	return token, nil

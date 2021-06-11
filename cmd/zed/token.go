@@ -54,16 +54,27 @@ func tokenListCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	usingToken, err := storage.CurrentToken(storage.DefaultConfigStore, storage.DefaultTokenStore)
+	if err != nil {
+		return err
+	}
+
 	var rows [][]string
 	for _, token := range tokens {
+		using := ""
+		if token.Name == usingToken.Name {
+			using = "true"
+		}
+
 		rows = append(rows, []string{
 			token.Name,
 			token.Endpoint,
-			token.ApiToken,
+			stringz.Join("_", token.Prefix, token.Secret),
+			using,
 		})
 	}
 
-	printers.PrintTable(os.Stdout, []string{"name", "endpoint", "token"}, rows)
+	printers.PrintTable(os.Stdout, []string{"name", "endpoint", "token", "using"}, rows)
 
 	return nil
 }
@@ -76,19 +87,10 @@ func tokenSaveCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	endpoint := stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "endpoint"), "grpc.authzed.com:443")
 
-	if err := storage.DefaultTokenStore.Put(storage.Token{
-		Name:     name,
-		Endpoint: endpoint,
-		ApiToken: token,
-	}); err != nil {
+	err = storage.DefaultTokenStore.Put(name, endpoint, token)
+	if err != nil {
 		return err
 	}
-
-	printers.PrintTable(
-		os.Stdout,
-		[]string{"system", "endpoint", "token"},
-		[][]string{{name, endpoint, "<redacted>"}},
-	)
 
 	return storage.SetCurrentToken(name, storage.DefaultConfigStore, storage.DefaultTokenStore)
 }

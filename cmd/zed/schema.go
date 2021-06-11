@@ -40,7 +40,7 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := ClientFromFlags(cmd, token.Endpoint, token.ApiToken)
+	client, err := ClientFromFlags(cmd, token.Endpoint, token.Secret)
 	if err != nil {
 		return err
 	}

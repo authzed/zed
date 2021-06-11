@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/99designs/keyring"
+	"github.com/jzelinskie/stringz"
 	"golang.org/x/term"
 )
 
@@ -15,7 +17,8 @@ var DefaultTokenStore = KeychainTokenStore{}
 type Token struct {
 	Name     string
 	Endpoint string
-	ApiToken string
+	Prefix   string
+	Secret   string
 }
 
 var ErrTokenDoesNotExist = errors.New("token does not exist")
@@ -24,11 +27,12 @@ var ErrMultipleTokens = errors.New("multiple tokens with the same name")
 type TokenStore interface {
 	List(redactTokens bool) ([]Token, error)
 	Get(name string, redactTokens bool) (Token, error)
-	Put(Token) error
+	Put(name, endpoint, secret string) error
 	Delete(name string) error
 }
 
 const keychainSvcName = "zed tokens"
+const redactedMessage = "<redacted>"
 
 type KeychainTokenStore struct{}
 
@@ -59,6 +63,22 @@ func openKeyring() (keyring.Keyring, error) {
 	})
 }
 
+func encodeLabel(prefix, endpoint string) string {
+	return stringz.Join("@", prefix, endpoint)
+}
+
+func decodeLabel(label string) (prefix, endpoint string) {
+	if err := stringz.SplitExact(label, "@", &prefix, &endpoint); err != nil {
+		return "", label
+	}
+	return prefix, endpoint
+}
+
+func splitAPIToken(token string) (prefix, secret string) {
+	exploded := strings.Split(token, "_")
+	return strings.Join(exploded[:len(exploded)-1], "_"), exploded[len(exploded)-1]
+}
+
 func (ks KeychainTokenStore) List(redactTokens bool) ([]Token, error) {
 	ring, err := openKeyring()
 	if err != nil {
@@ -77,15 +97,17 @@ func (ks KeychainTokenStore) List(redactTokens bool) ([]Token, error) {
 			return nil, err
 		}
 
-		token := "<redacted>"
+		prefix, endpoint := decodeLabel(item.Label)
+		secret := redactedMessage
 		if !redactTokens {
-			token = string(item.Data)
+			secret = string(item.Data)
 		}
 
 		tokens = append(tokens, Token{
 			Name:     item.Key,
-			Endpoint: item.Label,
-			ApiToken: token,
+			Endpoint: endpoint,
+			Prefix:   prefix,
+			Secret:   secret,
 		})
 	}
 
@@ -106,30 +128,33 @@ func (ks KeychainTokenStore) Get(name string, redactTokens bool) (Token, error) 
 		return Token{}, err
 	}
 
-	token := "<redacted>"
+	prefix, endpoint := decodeLabel(item.Label)
+	token := redactedMessage
 	if !redactTokens {
 		token = string(item.Data)
 	}
 
 	return Token{
 		Name:     item.Key,
-		Endpoint: item.Label,
-		ApiToken: token,
+		Endpoint: endpoint,
+		Prefix:   prefix,
+		Secret:   token,
 	}, nil
 }
 
-func (ks KeychainTokenStore) Put(t Token) error {
+func (ks KeychainTokenStore) Put(name, endpoint, secret string) error {
+	prefix, secret := splitAPIToken(secret)
+
 	ring, err := openKeyring()
 	if err != nil {
 		return err
 	}
 
-	err = ring.Set(keyring.Item{
-		Key:   t.Name,
-		Data:  []byte(t.ApiToken),
-		Label: t.Endpoint,
+	return ring.Set(keyring.Item{
+		Key:   name,
+		Data:  []byte(secret),
+		Label: encodeLabel(prefix, endpoint),
 	})
-	return err
 }
 
 func (ks KeychainTokenStore) Delete(name string) error {

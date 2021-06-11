@@ -62,7 +62,7 @@ func writeRelationshipCmdFunc(operation api.RelationTupleUpdate_Operation) func(
 			return err
 		}
 
-		client, err := ClientFromFlags(cmd, token.Endpoint, token.ApiToken)
+		client, err := ClientFromFlags(cmd, token.Endpoint, token.Secret)
 		if err != nil {
 			return err
 		}
