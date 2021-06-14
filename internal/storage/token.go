@@ -13,12 +13,19 @@ import (
 )
 
 var (
+	// DefaultTokenStore is the TokenStore that should be used unless otherwise
+	// specified.
 	DefaultTokenStore = KeychainTokenStore{}
 
-	ErrTokenDoesNotExist = errors.New("token does not exist")
-	ErrMultipleTokens    = errors.New("multiple tokens with the same name")
+	// ErrTokenNotFound is returned if there is no Config in a ConfigStore.
+	ErrTokenNotFound = errors.New("token does not exist")
+
+	// ErrMultipleTokens is returned if there are multiple tokens with the same
+	// name.
+	ErrMultipleTokens = errors.New("multiple tokens with the same name")
 )
 
+// Token represents an API Token and all of its metadata.
 type Token struct {
 	Name     string
 	Endpoint string
@@ -26,6 +33,7 @@ type Token struct {
 	Secret   string
 }
 
+// TokenStore is anything that can securely persist Tokens.
 type TokenStore interface {
 	List(revealTokens bool) ([]Token, error)
 	Get(name string, revealTokens bool) (Token, error)
@@ -39,6 +47,8 @@ const (
 	redactedMessage = "<redacted>"
 )
 
+// KeychainTokenStore implements TokenStore by using the OS keychain service,
+// falling back to an encrypted JWT on disk if the OS has no keychain.
 type KeychainTokenStore struct{}
 
 var _ TokenStore = KeychainTokenStore{}
@@ -128,7 +138,7 @@ func (ks KeychainTokenStore) Get(name string, revealTokens bool) (Token, error) 
 	item, err := ring.Get(name)
 	if err != nil {
 		if err == keyring.ErrKeyNotFound {
-			return Token{}, ErrTokenDoesNotExist
+			return Token{}, ErrTokenNotFound
 		}
 		return Token{}, err
 	}
