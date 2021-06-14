@@ -54,6 +54,7 @@ document
 ### Relationships
 
 Once a Permissions System has a Schema that defines Relations for its Objects, it can be populated with Relationships -- think of them like unique rows in a database.
+Relationship updates always yield a new Zed Token, which can be optionally provided to improve performance on Permissions operations.
 
 ```sh
 $ zed relationship create user:emilia writer document:firstdoc

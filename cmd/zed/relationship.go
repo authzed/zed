@@ -18,7 +18,7 @@ var relationshipCmd = &cobra.Command{
 }
 
 var createCmd = &cobra.Command{
-	Use:               "create <subject:id> relation <object:id>",
+	Use:               "create <subject:id> <relation> <object:id>",
 	Short:             "create a Relationship for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
@@ -26,7 +26,7 @@ var createCmd = &cobra.Command{
 }
 
 var touchCmd = &cobra.Command{
-	Use:               "touch <subject:id> relation <object:id>",
+	Use:               "touch <subject:id> <relation> <object:id>",
 	Short:             "idempotently update a Relationship for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
@@ -34,7 +34,7 @@ var touchCmd = &cobra.Command{
 }
 
 var deleteCmd = &cobra.Command{
-	Use:               "delete <subject:id> relation <object:id>",
+	Use:               "delete <subject:id> <relation> <object:id>",
 	Short:             "delete a Relationship",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
@@ -43,8 +43,7 @@ var deleteCmd = &cobra.Command{
 
 func writeRelationshipCmdFunc(operation api.RelationTupleUpdate_Operation) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		var userNS, userID string
-		err := stringz.SplitExact(args[0], ":", &userNS, &userID)
+		userNS, userID, userRel, err := parseUser(args[0])
 		if err != nil {
 			return err
 		}
@@ -78,7 +77,7 @@ func writeRelationshipCmdFunc(operation api.RelationTupleUpdate_Operation) func(
 				User: &api.User{UserOneof: &api.User_Userset{Userset: &api.ObjectAndRelation{
 					Namespace: stringz.Join("/", token.Name, userNS),
 					ObjectId:  userID,
-					Relation:  "...",
+					Relation:  userRel,
 				}}},
 			},
 		}}}

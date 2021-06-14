@@ -36,9 +36,21 @@ var expandCmd = &cobra.Command{
 	RunE:              expandCmdFunc,
 }
 
+func parseUser(s string) (namespace, id, relation string, err error) {
+	err = stringz.SplitExact(s, ":", &namespace, &id)
+	if err != nil {
+		return
+	}
+	err = stringz.SplitExact(id, "#", &id, &relation)
+	if err != nil {
+		relation = "..."
+		err = nil
+	}
+	return
+}
+
 func checkCmdFunc(cmd *cobra.Command, args []string) error {
-	var userNS, userID string
-	err := stringz.SplitExact(args[0], ":", &userNS, &userID)
+	userNS, userID, userRel, err := parseUser(args[0])
 	if err != nil {
 		return err
 	}
@@ -71,7 +83,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 			Userset: &api.ObjectAndRelation{
 				Namespace: stringz.Join("/", token.Name, userNS),
 				ObjectId:  userID,
-				Relation:  "...",
+				Relation:  userRel,
 			},
 		}},
 	}
@@ -79,6 +91,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
 		request.AtRevision = &api.Zookie{Token: zedToken}
 	}
+	fmt.Println(request)
 
 	resp, err := client.Check(context.Background(), request)
 	if err != nil {
