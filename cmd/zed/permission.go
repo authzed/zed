@@ -36,7 +36,7 @@ var expandCmd = &cobra.Command{
 	RunE:              expandCmdFunc,
 }
 
-func parseUser(s string) (namespace, id, relation string, err error) {
+func parseSubject(s string) (namespace, id, relation string, err error) {
 	err = stringz.SplitExact(s, ":", &namespace, &id)
 	if err != nil {
 		return
@@ -50,7 +50,7 @@ func parseUser(s string) (namespace, id, relation string, err error) {
 }
 
 func checkCmdFunc(cmd *cobra.Command, args []string) error {
-	userNS, userID, userRel, err := parseUser(args[0])
+	subjectNS, subjectID, subjectRel, err := parseSubject(args[0])
 	if err != nil {
 		return err
 	}
@@ -81,9 +81,9 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		},
 		User: &api.User{UserOneof: &api.User_Userset{
 			Userset: &api.ObjectAndRelation{
-				Namespace: stringz.Join("/", token.Name, userNS),
-				ObjectId:  userID,
-				Relation:  userRel,
+				Namespace: stringz.Join("/", token.Name, subjectNS),
+				ObjectId:  subjectID,
+				Relation:  subjectRel,
 			},
 		}},
 	}

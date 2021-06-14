@@ -43,7 +43,7 @@ var deleteCmd = &cobra.Command{
 
 func writeRelationshipCmdFunc(operation api.RelationTupleUpdate_Operation) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		userNS, userID, userRel, err := parseUser(args[0])
+		subjectNS, subjectID, subjectRel, err := parseSubject(args[0])
 		if err != nil {
 			return err
 		}
@@ -75,9 +75,9 @@ func writeRelationshipCmdFunc(operation api.RelationTupleUpdate_Operation) func(
 					Relation:  relation,
 				},
 				User: &api.User{UserOneof: &api.User_Userset{Userset: &api.ObjectAndRelation{
-					Namespace: stringz.Join("/", token.Name, userNS),
-					ObjectId:  userID,
-					Relation:  userRel,
+					Namespace: stringz.Join("/", token.Name, subjectNS),
+					ObjectId:  subjectID,
+					Relation:  subjectRel,
 				}}},
 			},
 		}}}
