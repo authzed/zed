@@ -33,8 +33,8 @@ The environment variables `$ZED_PERMISSIONS_SYSTEM`, `$ZED_ENDPOINT`, and `$ZED_
 $ zed token save my_perms_system tu_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
 $ zed token use  my_perms_system # `token save` does this, but we'll be explicit
 $ zed token list
-NAME           	ENDPOINT            	TOKEN                      	USING
-my_perms_system	grpc.authzed.com:443	tu_zed_my_laptop_<redacted>	true
+USING	NAME           	ENDPOINT            	TOKEN
+true 	my_perms_system	grpc.authzed.com:443	tu_zed_my_laptop_<redacted>
 ```
 
 ### Schemas

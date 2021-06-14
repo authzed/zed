@@ -12,7 +12,12 @@ import (
 	"golang.org/x/term"
 )
 
-var DefaultTokenStore = KeychainTokenStore{}
+var (
+	DefaultTokenStore = KeychainTokenStore{}
+
+	ErrTokenDoesNotExist = errors.New("token does not exist")
+	ErrMultipleTokens    = errors.New("multiple tokens with the same name")
+)
 
 type Token struct {
 	Name     string
@@ -21,18 +26,18 @@ type Token struct {
 	Secret   string
 }
 
-var ErrTokenDoesNotExist = errors.New("token does not exist")
-var ErrMultipleTokens = errors.New("multiple tokens with the same name")
-
 type TokenStore interface {
-	List(redactTokens bool) ([]Token, error)
-	Get(name string, redactTokens bool) (Token, error)
+	List(revealTokens bool) ([]Token, error)
+	Get(name string, revealTokens bool) (Token, error)
 	Put(name, endpoint, secret string) error
 	Delete(name string) error
 }
 
-const keychainSvcName = "zed tokens"
-const redactedMessage = "<redacted>"
+const (
+	keychainSvcName = "zed tokens"
+	keyringFilename = "keyring.jwt"
+	redactedMessage = "<redacted>"
+)
 
 type KeychainTokenStore struct{}
 
@@ -46,7 +51,7 @@ func openKeyring() (keyring.Keyring, error) {
 
 	return keyring.Open(keyring.Config{
 		ServiceName: keychainSvcName,
-		FileDir:     filepath.Join(path, "keyring"),
+		FileDir:     filepath.Join(path, keyringFilename),
 		FilePasswordFunc: func(prompt string) (string, error) {
 			if password, ok := os.LookupEnv("ZED_KEYRING_PASSWORD"); ok {
 				return password, nil
@@ -79,7 +84,7 @@ func splitAPIToken(token string) (prefix, secret string) {
 	return strings.Join(exploded[:len(exploded)-1], "_"), exploded[len(exploded)-1]
 }
 
-func (ks KeychainTokenStore) List(redactTokens bool) ([]Token, error) {
+func (ks KeychainTokenStore) List(revealTokens bool) ([]Token, error) {
 	ring, err := openKeyring()
 	if err != nil {
 		return nil, err
@@ -99,7 +104,7 @@ func (ks KeychainTokenStore) List(redactTokens bool) ([]Token, error) {
 
 		prefix, endpoint := decodeLabel(item.Label)
 		secret := redactedMessage
-		if !redactTokens {
+		if revealTokens {
 			secret = string(item.Data)
 		}
 
@@ -114,7 +119,7 @@ func (ks KeychainTokenStore) List(redactTokens bool) ([]Token, error) {
 	return tokens, nil
 }
 
-func (ks KeychainTokenStore) Get(name string, redactTokens bool) (Token, error) {
+func (ks KeychainTokenStore) Get(name string, revealTokens bool) (Token, error) {
 	ring, err := openKeyring()
 	if err != nil {
 		return Token{}, err
@@ -130,7 +135,7 @@ func (ks KeychainTokenStore) Get(name string, redactTokens bool) (Token, error) 
 
 	prefix, endpoint := decodeLabel(item.Label)
 	token := redactedMessage
-	if !redactTokens {
+	if revealTokens {
 		token = string(item.Data)
 	}
 

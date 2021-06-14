@@ -49,7 +49,7 @@ var tokenUseCmd = &cobra.Command{
 }
 
 func tokenListCmdFunc(cmd *cobra.Command, args []string) error {
-	tokens, err := storage.DefaultTokenStore.List(!cobrautil.MustGetBool(cmd, "reveal-tokens"))
+	tokens, err := storage.DefaultTokenStore.List(cobrautil.MustGetBool(cmd, "reveal-tokens"))
 	if err != nil {
 		return err
 	}
@@ -67,14 +67,14 @@ func tokenListCmdFunc(cmd *cobra.Command, args []string) error {
 		}
 
 		rows = append(rows, []string{
+			using,
 			token.Name,
 			token.Endpoint,
 			stringz.Join("_", token.Prefix, token.Secret),
-			using,
 		})
 	}
 
-	printers.PrintTable(os.Stdout, []string{"name", "endpoint", "token", "using"}, rows)
+	printers.PrintTable(os.Stdout, []string{"using", "name", "endpoint", "token"}, rows)
 
 	return nil
 }
