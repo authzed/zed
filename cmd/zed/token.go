@@ -63,7 +63,7 @@ func tokenListCmdFunc(cmd *cobra.Command, args []string) error {
 	for _, token := range tokens {
 		using := ""
 		if token.System == cfg.CurrentToken {
-			using = "true"
+			using = "  ✓  "
 		}
 
 		rows = append(rows, []string{
