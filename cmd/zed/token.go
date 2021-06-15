@@ -62,19 +62,19 @@ func tokenListCmdFunc(cmd *cobra.Command, args []string) error {
 	var rows [][]string
 	for _, token := range tokens {
 		using := ""
-		if token.Name == cfg.CurrentToken {
+		if token.System == cfg.CurrentToken {
 			using = "true"
 		}
 
 		rows = append(rows, []string{
 			using,
-			token.Name,
+			token.System,
 			token.Endpoint,
 			stringz.Join("_", token.Prefix, token.Secret),
 		})
 	}
 
-	printers.PrintTable(os.Stdout, []string{"using", "name", "endpoint", "token"}, rows)
+	printers.PrintTable(os.Stdout, []string{"using", "permissions system", "endpoint", "token"}, rows)
 
 	return nil
 }

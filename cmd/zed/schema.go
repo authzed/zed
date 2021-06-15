@@ -46,7 +46,7 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 
 	for _, objectType := range args {
 		resp, err := client.ReadConfig(context.Background(), &api.ReadConfigRequest{
-			Namespace: stringz.Join("/", token.Name, objectType),
+			Namespace: stringz.Join("/", token.System, objectType),
 		})
 		if err != nil {
 			return err

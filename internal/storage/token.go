@@ -27,7 +27,7 @@ var (
 
 // Token represents an API Token and all of its metadata.
 type Token struct {
-	Name     string
+	System   string
 	Endpoint string
 	Prefix   string
 	Secret   string
@@ -36,9 +36,9 @@ type Token struct {
 // TokenStore is anything that can securely persist Tokens.
 type TokenStore interface {
 	List(revealTokens bool) ([]Token, error)
-	Get(name string, revealTokens bool) (Token, error)
-	Put(name, endpoint, secret string) error
-	Delete(name string) error
+	Get(system string, revealTokens bool) (Token, error)
+	Put(system, endpoint, secret string) error
+	Delete(system string) error
 }
 
 const (
@@ -119,7 +119,7 @@ func (ks KeychainTokenStore) List(revealTokens bool) ([]Token, error) {
 		}
 
 		tokens = append(tokens, Token{
-			Name:     item.Key,
+			System:   item.Key,
 			Endpoint: endpoint,
 			Prefix:   prefix,
 			Secret:   secret,
@@ -129,13 +129,13 @@ func (ks KeychainTokenStore) List(revealTokens bool) ([]Token, error) {
 	return tokens, nil
 }
 
-func (ks KeychainTokenStore) Get(name string, revealTokens bool) (Token, error) {
+func (ks KeychainTokenStore) Get(system string, revealTokens bool) (Token, error) {
 	ring, err := openKeyring()
 	if err != nil {
 		return Token{}, err
 	}
 
-	item, err := ring.Get(name)
+	item, err := ring.Get(system)
 	if err != nil {
 		if err == keyring.ErrKeyNotFound {
 			return Token{}, ErrTokenNotFound
@@ -150,14 +150,14 @@ func (ks KeychainTokenStore) Get(name string, revealTokens bool) (Token, error) 
 	}
 
 	return Token{
-		Name:     item.Key,
+		System:   item.Key,
 		Endpoint: endpoint,
 		Prefix:   prefix,
 		Secret:   token,
 	}, nil
 }
 
-func (ks KeychainTokenStore) Put(name, endpoint, secret string) error {
+func (ks KeychainTokenStore) Put(system, endpoint, secret string) error {
 	prefix, secret := splitAPIToken(secret)
 
 	ring, err := openKeyring()
@@ -166,17 +166,17 @@ func (ks KeychainTokenStore) Put(name, endpoint, secret string) error {
 	}
 
 	return ring.Set(keyring.Item{
-		Key:   name,
+		Key:   system,
 		Data:  []byte(secret),
 		Label: encodeLabel(prefix, endpoint),
 	})
 }
 
-func (ks KeychainTokenStore) Delete(name string) error {
+func (ks KeychainTokenStore) Delete(system string) error {
 	ring, err := openKeyring()
 	if err != nil {
 		return err
 	}
 
-	return ring.Remove(name)
+	return ring.Remove(system)
 }

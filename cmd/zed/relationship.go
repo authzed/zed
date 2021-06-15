@@ -70,12 +70,12 @@ func writeRelationshipCmdFunc(operation api.RelationTupleUpdate_Operation) func(
 			Operation: operation,
 			Tuple: &api.RelationTuple{
 				ObjectAndRelation: &api.ObjectAndRelation{
-					Namespace: stringz.Join("/", token.Name, objectNS),
+					Namespace: stringz.Join("/", token.System, objectNS),
 					ObjectId:  objectID,
 					Relation:  relation,
 				},
 				User: &api.User{UserOneof: &api.User_Userset{Userset: &api.ObjectAndRelation{
-					Namespace: stringz.Join("/", token.Name, subjectNS),
+					Namespace: stringz.Join("/", token.System, subjectNS),
 					ObjectId:  subjectID,
 					Relation:  subjectRel,
 				}}},

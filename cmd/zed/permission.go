@@ -75,13 +75,13 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 
 	request := &api.CheckRequest{
 		TestUserset: &api.ObjectAndRelation{
-			Namespace: stringz.Join("/", token.Name, objectNS),
+			Namespace: stringz.Join("/", token.System, objectNS),
 			ObjectId:  objectID,
 			Relation:  relation,
 		},
 		User: &api.User{UserOneof: &api.User_Userset{
 			Userset: &api.ObjectAndRelation{
-				Namespace: stringz.Join("/", token.Name, subjectNS),
+				Namespace: stringz.Join("/", token.System, subjectNS),
 				ObjectId:  subjectID,
 				Relation:  subjectRel,
 			},
@@ -134,7 +134,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 
 	request := &api.ExpandRequest{
 		Userset: &api.ObjectAndRelation{
-			Namespace: stringz.Join("/", token.Name, objectNS),
+			Namespace: stringz.Join("/", token.System, objectNS),
 			ObjectId:  objectID,
 			Relation:  relation,
 		},
