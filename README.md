@@ -39,7 +39,7 @@ USING	PERMISSIONS SYSTEM	ENDPOINT            	TOKEN
 
 ### Schemas
 
-The `schema read` command prints a tree view of the Object Definitions in a Permissions System.
+The `schema read` command prints a tree view of the Object Definitions in a Permissions System's Schema.
 
 ```sh
 $ zed schema read document
@@ -53,7 +53,7 @@ document
 
 ### Relationships
 
-Once a Permissions System has a Schema that defines Relations for its Objects, it can be populated with Relationships -- think of them like unique rows in a database.
+Once a Permissions System has a Schema that defines Relations and Permissions for its Objects, it can be populated with Relationships -- think of them like unique rows in a database.
 Relationship updates always yield a new Zed Token, which can be optionally provided to improve performance on Permissions operations.
 
 ```sh
