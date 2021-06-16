@@ -27,14 +27,15 @@ func registerSchemaCmd(rootCmd *cobra.Command) {
 }
 
 var schemaCmd = &cobra.Command{
-	Use:   "schema <subcommand>",
-	Short: "read and write to a Schema for a Permissions System",
+	Use:               "schema <subcommand>",
+	Short:             "read and write to a Schema for a Permissions System",
+	PersistentPreRunE: persistentPreRunE,
 }
 
 var schemaReadCmd = &cobra.Command{
 	Use:               "read <object type>",
 	Short:             "read the Schema of current Permissions System",
-	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+	PersistentPreRunE: persistentPreRunE,
 	RunE:              schemaReadCmdFunc,
 }
 

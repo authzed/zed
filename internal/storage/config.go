@@ -41,7 +41,7 @@ func CurrentToken(cs ConfigStore, ts TokenStore) (Token, error) {
 		return Token{}, err
 	}
 
-	return ts.Get(cfg.CurrentToken, false)
+	return ts.Get(cfg.CurrentToken, true)
 }
 
 // SetCurrentToken is a convenient way to set the CurrentToken field in a

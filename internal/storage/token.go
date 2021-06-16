@@ -9,6 +9,7 @@ import (
 
 	"github.com/99designs/keyring"
 	"github.com/jzelinskie/stringz"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/term"
 )
 
@@ -84,9 +85,9 @@ func encodeLabel(prefix, endpoint string) string {
 
 func decodeLabel(label string) (prefix, endpoint string) {
 	if err := stringz.SplitExact(label, "@", &prefix, &endpoint); err != nil {
-		return "", label
+		endpoint = label
 	}
-	return prefix, endpoint
+	return
 }
 
 func splitAPIToken(token string) (prefix, secret string) {
@@ -142,6 +143,7 @@ func (ks KeychainTokenStore) Get(system string, revealTokens bool) (Token, error
 		}
 		return Token{}, err
 	}
+	log.Trace().Interface("keychain item", item).Send()
 
 	prefix, endpoint := decodeLabel(item.Label)
 	token := redactedMessage

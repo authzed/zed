@@ -9,6 +9,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
@@ -28,15 +29,16 @@ func registerPermissionCmd(rootCmd *cobra.Command) {
 }
 
 var permissionCmd = &cobra.Command{
-	Use:   "permission <subcommand>",
-	Short: "perform queries on the Permissions in a Permissions System",
+	Use:               "permission <subcommand>",
+	Short:             "perform queries on the Permissions in a Permissions System",
+	PersistentPreRunE: persistentPreRunE,
 }
 
 var checkCmd = &cobra.Command{
 	Use:               "check <subject:id> <permission> <object:id>",
 	Short:             "check that a Permission exists for a Subject",
 	Args:              cobra.ExactArgs(3),
-	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+	PersistentPreRunE: persistentPreRunE,
 	RunE:              checkCmdFunc,
 }
 
@@ -44,7 +46,7 @@ var expandCmd = &cobra.Command{
 	Use:               "expand <permission> <object:id>",
 	Short:             "expand the structure of a Permission",
 	Args:              cobra.ExactArgs(2),
-	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+	PersistentPreRunE: persistentPreRunE,
 	RunE:              expandCmdFunc,
 }
 
@@ -103,7 +105,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
 		request.AtRevision = &api.Zookie{Token: zedToken}
 	}
-	fmt.Println(request)
+	log.Trace().Interface("request", request).Send()
 
 	resp, err := client.Check(context.Background(), request)
 	if err != nil {
@@ -155,6 +157,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
 		request.AtRevision = &api.Zookie{Token: zedToken}
 	}
+	log.Trace().Interface("request", request).Send()
 
 	resp, err := client.Expand(context.Background(), request)
 	if err != nil {
