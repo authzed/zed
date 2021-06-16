@@ -39,7 +39,7 @@ USING	PERMISSIONS SYSTEM	ENDPOINT            	TOKEN
 
 ### Schemas
 
-The `schema read` command prints a tree view of the Object Definitions in a Permissions System's Schema.
+The `schema read` command prints a tree view of the specified Object Definition(s) in a Permissions System's Schema.
 
 ```sh
 $ zed schema read document
