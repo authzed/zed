@@ -18,17 +18,19 @@ func prettyUser(user *api.User) string {
 		)
 	}
 	return fmt.Sprintf(
-		"%s:%s %s",
+		"%s:%s->%s",
 		stringz.TrimPrefixIndex(userset.Namespace, "/"),
 		userset.ObjectId,
 		userset.Relation,
 	)
 }
 
+// TreeNodeTree walks an Authzed Tree Node and creates corresponding nodes
+// for a treeprinter.
 func TreeNodeTree(tp treeprinter.Node, treeNode *api.RelationTupleTreeNode) {
 	if treeNode.Expanded != nil {
 		tp = tp.Child(fmt.Sprintf(
-			"%s:%s %s",
+			"%s:%s->%s",
 			stringz.TrimPrefixIndex(treeNode.Expanded.Namespace, "/"),
 			treeNode.Expanded.ObjectId,
 			treeNode.Expanded.Relation,
@@ -64,30 +66,32 @@ func TreeNodeTree(tp treeprinter.Node, treeNode *api.RelationTupleTreeNode) {
 	}
 }
 
+// TreeNodeTree walks an Authzed Namespace and creates corresponding nodes for
+// a treeprinter.
 func NamespaceTree(tp treeprinter.Node, nsdef *api.NamespaceDefinition) {
 	root := tp.Child(stringz.TrimPrefixIndex(nsdef.GetName(), "/"))
 	for _, relation := range nsdef.GetRelation() {
 		relNode := root.Child(relation.GetName())
 		if rewrite := relation.GetUsersetRewrite(); rewrite != nil {
-			UsersetRewriteTree(relNode, rewrite)
+			usersetRewriteTree(relNode, rewrite)
 		}
 	}
 }
 
-func SetOperationChildTree(tp treeprinter.Node, child *api.SetOperation_Child) {
+func setOperationChildTree(tp treeprinter.Node, child *api.SetOperation_Child) {
 	switch child.ChildType.(type) {
 	case *api.SetOperation_Child_XThis:
 		tp.Child("_this")
 	case *api.SetOperation_Child_ComputedUserset:
-		ComputedUsersetTree(tp, child.GetComputedUserset())
+		computedUsersetTree(tp, child.GetComputedUserset())
 	case *api.SetOperation_Child_TupleToUserset:
-		TupleToUsersetTree(tp, child.GetTupleToUserset())
+		tupleToUsersetTree(tp, child.GetTupleToUserset())
 	case *api.SetOperation_Child_UsersetRewrite:
-		UsersetRewriteTree(tp, child.GetUsersetRewrite())
+		usersetRewriteTree(tp, child.GetUsersetRewrite())
 	}
 }
 
-func ComputedUsersetTree(tp treeprinter.Node, userset *api.ComputedUserset) {
+func computedUsersetTree(tp treeprinter.Node, userset *api.ComputedUserset) {
 	obj := userset.GetObject()
 	switch obj {
 	case api.ComputedUserset_TUPLE_OBJECT:
@@ -97,27 +101,27 @@ func ComputedUsersetTree(tp treeprinter.Node, userset *api.ComputedUserset) {
 	}
 }
 
-func TupleToUsersetTree(tp treeprinter.Node, t2u *api.TupleToUserset) {
+func tupleToUsersetTree(tp treeprinter.Node, t2u *api.TupleToUserset) {
 	relNode := tp.Child(t2u.GetTupleset().GetRelation())
-	ComputedUsersetTree(relNode, t2u.GetComputedUserset())
+	computedUsersetTree(relNode, t2u.GetComputedUserset())
 }
 
-func UsersetRewriteTree(tp treeprinter.Node, rewrite *api.UsersetRewrite) {
+func usersetRewriteTree(tp treeprinter.Node, rewrite *api.UsersetRewrite) {
 	switch rewrite.GetRewriteOperation().(type) {
 	case *api.UsersetRewrite_Union:
 		childNode := tp.Child("union")
 		for _, child := range rewrite.GetUnion().GetChild() {
-			SetOperationChildTree(childNode, child)
+			setOperationChildTree(childNode, child)
 		}
 	case *api.UsersetRewrite_Intersection:
 		childNode := tp.Child("intersection")
 		for _, child := range rewrite.GetIntersection().GetChild() {
-			SetOperationChildTree(childNode, child)
+			setOperationChildTree(childNode, child)
 		}
 	case *api.UsersetRewrite_Exclusion:
 		childNode := tp.Child("exclusion")
 		for _, child := range rewrite.GetExclusion().GetChild() {
-			SetOperationChildTree(childNode, child)
+			setOperationChildTree(childNode, child)
 		}
 	}
 }

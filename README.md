@@ -1,14 +1,11 @@
 # zed
 
-<!-- Uncomment when we setup CI
-[![Build Status](https://github.com/authzed/zed/workflows/CI/badge.svg)](https://github.com/authzed/zed/actions)
-[![Docker Repository on Quay.io](https://quay.io/repository/authzed/zed/status "Docker Repository on Quay.io")](https://quay.io/repository/authzed/zed)
--->
-[![Go Report Card](https://goreportcard.com/badge/github.com/authzed/zed)](https://goreportcard.com/report/github.com/authzed/zed)
 [![GoDoc](https://godoc.org/github.com/authzed/zed?status.svg)](https://godoc.org/github.com/authzed/zed)
-![Lines of Code](https://tokei.rs/b1/github/authzed/zed)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
-[![IRC Channel](https://img.shields.io/badge/freenode-%23authzed-blue.svg "IRC Channel")](http://webchat.freenode.net/?channels=authzed)
+![Lines of Code](https://tokei.rs/b1/github/authzed/zed)
+[![Discord Server](https://img.shields.io/discord/844600078504951838?color=7289da&logo=discord "Discord Server")](https://discord.gg/jTysUaxXzM)
+[![Build Status](https://github.com/authzed/zed/workflows/build/badge.svg)](https://github.com/authzed/zed/actions)
+[![Docker Repository on Quay.io](https://quay.io/repository/authzed/zed/status "Docker Repository on Quay.io")](https://quay.io/repository/authzed/zed)
 
 A client for managing [authzed] or any API-compatible system from your command line.
 
@@ -26,45 +23,28 @@ $ brew install --HEAD authzed/tap/zed
 
 ## Example Usage
 
-### Managing credentials
+### Authenticating with a Permissions System
 
-Configuring credentials is similar to [kubeconfig] in [kubectl].
+In order to interact with a Permissions System, zed first needs a context: a permissions system and API token.
+zed stores API Tokens in your OS's keychain; all other non-sensitive data is stored in `$XDG_CONFIG_HOME/zed` with a fallback of `$HOME/.zed`.
+The `zed context` command has operations for setting the current, creating, listing, deleting contexts.
+`zed login` and `zed use` are aliases that make the most common commands more convenient.
 
-[kubeconfig]: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-[kubectl]: https://kubernetes.io/docs/reference/kubectl/overview/
+The environment variables `$ZED_PERMISSIONS_SYSTEM`, `$ZED_ENDPOINT`, and `$ZED_TOKEN` can be used to override their respective values in the current context.
 
-API Tokens are stored in the system keychain.
-
-```
-$ zed config set-token jimmy@authzed.com tu_zed_hanazawa_deadbeefdeadbeefdeadbeefdeadbeef
-NAME             	ENDPOINT            	TOKEN
-jimmy@authzed.com	grpc.authzed.com:443	<redacted>
-
-$ zed config get-tokens
-NAME             	ENDPOINT            	TOKEN
-jimmy@authzed.com	grpc.authzed.com:443	<redacted>
+```sh
+$ zed login my_perms_system tc_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
+$ zed context list
+CURRENT	PERMISSIONS SYSTEM	ENDPOINT            	TOKEN
+   ✓   	my_perms_system   	grpc.authzed.com:443	tc_zed_my_laptop_<redacted>
 ```
 
-Context data is stored in `$XDG_CONFIG_HOME/zed` falling back to `~/.zed` if that environment variable is not set.
+### Schemas
 
-```
-$ zed config set-context rbac rbac_example jimmy@authzed.com
-NAME	TENANT      	TOKEN NAME       	ENDPOINT            	CURRENT
-rbac	rbac_example	jimmy@authzed.com	grpc.authzed.com:443
+The `schema read` command prints a tree view of the specified Object Definition(s) in a Permissions System's Schema.
 
-$ zed config use-context rbac
-NAME	TENANT      	TOKEN NAME       	ENDPOINT            	CURRENT
-rbac	rbac_example	jimmy@authzed.com	grpc.authzed.com:443	true
-```
-
-The environment variables `$ZED_TENANT`, `$ZED_TOKEN`, and `$ZED_ENDPOINT` can be used to override their respective values in the current context.
-
-### Explore relationships
-
-The `describe` command provides a tree view of a namespace definition.
-
-```
-$ zed describe document
+```sh
+$ zed schema read document
 document
  ├── writer
  └── reader
@@ -73,45 +53,58 @@ document
            └── TUPLE_OBJECT: writer
 ```
 
-The `expand` command provides a tree view of a relation of a particular object.
+### Relationships
 
-```
-$ zed expand document:firstdoc reader
-document:firstdoc reader
- └── union
-      ├── user:fred
-      └── document:firstdoc writer
-           └── user:tom
-```
+Once a Permissions System has a Schema that defines Relations and Permissions for its Objects, it can be populated with Relationships -- think of them like unique rows in a database.
+Relationship updates always yield a new Zed Token, which can be optionally provided to improve performance on Permissions operations.
 
-When piped or provided the `--json` flag, API responses are converted into JSON.
-
-```
-$ zed describe document | jq '.config.relation[0].name'
-"writer"
-```
-
-### Modify relationships
-
-```
-$ zed check user:jimmy document:firstdoc reader
-false
-
-$ zed create user:jimmy document:firstdoc writer
+```sh
+$ zed relationship create user:emilia writer document:firstdoc
 CAESAwiLBA==
 
-$ zed check user:jimmy document:firstdoc writer
-true
-
-$ zed check user:jimmy document:firstdoc reader
-true
-
-$ zed delete user:jimmy document:firstdoc writer
+$ zed relationship delete user:beatrice writer document:firstdoc
 CAESAwiMBA==
 
-$ zed check user:jimmy document:firstdoc reader
-false
+$ zed relationship create user:beatrice reader document:firstdoc
+CAESAwiMBA==
+```
 
-$ zed check user:jimmy document:firstdoc writer
+### Permissions
+
+After there are Relationships within a Permissions System, you can start performing operations on Permissions.
+
+The `permission check` command determines whether or not the Subject has a Permission on a particular Object.
+
+```sh
+$ zed permission check user:emilia writer document:firstdoc
+true
+
+$ zed permission check user:emilia reader document:firstdoc
+true
+
+$ zed permission check user:beatrice reader document:firstdoc
+true
+
+$ zed permission check user:beatrice writer document:firstdoc
 false
+```
+
+The `permission expand` command provides a tree view of the expanded structure of a particular Permission.
+
+```
+$ zed permission expand document:firstdoc reader
+document:firstdoc->reader
+ └── union
+      ├── user:beatrice
+      └── document:firstdoc->writer
+           └── user:emilia
+```
+
+### Misc
+
+For ease of scripting, most commands when piped or provided the `--json` flag have their API responses are converted into JSON.
+
+```
+$ zed schema read document | jq '.config.relation[0].name'
+"writer"
 ```
