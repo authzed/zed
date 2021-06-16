@@ -73,66 +73,28 @@ func main() {
 			fmt.Println(version.UsageVersion(cobrautil.MustGetBool(cmd, "include-deps")))
 		},
 	}
-
 	versionCmd.Flags().Bool("include-deps", false, "include dependencies' versions")
-
 	rootCmd.AddCommand(versionCmd)
 
-	// Register token subcommands & flags
-	rootCmd.AddCommand(tokenCmd)
+	// Register root-level aliases
+	rootCmd.AddCommand(&cobra.Command{
+		Use:               "login <system> <token>",
+		Short:             "an alias for `zed context set`",
+		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+		RunE:              contextSetCmdFunc,
+	})
+	rootCmd.AddCommand(&cobra.Command{
+		Use:               "use <system>",
+		Short:             "an alias for `zed context use`",
+		PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+		RunE:              contextUseCmdFunc,
+	})
 
-	tokenCmd.AddCommand(tokenListCmd)
-	tokenListCmd.Flags().Bool("reveal-tokens", false, "display secrets in results")
-
-	tokenCmd.AddCommand(tokenSaveCmd)
-
-	tokenCmd.AddCommand(tokenDeleteCmd)
-
-	tokenCmd.AddCommand(tokenUseCmd)
-
-	// Register schema subcommands & flags
-	rootCmd.AddCommand(schemaCmd)
-
-	schemaCmd.AddCommand(schemaReadCmd)
-	schemaReadCmd.Flags().Bool("json", false, "output as JSON")
-
-	// Register permission subcommands & flags
-	rootCmd.AddCommand(permissionCmd)
-
-	permissionCmd.AddCommand(checkCmd)
-	checkCmd.Flags().Bool("json", false, "output as JSON")
-	checkCmd.Flags().String("revision", "", "optional revision at which to check")
-
-	permissionCmd.AddCommand(expandCmd)
-	expandCmd.Flags().Bool("json", false, "output as JSON")
-	expandCmd.Flags().String("revision", "", "optional revision at which to check")
-
-	// Register relationship subcommands & flags
-	rootCmd.AddCommand(relationshipCmd)
-
-	createCmd.Flags().Bool("json", false, "output as JSON")
-	relationshipCmd.AddCommand(createCmd)
-
-	touchCmd.Flags().Bool("json", false, "output as JSON")
-	relationshipCmd.AddCommand(touchCmd)
-
-	deleteCmd.Flags().Bool("json", false, "output as JSON")
-	relationshipCmd.AddCommand(deleteCmd)
-
-	plugins := []struct{ name, description string }{
-		{"testserver", "run a test server"},
-	}
-	for _, plugin := range plugins {
-		binaryName := fmt.Sprintf("zed-%s", plugin.name)
-		if commandIsAvailable(binaryName) {
-			rootCmd.AddCommand(&cobra.Command{
-				Use:                plugin.name,
-				Short:              plugin.description,
-				RunE:               pluginCmdFunc(binaryName),
-				DisableFlagParsing: true, // Passes flags as args to the subcommand.
-			})
-		}
-	}
+	registerContextCmd(rootCmd)
+	registerSchemaCmd(rootCmd)
+	registerPermissionCmd(rootCmd)
+	registerRelationshipCmd(rootCmd)
+	registerPlugins(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

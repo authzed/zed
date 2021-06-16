@@ -11,44 +11,55 @@ import (
 	"github.com/authzed/zed/internal/storage"
 )
 
-var tokenCmd = &cobra.Command{
-	Use:   "token <subcommand>",
-	Short: "manage the API Tokens stored on your machine",
+func registerContextCmd(rootCmd *cobra.Command) {
+	rootCmd.AddCommand(contextCmd)
+
+	contextCmd.AddCommand(contextListCmd)
+	contextListCmd.Flags().Bool("reveal-tokens", false, "display secrets in results")
+
+	contextCmd.AddCommand(contextSetCmd)
+	contextCmd.AddCommand(contextRemoveCmd)
+	contextCmd.AddCommand(contextUseCmd)
 }
 
-var tokenListCmd = &cobra.Command{
+var contextCmd = &cobra.Command{
+	Use:   "context <subcommand>",
+	Short: "manage your machines Authzed credentials",
+}
+
+var contextListCmd = &cobra.Command{
 	Use:               "list",
-	Short:             "list all the API Tokens",
+	Short:             "list all contexts",
 	Args:              cobra.ExactArgs(0),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
-	RunE:              tokenListCmdFunc,
+	RunE:              contextListCmdFunc,
 }
 
-var tokenSaveCmd = &cobra.Command{
-	Use:               "save <system> <token>",
-	Short:             "save an API Token",
+var contextSetCmd = &cobra.Command{
+	Use:               "set <system> <token>",
+	Short:             "create or overwrite a context",
 	Args:              cobra.ExactArgs(2),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
-	RunE:              tokenSaveCmdFunc,
+	RunE:              contextSetCmdFunc,
 }
 
-var tokenDeleteCmd = &cobra.Command{
-	Use:               "delete <system>",
-	Short:             "delete an API Token",
+var contextRemoveCmd = &cobra.Command{
+	Use:               "remove <system>",
+	Short:             "remove a context",
 	Args:              cobra.ExactArgs(1),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
-	RunE:              tokenDeleteCmdFunc,
+	RunE:              contextRemoveCmdFunc,
 }
 
-var tokenUseCmd = &cobra.Command{
+var contextUseCmd = &cobra.Command{
 	Use:               "use <system>",
-	Short:             "use an API Token",
+	Short:             "set a context as the current context",
 	Args:              cobra.ExactArgs(1),
 	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
-	RunE:              tokenUseCmdFunc,
+	RunE:              contextUseCmdFunc,
 }
 
-func tokenListCmdFunc(cmd *cobra.Command, args []string) error {
+func contextListCmdFunc(cmd *cobra.Command, args []string) error {
 	tokens, err := storage.DefaultTokenStore.List(cobrautil.MustGetBool(cmd, "reveal-tokens"))
 	if err != nil {
 		return err
@@ -61,25 +72,25 @@ func tokenListCmdFunc(cmd *cobra.Command, args []string) error {
 
 	var rows [][]string
 	for _, token := range tokens {
-		using := ""
+		current := ""
 		if token.System == cfg.CurrentToken {
-			using = "  ✓  "
+			current = "   ✓   "
 		}
 
 		rows = append(rows, []string{
-			using,
+			current,
 			token.System,
 			token.Endpoint,
 			stringz.Join("_", token.Prefix, token.Secret),
 		})
 	}
 
-	printers.PrintTable(os.Stdout, []string{"using", "permissions system", "endpoint", "token"}, rows)
+	printers.PrintTable(os.Stdout, []string{"current", "permissions system", "endpoint", "token"}, rows)
 
 	return nil
 }
 
-func tokenSaveCmdFunc(cmd *cobra.Command, args []string) error {
+func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 	var name, token string
 	err := stringz.Unpack(args, &name, &token)
 	if err != nil {
@@ -95,7 +106,7 @@ func tokenSaveCmdFunc(cmd *cobra.Command, args []string) error {
 	return storage.SetCurrentToken(name, storage.DefaultConfigStore, storage.DefaultTokenStore)
 }
 
-func tokenDeleteCmdFunc(cmd *cobra.Command, args []string) error {
+func contextRemoveCmdFunc(cmd *cobra.Command, args []string) error {
 	// If the token is what's currently being used, remove it from the config.
 	cfg, err := storage.DefaultConfigStore.Get()
 	if err != nil {
@@ -113,6 +124,6 @@ func tokenDeleteCmdFunc(cmd *cobra.Command, args []string) error {
 	return storage.DefaultTokenStore.Delete(args[0])
 }
 
-func tokenUseCmdFunc(cmd *cobra.Command, args []string) error {
+func contextUseCmdFunc(cmd *cobra.Command, args []string) error {
 	return storage.SetCurrentToken(args[0], storage.DefaultConfigStore, storage.DefaultTokenStore)
 }

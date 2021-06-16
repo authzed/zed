@@ -19,6 +19,13 @@ import (
 	"github.com/authzed/zed/internal/printers"
 )
 
+func registerSchemaCmd(rootCmd *cobra.Command) {
+	rootCmd.AddCommand(schemaCmd)
+
+	schemaCmd.AddCommand(schemaReadCmd)
+	schemaReadCmd.Flags().Bool("json", false, "output as JSON")
+}
+
 var schemaCmd = &cobra.Command{
 	Use:   "schema <subcommand>",
 	Short: "read and write to a Schema for a Permissions System",

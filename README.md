@@ -25,16 +25,18 @@ $ brew install --HEAD authzed/tap/zed
 
 ### Authenticating with a Permissions System
 
-In order to interact with a Permissions System, zed first needs an API token.
+In order to interact with a Permissions System, zed first needs a context: a permissions system and API token.
 zed stores API Tokens in your OS's keychain; all other non-sensitive data is stored in `$XDG_CONFIG_HOME/zed` with a fallback of `$HOME/.zed`.
+The `zed context` command has operations for setting the current, creating, listing, deleting contexts.
+`zed login` and `zed use` are aliases that make the most common commands more convenient.
+
 The environment variables `$ZED_PERMISSIONS_SYSTEM`, `$ZED_ENDPOINT`, and `$ZED_TOKEN` can be used to override their respective values in the current context.
 
 ```sh
-$ zed token save my_perms_system tc_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
-$ zed token use  my_perms_system # `token save` does this, but we'll be explicit
-$ zed token list
-USING	PERMISSIONS SYSTEM	ENDPOINT            	TOKEN
-  ✓  	my_perms_system   	grpc.authzed.com:443	tc_zed_my_laptop_<redacted>
+$ zed login my_perms_system tc_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
+$ zed context list
+CURRENT	PERMISSIONS SYSTEM	ENDPOINT            	TOKEN
+   ✓   	my_perms_system   	grpc.authzed.com:443	tc_zed_my_laptop_<redacted>
 ```
 
 ### Schemas

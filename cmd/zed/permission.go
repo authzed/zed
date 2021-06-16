@@ -15,6 +15,18 @@ import (
 	"github.com/authzed/zed/internal/printers"
 )
 
+func registerPermissionCmd(rootCmd *cobra.Command) {
+	rootCmd.AddCommand(permissionCmd)
+
+	permissionCmd.AddCommand(checkCmd)
+	checkCmd.Flags().Bool("json", false, "output as JSON")
+	checkCmd.Flags().String("revision", "", "optional revision at which to check")
+
+	permissionCmd.AddCommand(expandCmd)
+	expandCmd.Flags().Bool("json", false, "output as JSON")
+	expandCmd.Flags().String("revision", "", "optional revision at which to check")
+}
+
 var permissionCmd = &cobra.Command{
 	Use:   "permission <subcommand>",
 	Short: "perform queries on the Permissions in a Permissions System",

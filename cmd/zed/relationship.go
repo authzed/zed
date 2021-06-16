@@ -12,6 +12,19 @@ import (
 	"golang.org/x/term"
 )
 
+func registerRelationshipCmd(rootCmd *cobra.Command) {
+	rootCmd.AddCommand(relationshipCmd)
+
+	relationshipCmd.AddCommand(createCmd)
+	createCmd.Flags().Bool("json", false, "output as JSON")
+
+	relationshipCmd.AddCommand(touchCmd)
+	touchCmd.Flags().Bool("json", false, "output as JSON")
+
+	relationshipCmd.AddCommand(deleteCmd)
+	deleteCmd.Flags().Bool("json", false, "output as JSON")
+}
+
 var relationshipCmd = &cobra.Command{
 	Use:   "relationship <subcommand>",
 	Short: "perform CRUD operations on the Relationships in a Permissions System",
