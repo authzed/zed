@@ -41,14 +41,14 @@ func CurrentToken(cs ConfigStore, ts TokenStore) (Token, error) {
 		return Token{}, err
 	}
 
-	return ts.Get(cfg.CurrentToken, true)
+	return ts.Get(cfg.CurrentToken)
 }
 
 // SetCurrentToken is a convenient way to set the CurrentToken field in a
 // the current config.
 func SetCurrentToken(name string, cs ConfigStore, ts TokenStore) error {
 	// Ensure the token exists
-	_, err := ts.Get(name, true)
+	_, err := ts.Get(name)
 	if err != nil {
 		return err
 	}
