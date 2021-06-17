@@ -99,7 +99,7 @@ func main() {
 	rootCmd.PersistentFlags().Bool("insecure", false, "connect over a plaintext connection")
 	rootCmd.PersistentFlags().Bool("no-verify-ca", false, "do not attempt to verify the server's certificate chain and host name")
 	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
-	rootCmd.PersistentFlags().MarkHidden("debug")
+	_ = rootCmd.PersistentFlags().MarkHidden("debug") // This cannot return its error.
 
 	var versionCmd = &cobra.Command{
 		Use:               "version",
