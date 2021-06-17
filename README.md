@@ -91,7 +91,7 @@ false
 
 The `permission expand` command provides a tree view of the expanded structure of a particular Permission.
 
-```
+```sh
 $ zed permission expand document:firstdoc reader
 document:firstdoc->reader
  └── union
@@ -100,11 +100,36 @@ document:firstdoc->reader
            └── user:emilia
 ```
 
-### Misc
+### Open Policy Agent (OPA)
 
-For ease of scripting, most commands when piped or provided the `--json` flag have their API responses are converted into JSON.
+Experimentally, zed embeds an instance of [OPA] that supports additional builtins specifically for accessing Authzed.
 
+The following functions have been added:
+
+```rego
+authzed.check("subject:id", "permission", "object:id", "zedToken")
 ```
-$ zed schema read document | jq '.config.relation[0].name'
-"writer"
+
+It can be found under the `zed experiment opa` command:
+
+```sh
+$ zed experiment opa eval 'authzed.check("user:emilia", "reader", "document:firstdoc", "")'
+{
+  "result": [
+    {
+      "expressions": [
+        {
+          "value": true,
+          "text": "authzed.check(\"user:emilia\", \"reader\", \"document:firstdoc\", \"\")",
+          "location": {
+            "row": 1,
+            "col": 1
+          }
+        }
+      ]
+    }
+  ]
+}
 ```
+
+[OPA]: https://openpolicyagent.org
