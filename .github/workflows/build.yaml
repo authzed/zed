@@ -13,9 +13,7 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
     - uses: "actions/checkout@v2"
-    - uses: "actions/setup-go@v2"
-      with:
-        go-version: ^1.16
+    - uses: golangci/golangci-lint-action@v2
     - name: "go fmt"
       run: |
         GOFMT_OUTPUT="$(gofmt -l `find ./ -name '*.go' | grep -v vendor` 2>&1)"
@@ -44,7 +42,6 @@ jobs:
           echo "${GO_MOD_OUPUT}"
           exit 1
         fi
-    - uses: golangci/golangci-lint-action@v2
 
   test:
     name: "Test"
