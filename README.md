@@ -9,7 +9,13 @@
 
 A client for managing [authzed] or any API-compatible system from your command line.
 
+Features included:
+- Credential management
+- Unix interface for the v0 API
+- An extended version of [OPA] with authzed builtins
+
 [authzed]: https://authzed.com
+[OPA]: https://openpolicyagent.org
 
 ## Installation
 
@@ -132,4 +138,3 @@ $ zed experiment opa eval 'authzed.check("user:emilia", "reader", "document:firs
 }
 ```
 
-[OPA]: https://openpolicyagent.org
