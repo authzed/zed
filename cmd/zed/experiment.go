@@ -70,8 +70,7 @@ func RegisterAuthzedBuiltins(system string, client *authzed.Client) {
 				return nil, err
 			}
 
-			var subjectNS, subjectID string
-			err := stringz.SplitExact(subjectStr, ":", &subjectNS, &subjectID)
+			subjectNS, subjectID, subjectRel, err := parseSubject(subjectStr)
 			if err != nil {
 				return nil, err
 			}
@@ -91,7 +90,7 @@ func RegisterAuthzedBuiltins(system string, client *authzed.Client) {
 				User: &v0.User{UserOneof: &v0.User_Userset{Userset: &v0.ObjectAndRelation{
 					Namespace: stringz.Join("/", system, subjectNS),
 					ObjectId:  subjectID,
-					Relation:  "...",
+					Relation:  subjectRel,
 				}}},
 			}
 
