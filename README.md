@@ -33,10 +33,11 @@ $ brew install --HEAD authzed/tap/zed
 
 In order to interact with a Permissions System, zed first needs a context: a permissions system and API token.
 zed stores API Tokens in your OS's keychain; all other non-sensitive data is stored in `$XDG_CONFIG_HOME/zed` with a fallback of `$HOME/.zed`.
+
 The `zed context` command has operations for setting the current, creating, listing, deleting contexts.
 `zed login` and `zed use` are aliases that make the most common commands more convenient.
 
-The environment variables `$ZED_PERMISSIONS_SYSTEM`, `$ZED_ENDPOINT`, and `$ZED_TOKEN` can be used to override their respective values in the current context.
+The environment variables `ZED_PERMISSIONS_SYSTEM`, `ZED_ENDPOINT`, and `ZED_TOKEN` can be used to override their respective values in the current context.
 
 ```sh
 $ zed login my_perms_system tc_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
@@ -113,7 +114,7 @@ Experimentally, zed embeds an instance of [OPA] that supports additional builtin
 The following functions have been added:
 
 ```rego
-authzed.check("subject:id", "permission", "object:id", "zedToken")
+authzed.check("subject:id", "permission", "object:id", "zedtoken")
 ```
 
 It can be found under the `zed experiment opa` command:
