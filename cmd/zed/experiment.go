@@ -54,19 +54,18 @@ func RegisterAuthzedBuiltins(system string, client *authzed.Client) {
 			Decl:    types.NewFunction(types.Args(types.S, types.S, types.S, types.S), types.B),
 			Memoize: false,
 		},
-		func(bctx rego.BuiltinContext, a, b, c, d *ast.Term) (*ast.Term, error) {
-			var subjectStr, relation, objectStr, zedToken string
-
-			if err := ast.As(a.Value, &subjectStr); err != nil {
+		func(bctx rego.BuiltinContext, subjectTerm, relationTerm, objectTerm, zedtokenTerm *ast.Term) (*ast.Term, error) {
+			var subjectStr, relation, objectStr, zedtoken string
+			if err := ast.As(subjectTerm.Value, &subjectStr); err != nil {
 				return nil, err
 			}
-			if err := ast.As(b.Value, &relation); err != nil {
+			if err := ast.As(relationTerm.Value, &relation); err != nil {
 				return nil, err
 			}
-			if err := ast.As(c.Value, &objectStr); err != nil {
+			if err := ast.As(objectTerm.Value, &objectStr); err != nil {
 				return nil, err
 			}
-			if err := ast.As(d.Value, &zedToken); err != nil {
+			if err := ast.As(zedtokenTerm.Value, &zedtoken); err != nil {
 				return nil, err
 			}
 
@@ -94,8 +93,8 @@ func RegisterAuthzedBuiltins(system string, client *authzed.Client) {
 				}}},
 			}
 
-			if zedToken != "" {
-				request.AtRevision = &v0.Zookie{Token: zedToken}
+			if zedtoken != "" {
+				request.AtRevision = &v0.Zookie{Token: zedtoken}
 			}
 
 			resp, err := client.Check(context.Background(), request)
