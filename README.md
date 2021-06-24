@@ -9,7 +9,13 @@
 
 A client for managing [authzed] or any API-compatible system from your command line.
 
+Features included:
+- Credential management
+- Unix interface for the v0 API
+- An extended version of [OPA] with authzed builtins
+
 [authzed]: https://authzed.com
+[OPA]: https://openpolicyagent.org
 
 ## Installation
 
@@ -27,10 +33,11 @@ $ brew install --HEAD authzed/tap/zed
 
 In order to interact with a Permissions System, zed first needs a context: a permissions system and API token.
 zed stores API Tokens in your OS's keychain; all other non-sensitive data is stored in `$XDG_CONFIG_HOME/zed` with a fallback of `$HOME/.zed`.
+
 The `zed context` command has operations for setting the current, creating, listing, deleting contexts.
 `zed login` and `zed use` are aliases that make the most common commands more convenient.
 
-The environment variables `$ZED_PERMISSIONS_SYSTEM`, `$ZED_ENDPOINT`, and `$ZED_TOKEN` can be used to override their respective values in the current context.
+The environment variables `ZED_PERMISSIONS_SYSTEM`, `ZED_ENDPOINT`, and `ZED_TOKEN` can be used to override their respective values in the current context.
 
 ```sh
 $ zed login my_perms_system tc_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
@@ -91,7 +98,7 @@ false
 
 The `permission expand` command provides a tree view of the expanded structure of a particular Permission.
 
-```
+```sh
 $ zed permission expand document:firstdoc reader
 document:firstdoc->reader
  └── union
@@ -100,11 +107,35 @@ document:firstdoc->reader
            └── user:emilia
 ```
 
-### Misc
+### Open Policy Agent (OPA)
 
-For ease of scripting, most commands when piped or provided the `--json` flag have their API responses are converted into JSON.
+Experimentally, zed embeds an instance of [OPA] that supports additional builtins specifically for accessing Authzed.
 
+The following functions have been added:
+
+```rego
+authzed.check("subject:id", "permission", "object:id", "zedtoken")
 ```
-$ zed schema read document | jq '.config.relation[0].name'
-"writer"
+
+It can be found under the `zed experiment opa` command:
+
+```sh
+$ zed experiment opa eval 'authzed.check("user:emilia", "reader", "document:firstdoc", "")'
+{
+  "result": [
+    {
+      "expressions": [
+        {
+          "value": true,
+          "text": "authzed.check(\"user:emilia\", \"reader\", \"document:firstdoc\", \"\")",
+          "location": {
+            "row": 1,
+            "col": 1
+          }
+        }
+      ]
+    }
+  ]
+}
 ```
+

@@ -9,6 +9,7 @@ import (
 
 	"github.com/99designs/keyring"
 	"github.com/jzelinskie/stringz"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/term"
 )
 
@@ -36,7 +37,7 @@ type Token struct {
 // TokenStore is anything that can securely persist Tokens.
 type TokenStore interface {
 	List(revealTokens bool) ([]Token, error)
-	Get(system string, revealTokens bool) (Token, error)
+	Get(system string) (Token, error)
 	Put(system, endpoint, secret string) error
 	Delete(system string) error
 }
@@ -84,9 +85,9 @@ func encodeLabel(prefix, endpoint string) string {
 
 func decodeLabel(label string) (prefix, endpoint string) {
 	if err := stringz.SplitExact(label, "@", &prefix, &endpoint); err != nil {
-		return "", label
+		endpoint = label
 	}
-	return prefix, endpoint
+	return
 }
 
 func splitAPIToken(token string) (prefix, secret string) {
@@ -129,7 +130,7 @@ func (ks KeychainTokenStore) List(revealTokens bool) ([]Token, error) {
 	return tokens, nil
 }
 
-func (ks KeychainTokenStore) Get(system string, revealTokens bool) (Token, error) {
+func (ks KeychainTokenStore) Get(system string) (Token, error) {
 	ring, err := openKeyring()
 	if err != nil {
 		return Token{}, err
@@ -142,18 +143,14 @@ func (ks KeychainTokenStore) Get(system string, revealTokens bool) (Token, error
 		}
 		return Token{}, err
 	}
+	log.Trace().Interface("keychain item", item).Send()
 
 	prefix, endpoint := decodeLabel(item.Label)
-	token := redactedMessage
-	if revealTokens {
-		token = string(item.Data)
-	}
-
 	return Token{
 		System:   item.Key,
 		Endpoint: endpoint,
 		Prefix:   prefix,
-		Secret:   token,
+		Secret:   string(item.Data),
 	}, nil
 }
 

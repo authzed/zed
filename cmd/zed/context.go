@@ -23,15 +23,16 @@ func registerContextCmd(rootCmd *cobra.Command) {
 }
 
 var contextCmd = &cobra.Command{
-	Use:   "context <subcommand>",
-	Short: "manage your machines Authzed credentials",
+	Use:               "context <subcommand>",
+	Short:             "manage your machines Authzed credentials",
+	PersistentPreRunE: persistentPreRunE,
 }
 
 var contextListCmd = &cobra.Command{
 	Use:               "list",
 	Short:             "list all contexts",
 	Args:              cobra.ExactArgs(0),
-	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+	PersistentPreRunE: persistentPreRunE,
 	RunE:              contextListCmdFunc,
 }
 
@@ -39,7 +40,7 @@ var contextSetCmd = &cobra.Command{
 	Use:               "set <system> <token>",
 	Short:             "create or overwrite a context",
 	Args:              cobra.ExactArgs(2),
-	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+	PersistentPreRunE: persistentPreRunE,
 	RunE:              contextSetCmdFunc,
 }
 
@@ -47,7 +48,7 @@ var contextRemoveCmd = &cobra.Command{
 	Use:               "remove <system>",
 	Short:             "remove a context",
 	Args:              cobra.ExactArgs(1),
-	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+	PersistentPreRunE: persistentPreRunE,
 	RunE:              contextRemoveCmdFunc,
 }
 
@@ -55,7 +56,7 @@ var contextUseCmd = &cobra.Command{
 	Use:               "use <system>",
 	Short:             "set a context as the current context",
 	Args:              cobra.ExactArgs(1),
-	PersistentPreRunE: cobrautil.SyncViperPreRunE("ZED"),
+	PersistentPreRunE: persistentPreRunE,
 	RunE:              contextUseCmdFunc,
 }
 
