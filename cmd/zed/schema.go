@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/TylerBrock/colorjson"
-	api "github.com/authzed/authzed-go/arrakisapi/api"
+	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
 	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
@@ -53,7 +53,7 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, objectType := range args {
-		resp, err := client.ReadConfig(context.Background(), &api.ReadConfigRequest{
+		resp, err := client.ReadConfig(context.Background(), &v0.ReadConfigRequest{
 			Namespace: stringz.Join("/", token.System, objectType),
 		})
 		if err != nil {

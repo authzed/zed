@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/authzed/authzed-go"
-	v0 "github.com/authzed/authzed-go/arrakisapi/api"
+	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
 	"github.com/jzelinskie/stringz"
 	"github.com/open-policy-agent/opa/ast"
 	opacmd "github.com/open-policy-agent/opa/cmd"

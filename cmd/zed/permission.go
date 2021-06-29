@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	api "github.com/authzed/authzed-go/arrakisapi/api"
+	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
 	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
@@ -87,14 +87,14 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	request := &api.CheckRequest{
-		TestUserset: &api.ObjectAndRelation{
+	request := &v0.CheckRequest{
+		TestUserset: &v0.ObjectAndRelation{
 			Namespace: stringz.Join("/", token.System, objectNS),
 			ObjectId:  objectID,
 			Relation:  relation,
 		},
-		User: &api.User{UserOneof: &api.User_Userset{
-			Userset: &api.ObjectAndRelation{
+		User: &v0.User{UserOneof: &v0.User_Userset{
+			Userset: &v0.ObjectAndRelation{
 				Namespace: stringz.Join("/", token.System, subjectNS),
 				ObjectId:  subjectID,
 				Relation:  subjectRel,
@@ -103,7 +103,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
-		request.AtRevision = &api.Zookie{Token: zedToken}
+		request.AtRevision = &v0.Zookie{Token: zedToken}
 	}
 	log.Trace().Interface("request", request).Send()
 
@@ -122,7 +122,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Println(resp.Membership == api.CheckResponse_MEMBER)
+	fmt.Println(resp.Membership == v0.CheckResponse_MEMBER)
 
 	return nil
 }
@@ -146,8 +146,8 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	request := &api.ExpandRequest{
-		Userset: &api.ObjectAndRelation{
+	request := &v0.ExpandRequest{
+		Userset: &v0.ObjectAndRelation{
 			Namespace: stringz.Join("/", token.System, objectNS),
 			ObjectId:  objectID,
 			Relation:  relation,
@@ -155,7 +155,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
-		request.AtRevision = &api.Zookie{Token: zedToken}
+		request.AtRevision = &v0.Zookie{Token: zedToken}
 	}
 	log.Trace().Interface("request", request).Send()
 
