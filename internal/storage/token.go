@@ -26,6 +26,38 @@ var (
 	ErrMultipleTokens = errors.New("multiple tokens with the same name")
 )
 
+// DefaultToken creates a Token from input, filling any missing values in
+// with the current context's defaults.
+func DefaultToken(psystem, endpoint, tokenStr string) (Token, error) {
+	// If all info is explicitly passed, short-circuit any trips to storage.
+	if psystem != "" && endpoint != "" && tokenStr != "" {
+		token := Token{
+			System:   psystem,
+			Endpoint: endpoint,
+			Prefix:   "",
+			Secret:   tokenStr,
+		}
+		return token, nil
+	}
+
+	token, err := CurrentToken(DefaultConfigStore, DefaultTokenStore)
+	if err != nil {
+		if errors.Is(err, ErrConfigNotFound) {
+			return Token{}, errors.New("must first save a token: see `zed token save --help`")
+		}
+		return Token{}, err
+	}
+
+	token = Token{
+		System:   stringz.DefaultEmpty(psystem, token.System),
+		Endpoint: stringz.DefaultEmpty(endpoint, token.Endpoint),
+		Prefix:   token.Prefix,
+		Secret:   stringz.DefaultEmpty(tokenStr, token.Secret),
+	}
+
+	return token, nil
+}
+
 // Token represents an API Token and all of its metadata.
 type Token struct {
 	System   string
@@ -95,6 +127,9 @@ func splitAPIToken(token string) (prefix, secret string) {
 	return strings.Join(exploded[:len(exploded)-1], "_"), exploded[len(exploded)-1]
 }
 
+// List returns all of the tokens in the keychain.
+//
+// If revealTokens is true, the Token.Secrets field will contain the secret.
 func (ks KeychainTokenStore) List(revealTokens bool) ([]Token, error) {
 	ring, err := openKeyring()
 	if err != nil {
@@ -130,6 +165,7 @@ func (ks KeychainTokenStore) List(revealTokens bool) ([]Token, error) {
 	return tokens, nil
 }
 
+// Get fetches a Token from the keychain.
 func (ks KeychainTokenStore) Get(system string) (Token, error) {
 	ring, err := openKeyring()
 	if err != nil {
@@ -154,6 +190,7 @@ func (ks KeychainTokenStore) Get(system string) (Token, error) {
 	}, nil
 }
 
+// Put overwrites a Token in the keychain.
 func (ks KeychainTokenStore) Put(system, endpoint, secret string) error {
 	prefix, secret := splitAPIToken(secret)
 
@@ -169,6 +206,7 @@ func (ks KeychainTokenStore) Put(system, endpoint, secret string) error {
 	})
 }
 
+// Delete removes a Token from the keychain.
 func (ks KeychainTokenStore) Delete(system string) error {
 	ring, err := openKeyring()
 	if err != nil {

@@ -66,8 +66,8 @@ func TreeNodeTree(tp treeprinter.Node, treeNode *v0.RelationTupleTreeNode) {
 	}
 }
 
-// TreeNodeTree walks an Authzed Namespace and creates corresponding nodes for
-// a treeprinter.
+// NamespaceTree walks a Namespace Definition and creates corresponding nodes
+// for a treeprinter.
 func NamespaceTree(tp treeprinter.Node, nsdef *v0.NamespaceDefinition) {
 	root := tp.Child(stringz.TrimPrefixIndex(nsdef.GetName(), "/"))
 	for _, relation := range nsdef.GetRelation() {

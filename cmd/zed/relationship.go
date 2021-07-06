@@ -6,8 +6,11 @@ import (
 	"os"
 
 	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
+	"github.com/authzed/authzed-go/v0"
+	"github.com/authzed/zed/internal/storage"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -70,12 +73,14 @@ func writeRelationshipCmdFunc(operation v0.RelationTupleUpdate_Operation) func(c
 			return err
 		}
 
-		token, err := TokenFromFlags(cmd)
-		if err != nil {
-			return err
-		}
+		token, err := storage.DefaultToken(
+			cobrautil.MustGetString(cmd, "permissions-system"),
+			cobrautil.MustGetString(cmd, "endpoint"),
+			cobrautil.MustGetString(cmd, "token"),
+		)
+		log.Trace().Interface("token", token).Send()
 
-		client, err := ClientFromFlags(cmd, token.Endpoint, token.Secret)
+		client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
 		if err != nil {
 			return err
 		}

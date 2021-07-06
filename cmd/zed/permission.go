@@ -6,6 +6,7 @@ import (
 	"os"
 
 	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
+	"github.com/authzed/authzed-go/v0"
 	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
@@ -14,6 +15,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/authzed/zed/internal/printers"
+	"github.com/authzed/zed/internal/storage"
 )
 
 func registerPermissionCmd(rootCmd *cobra.Command) {
@@ -77,12 +79,17 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	token, err := TokenFromFlags(cmd)
+	token, err := storage.DefaultToken(
+		cobrautil.MustGetString(cmd, "permissions-system"),
+		cobrautil.MustGetString(cmd, "endpoint"),
+		cobrautil.MustGetString(cmd, "token"),
+	)
 	if err != nil {
 		return err
 	}
+	log.Trace().Interface("token", token).Send()
 
-	client, err := ClientFromFlags(cmd, token.Endpoint, token.Secret)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
 	if err != nil {
 		return err
 	}
@@ -136,12 +143,17 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	token, err := TokenFromFlags(cmd)
+	token, err := storage.DefaultToken(
+		cobrautil.MustGetString(cmd, "permissions-system"),
+		cobrautil.MustGetString(cmd, "endpoint"),
+		cobrautil.MustGetString(cmd, "token"),
+	)
 	if err != nil {
 		return err
 	}
+	log.Trace().Interface("token", token).Send()
 
-	client, err := ClientFromFlags(cmd, token.Endpoint, token.Secret)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
 	if err != nil {
 		return err
 	}
