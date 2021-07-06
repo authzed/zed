@@ -16,26 +16,19 @@ jobs:
     - uses: "actions/setup-go@v2"
       with:
         go-version: ^1.16
-    - name: "go fmt"
+    - name: "go fmt/imports"
       run: |
-        GOFMT_OUTPUT="$(gofmt -l `find ./ -name '*.go' | grep -v vendor` 2>&1)"
-
-        if [ -n "$GOFMT_OUTPUT" ]; then
+        go install mvdan.cc/gofumpt/gofumports@latest
+        GOFUMPT_OUTPUT="$(gofumports -d .)"
+        if [ -n "$GOFUMPT_OUTPUT" ]; then
           echo "All the following files are not correctly formatted"
-          echo "${GOFMT_OUTPUT}"
+          echo "${GOFUMPT_OUTPUT}"
           exit 1
         fi
-    - name: "go imports"
+    - name: "go lint"
       run: |
-        exec 5>&1
-        GOIMPORTS_OUTPUT="$(goimports -l -w `find ./ -name '*.go' | grep -v vendor` | tee /dev/fd/5)"
-
-        if [ -n "$GOIMPORTS_OUTPUT" ]; then
-          echo "All following has imports not properly ordered"
-          echo "${GOIMPORTS_OUTPUT}"
-
-          exit 1
-        fi
+        go install github.com/mgechev/revive@latest
+        revive ./...
     - name: "go mod tidy"
       run: |
         GO_MOD_OUPUT="$(go mod tidy -v 2>&1)"
@@ -44,10 +37,6 @@ jobs:
           echo "${GO_MOD_OUPUT}"
           exit 1
         fi
-    - name: "go lint"
-      run: |
-        go install github.com/mgechev/revive@latest
-        revive ./...
 
   test:
     name: "Test"
