@@ -3,14 +3,18 @@ package main
 import (
 	"context"
 
-	"github.com/authzed/authzed-go"
-	v0 "github.com/authzed/authzed-go/arrakisapi/api"
+	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
+	authzed "github.com/authzed/authzed-go/v0"
+	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/open-policy-agent/opa/ast"
 	opacmd "github.com/open-policy-agent/opa/cmd"
 	"github.com/open-policy-agent/opa/rego"
 	"github.com/open-policy-agent/opa/types"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	"github.com/authzed/zed/internal/storage"
 )
 
 func registerExperimentCmd(rootCmd *cobra.Command) {
@@ -32,22 +36,27 @@ func opaPreRunCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	token, err := TokenFromFlags(cmd)
+	token, err := storage.DefaultToken(
+		cobrautil.MustGetString(cmd, "permissions-system"),
+		cobrautil.MustGetString(cmd, "endpoint"),
+		cobrautil.MustGetString(cmd, "token"),
+	)
+	if err != nil {
+		return err
+	}
+	log.Trace().Interface("token", token).Send()
+
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
 	if err != nil {
 		return err
 	}
 
-	client, err := ClientFromFlags(cmd, token.Endpoint, token.Secret)
-	if err != nil {
-		return err
-	}
-
-	RegisterAuthzedBuiltins(token.System, client)
+	registerAuthzedBuiltins(token.System, client)
 
 	return nil
 }
 
-func RegisterAuthzedBuiltins(system string, client *authzed.Client) {
+func registerAuthzedBuiltins(system string, client *authzed.Client) {
 	rego.RegisterBuiltin4(
 		&rego.Function{
 			Name:    "authzed.check",

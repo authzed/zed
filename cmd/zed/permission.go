@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	api "github.com/authzed/authzed-go/arrakisapi/api"
+	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
+	"github.com/authzed/authzed-go/v0"
 	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
@@ -14,6 +15,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/authzed/zed/internal/printers"
+	"github.com/authzed/zed/internal/storage"
 )
 
 func registerPermissionCmd(rootCmd *cobra.Command) {
@@ -77,24 +79,29 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	token, err := TokenFromFlags(cmd)
+	token, err := storage.DefaultToken(
+		cobrautil.MustGetString(cmd, "permissions-system"),
+		cobrautil.MustGetString(cmd, "endpoint"),
+		cobrautil.MustGetString(cmd, "token"),
+	)
+	if err != nil {
+		return err
+	}
+	log.Trace().Interface("token", token).Send()
+
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
 	if err != nil {
 		return err
 	}
 
-	client, err := ClientFromFlags(cmd, token.Endpoint, token.Secret)
-	if err != nil {
-		return err
-	}
-
-	request := &api.CheckRequest{
-		TestUserset: &api.ObjectAndRelation{
+	request := &v0.CheckRequest{
+		TestUserset: &v0.ObjectAndRelation{
 			Namespace: stringz.Join("/", token.System, objectNS),
 			ObjectId:  objectID,
 			Relation:  relation,
 		},
-		User: &api.User{UserOneof: &api.User_Userset{
-			Userset: &api.ObjectAndRelation{
+		User: &v0.User{UserOneof: &v0.User_Userset{
+			Userset: &v0.ObjectAndRelation{
 				Namespace: stringz.Join("/", token.System, subjectNS),
 				ObjectId:  subjectID,
 				Relation:  subjectRel,
@@ -103,7 +110,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
-		request.AtRevision = &api.Zookie{Token: zedToken}
+		request.AtRevision = &v0.Zookie{Token: zedToken}
 	}
 	log.Trace().Interface("request", request).Send()
 
@@ -122,7 +129,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Println(resp.Membership == api.CheckResponse_MEMBER)
+	fmt.Println(resp.Membership == v0.CheckResponse_MEMBER)
 
 	return nil
 }
@@ -136,18 +143,23 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	token, err := TokenFromFlags(cmd)
+	token, err := storage.DefaultToken(
+		cobrautil.MustGetString(cmd, "permissions-system"),
+		cobrautil.MustGetString(cmd, "endpoint"),
+		cobrautil.MustGetString(cmd, "token"),
+	)
+	if err != nil {
+		return err
+	}
+	log.Trace().Interface("token", token).Send()
+
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
 	if err != nil {
 		return err
 	}
 
-	client, err := ClientFromFlags(cmd, token.Endpoint, token.Secret)
-	if err != nil {
-		return err
-	}
-
-	request := &api.ExpandRequest{
-		Userset: &api.ObjectAndRelation{
+	request := &v0.ExpandRequest{
+		Userset: &v0.ObjectAndRelation{
 			Namespace: stringz.Join("/", token.System, objectNS),
 			ObjectId:  objectID,
 			Relation:  relation,
@@ -155,7 +167,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
-		request.AtRevision = &api.Zookie{Token: zedToken}
+		request.AtRevision = &v0.Zookie{Token: zedToken}
 	}
 	log.Trace().Interface("request", request).Send()
 

@@ -1,23 +1,27 @@
 module github.com/authzed/zed
 
-go 1.15
+go 1.16
 
 require (
 	github.com/99designs/keyring v1.1.6
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
-	github.com/authzed/authzed-go v0.0.0-20210419221633-af5e066c3272
+	github.com/authzed/authzed-go v0.0.0-20210706193116-47a8c1aba11e
+	github.com/authzed/grpcutil v0.0.0-20210702215403-5fe6e00b4101
 	github.com/cockroachdb/cockroach v20.1.13+incompatible
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
 	github.com/hokaccha/go-prettyjson v0.0.0-20210113012101-fb4e108d2519 // indirect
-	github.com/jzelinskie/cobrautil v0.0.0-20210330205530-45d5fbfe45dd
+	github.com/jzelinskie/cobrautil v0.0.0-20210619202150-2fc07a6abd5e
 	github.com/jzelinskie/stringz v0.0.0-20210604201827-321bc7aaa2dc
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/open-policy-agent/opa v0.29.4
 	github.com/rs/zerolog v1.23.0
-	github.com/spf13/cobra v1.1.3
+	github.com/spf13/cobra v1.2.1
+	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	golang.org/x/term v0.0.0-20201207232118-ee85cb95a76b
-	google.golang.org/grpc v1.37.0
-	google.golang.org/protobuf v1.25.1-0.20201020201750-d3470999428b
+	google.golang.org/genproto v0.0.0-20210701191553-46259e63a0a9 // indirect
+	google.golang.org/grpc v1.39.0
+	google.golang.org/protobuf v1.27.1
 	tailscale.com v1.6.0
 )

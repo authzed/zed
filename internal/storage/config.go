@@ -85,6 +85,7 @@ func localConfigPath() (string, error) {
 	return filepath.Join(home, ".zed"), nil
 }
 
+// Get parses a Config from the filesystem.
 func (s HomeJSONConfigStore) Get() (Config, error) {
 	path, err := localConfigPath()
 	if err != nil {
@@ -107,12 +108,13 @@ func (s HomeJSONConfigStore) Get() (Config, error) {
 	return cfg, nil
 }
 
+// Put overwrites a Config on the filesystem.
 func (s HomeJSONConfigStore) Put(cfg Config) error {
 	path, err := localConfigPath()
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(path, 0774); err != nil {
+	if err := os.MkdirAll(path, 0o774); err != nil {
 		return err
 	}
 
@@ -121,5 +123,5 @@ func (s HomeJSONConfigStore) Put(cfg Config) error {
 		return err
 	}
 
-	return atomicfile.WriteFile(filepath.Join(path, configFile), cfgBytes, 0774)
+	return atomicfile.WriteFile(filepath.Join(path, configFile), cfgBytes, 0o774)
 }
