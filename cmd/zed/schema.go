@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/TylerBrock/colorjson"
-	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
 	"github.com/authzed/authzed-go/proto/authzed/api/v1alpha1"
-	authzedv0 "github.com/authzed/authzed-go/v0"
 	authzedv1alpha1 "github.com/authzed/authzed-go/v1alpha1"
-	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
@@ -21,7 +19,6 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/authzed/zed/internal/printers"
 	"github.com/authzed/zed/internal/storage"
 )
 
@@ -42,7 +39,7 @@ var schemaCmd = &cobra.Command{
 }
 
 var schemaReadCmd = &cobra.Command{
-	Use:               "read <object type>",
+	Use:               "read <object definitions...>",
 	Args:              cobra.MinimumNArgs(1),
 	Short:             "read the Schema of current Permissions System",
 	PersistentPreRunE: persistentPreRunE,
@@ -70,33 +67,38 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzedv0.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+	client, err := authzedv1alpha1.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
 	if err != nil {
 		return err
 	}
 
-	for _, objectType := range args {
-		resp, err := client.ReadConfig(context.Background(), &v0.ReadConfigRequest{
-			Namespace: stringz.Join("/", token.System, objectType),
-		})
+	var objDefs []string
+	for _, arg := range args {
+		if !strings.Contains(arg, "/") {
+			arg = stringz.Join("/", token.System, arg)
+		}
+		objDefs = append(objDefs, arg)
+	}
+
+	request := &v1alpha1.ReadSchemaRequest{ObjectDefinitionsNames: objDefs}
+	log.Trace().Interface("request", request).Msg("requesting schema read")
+
+	resp, err := client.ReadSchema(context.Background(), request)
+	if err != nil {
+		return err
+	}
+
+	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+		prettyProto, err := prettyProto(resp)
 		if err != nil {
 			return err
 		}
 
-		if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
-			prettyProto, err := prettyProto(resp)
-			if err != nil {
-				return err
-			}
-
-			fmt.Println(string(prettyProto))
-		} else {
-			tp := treeprinter.New()
-			printers.NamespaceTree(tp, resp.GetConfig())
-			fmt.Println(tp.String())
-		}
+		fmt.Println(string(prettyProto))
+		return nil
 	}
 
+	fmt.Println(stringz.Join("\n\n", resp.ObjectDefinitions...))
 	return nil
 }
 
@@ -153,10 +155,10 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 		}
 
 		fmt.Println(string(prettyProto))
-	} else {
-		fmt.Printf("%s\n", stringz.Join("\n", resp.GetObjectDefinitionsNames()...))
+		return nil
 	}
 
+	fmt.Printf("%s\n", stringz.Join("\n", resp.GetObjectDefinitionsNames()...))
 	return nil
 }
 

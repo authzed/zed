@@ -17,6 +17,7 @@ func dialOptsFromFlags(cmd *cobra.Command, token string) []grpc.DialOption {
 
 	if cobrautil.MustGetBool(cmd, "insecure") {
 		opts = append(opts, grpc.WithInsecure())
+		opts = append(opts, grpcutil.WithInsecureBearerToken(token))
 	} else {
 		opts = append(opts, grpcutil.WithBearerToken(token))
 		tlsOpt := grpcutil.WithSystemCerts(cobrautil.MustGetBool(cmd, "no-verify-ca"))
