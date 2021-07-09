@@ -108,6 +108,8 @@ github.com/authzed/authzed-go v0.0.0-20210706193116-47a8c1aba11e h1:WzvXbu+wiaJH
 github.com/authzed/authzed-go v0.0.0-20210706193116-47a8c1aba11e/go.mod h1:a1qVgqL5pcdZq6EXRciRITz/9KJFHyGhPn3Ng/X2bc0=
 github.com/authzed/grpcutil v0.0.0-20210702215403-5fe6e00b4101 h1:z29rHmtuSh2jqwh5AzBXLJ6oGYnW2lEGdDkw0506uqk=
 github.com/authzed/grpcutil v0.0.0-20210702215403-5fe6e00b4101/go.mod h1:ZWOuCUQ/qoVIAWUctRy/lWHI37OcahRzt5ylELzumus=
+github.com/authzed/grpcutil v0.0.0-20210709212005-3a705ca91827 h1:+Jmg0JaD6mjIzUGX+O5c4T7K1L+tlw4RbqYAtHwYLRk=
+github.com/authzed/grpcutil v0.0.0-20210709212005-3a705ca91827/go.mod h1:ZWOuCUQ/qoVIAWUctRy/lWHI37OcahRzt5ylELzumus=
 github.com/aws/aws-lambda-go v1.13.3/go.mod h1:4UKl9IzQMoD+QF79YdCuzCwp8VbmG4VAQwij/eHl5CU=
 github.com/aws/aws-sdk-go v1.23.20/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go v1.25.37/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
@@ -1373,6 +1375,8 @@ google.golang.org/genproto v0.0.0-20210402141018-6c239bbf2bb1/go.mod h1:9lPAdzaE
 google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c/go.mod h1:UODoCrxHCcBojKKwX1terBiRUaqAsFqJiF615XL43r0=
 google.golang.org/genproto v0.0.0-20210701191553-46259e63a0a9 h1:HBPuvo39L0DgfVn9eHR3ki/RjZoUFWa+em77e7KFDfs=
 google.golang.org/genproto v0.0.0-20210701191553-46259e63a0a9/go.mod h1:yiaVoXHpRzHGyxV3o4DktVWY4mSUErTKaeEOq6C3t3U=
+google.golang.org/genproto v0.0.0-20210708141623-e76da96a951f h1:khwpF3oSk7GIab/7DDMDyE8cPQEO6FAfOcWHIRAhO20=
+google.golang.org/genproto v0.0.0-20210708141623-e76da96a951f/go.mod h1:AxrInvYm1dci+enl5hChSFPOmmUF1+uAa/UsgNRWd7k=
 google.golang.org/grpc v1.8.0/go.mod h1:yo6s7OP7yaDglbqo1J04qKzAhqBH6lvTonzMVmEdcZw=
 google.golang.org/grpc v1.17.0/go.mod h1:6QZJwpn2B+Zp71q/5VxRsJ6NXXVCE5NRUHRo+f3cWCs=
 google.golang.org/grpc v1.19.0/go.mod h1:mqu4LbDTu4XGKhr4mRzUsmM4RtVoemTSY81AxZiDr8c=
