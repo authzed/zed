@@ -142,13 +142,14 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 
 	resp, err := client.WriteSchema(context.Background(), request)
 	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write schema")
 	}
 	log.Trace().Interface("response", resp).Msg("wrote schema")
 
 	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
 		prettyProto, err := prettyProto(resp)
 		if err != nil {
-			return err
+			log.Fatal().Err(err).Msg("failed to convert schema to JSON")
 		}
 
 		fmt.Println(string(prettyProto))
