@@ -10,7 +10,7 @@ require (
 	github.com/cockroachdb/cockroach v20.1.13+incompatible
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
 	github.com/hokaccha/go-prettyjson v0.0.0-20210113012101-fb4e108d2519 // indirect
-	github.com/jzelinskie/cobrautil v0.0.0-20210619202150-2fc07a6abd5e
+	github.com/jzelinskie/cobrautil v0.0.1
 	github.com/jzelinskie/stringz v0.0.0-20210604201827-321bc7aaa2dc
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/olekukonko/tablewriter v0.0.5

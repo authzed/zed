@@ -499,6 +499,8 @@ github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8
 github.com/julz/importas v0.0.0-20210419104244-841f0c0fe66d/go.mod h1:oSFU2R4XK/P7kNBrnL/FEQlDGN1/6WoxXEjSSXO0DV0=
 github.com/jzelinskie/cobrautil v0.0.0-20210619202150-2fc07a6abd5e h1:L+iZASq0+VRhhKGZoCLDby3SBmrh/MjpEUrSGq+o8Qs=
 github.com/jzelinskie/cobrautil v0.0.0-20210619202150-2fc07a6abd5e/go.mod h1:SCYgxNGeeBswvNGD0nQ7OTOX93kPxvMy13czgMflbN0=
+github.com/jzelinskie/cobrautil v0.0.1 h1:XNz4uqmvmcz5q8DoXc21KFUyze9HF9rLYJaynP/iTfg=
+github.com/jzelinskie/cobrautil v0.0.1/go.mod h1:SCYgxNGeeBswvNGD0nQ7OTOX93kPxvMy13czgMflbN0=
 github.com/jzelinskie/stringz v0.0.0-20210414224931-d6a8ce844a70/go.mod h1:hHYbgxJuNLRw91CmpuFsYEOyQqpDVFg8pvEh23vy4P0=
 github.com/jzelinskie/stringz v0.0.0-20210604201827-321bc7aaa2dc h1:cdnUqAfmK21ic6/xfJIPrYmzxHSMyCqATynSboVNDQQ=
 github.com/jzelinskie/stringz v0.0.0-20210604201827-321bc7aaa2dc/go.mod h1:hHYbgxJuNLRw91CmpuFsYEOyQqpDVFg8pvEh23vy4P0=
