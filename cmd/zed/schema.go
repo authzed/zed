@@ -30,6 +30,9 @@ func registerSchemaCmd(rootCmd *cobra.Command) {
 
 	schemaCmd.AddCommand(schemaReadCmd)
 	schemaReadCmd.Flags().Bool("json", false, "output as JSON")
+
+	schemaCmd.AddCommand(schemaWriteCmd)
+	schemaWriteCmd.Flags().Bool("json", false, "output as JSON")
 }
 
 var schemaCmd = &cobra.Command{
