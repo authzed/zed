@@ -48,11 +48,20 @@ CURRENT	PERMISSIONS SYSTEM	ENDPOINT            	TOKEN
 
 ### Schemas
 
+The `schema write` command will write a Schema to a Permissions System.
+
+```sh
+$ zed schema write my_perms_system.zed
+my_perms_system/user
+my_perms_system/document
+```
+
 The `schema read` command prints the specified Object Definition(s) in a Permissions System's Schema.
 
 ```sh
 $ zed schema read user document
 definition my_perms_system/user {}
+
 definition my_perms_system/document {
 	relation write: my_perms_system/user
 	relation read: my_perms_system/user
