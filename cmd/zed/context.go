@@ -77,12 +77,16 @@ func contextListCmdFunc(cmd *cobra.Command, args []string) error {
 		if token.System == cfg.CurrentToken {
 			current = "   ✓   "
 		}
+		secret := token.Secret
+		if token.Prefix != "" {
+			secret = stringz.Join("_", token.Prefix, token.Secret)
+		}
 
 		rows = append(rows, []string{
 			current,
 			token.System,
 			token.Endpoint,
-			stringz.Join("_", token.Prefix, token.Secret),
+			secret,
 		})
 	}
 
