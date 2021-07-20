@@ -77,4 +77,4 @@ jobs:
         push: true
         tags: |-
           quay.io/authzed/zed:latest
-          quay.io/authzed/zed:${GITHUB_REF#ref/tags/}
+          quay.io/authzed/zed:${GITHUB_REF#refs/tags/}
