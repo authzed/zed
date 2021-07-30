@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/jzelinskie/cobrautil"
@@ -55,7 +56,7 @@ var contextRemoveCmd = &cobra.Command{
 var contextUseCmd = &cobra.Command{
 	Use:               "use <system>",
 	Short:             "set a context as the current context",
-	Args:              cobra.ExactArgs(1),
+	Args:              cobra.MaximumNArgs(1),
 	PersistentPreRunE: persistentPreRunE,
 	RunE:              contextUseCmdFunc,
 }
@@ -130,5 +131,19 @@ func contextRemoveCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func contextUseCmdFunc(cmd *cobra.Command, args []string) error {
-	return storage.SetCurrentToken(args[0], storage.DefaultConfigStore, storage.DefaultTokenStore)
+	switch len(args) {
+	case 0:
+		cfg, err := storage.DefaultConfigStore.Get()
+		if err != nil {
+			return err
+		}
+		fmt.Println(cfg.CurrentToken)
+
+	case 1:
+		return storage.SetCurrentToken(args[0], storage.DefaultConfigStore, storage.DefaultTokenStore)
+	default:
+		panic("cobra command did not enforce valid number of args")
+	}
+
+	return nil
 }
