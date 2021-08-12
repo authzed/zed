@@ -71,6 +71,7 @@ func main() {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:               "use <system>",
 		Short:             "an alias for `zed context use`",
+		Args:              cobra.MaximumNArgs(1),
 		PersistentPreRunE: persistentPreRunE,
 		RunE:              contextUseCmdFunc,
 	})
