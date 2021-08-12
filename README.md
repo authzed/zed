@@ -1,126 +1,91 @@
 # zed
 
-[![GoDoc](https://godoc.org/github.com/authzed/zed?status.svg)](https://godoc.org/github.com/authzed/zed)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
-![Lines of Code](https://tokei.rs/b1/github/authzed/zed)
-[![Discord Server](https://img.shields.io/discord/844600078504951838?color=7289da&logo=discord "Discord Server")](https://discord.gg/jTysUaxXzM)
-[![Build Status](https://github.com/authzed/zed/workflows/build/badge.svg)](https://github.com/authzed/zed/actions)
 [![Docker Repository on Quay.io](https://quay.io/repository/authzed/zed/status "Docker Repository on Quay.io")](https://quay.io/repository/authzed/zed)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
+[![Build Status](https://github.com/authzed/zed/workflows/build/badge.svg)](https://github.com/authzed/zed/actions)
+[![Discord Server](https://img.shields.io/discord/844600078504951838?color=7289da&logo=discord "Discord Server")](https://discord.gg/jTysUaxXzM)
+[![Twitter](https://img.shields.io/twitter/follow/authzed?color=%23179CF0&logo=twitter&style=flat-square)](https://twitter.com/authzed)
 
-A client for managing [authzed] or any API-compatible system from your command line.
+A command-line client for managing Authzed.
+
+[Authzed] is a database and service that stores, computes, and validates your application's permissions.
+
+Developers create a schema that models their permissions requirements and use a client, such as this one, to apply the schema to the database, insert data into the database, and query the data to efficiently check permissions in their applications.
 
 Features included:
-- Credential management
-- Unix interface for the v0 API
-- An extended version of [OPA] with authzed builtins
+- Unix-friendly interface for the [v0] and [v1alpha1] [Authzed APIs]
+- Store API Tokens in your OS keychain
+- An experimental [OPA] REPL with authzed builtin functions
 
-[authzed]: https://authzed.com
+[Authzed]: https://authzed.com
+[v0]: https://docs.authzed.com/reference/api#authzedapiv0
+[v1alpha1]: https://docs.authzed.com/reference/api#authzedapiv1alpha1
+[Authzed APIs]: https://docs.authzed.com/reference/api
 [OPA]: https://openpolicyagent.org
 
-## Installation
+## Getting Started
+
+We highly recommend following the **[Protecting Your First App]** guide to learn the latest best practice to integrate an application with Authzed.
+
+If you're interested in examples for a specific version of the API, they can be found in their respective folders in the [examples directory].
+
+[Protecting Your First App]: https://docs.authzed.com/guides/first-app
+[examples directory]: /examples
+
+## Basic Usage
+
+### Installation
 
 zed is currently packaged by as a _head-only_ [Homebrew] Formula for both macOS and Linux.
 
 [Homebrew]: https://brew.sh
 
 ```sh
-$ brew install --HEAD authzed/tap/zed
+brew install --HEAD authzed/tap/zed
 ```
 
-## Example Usage
+In order to upgrade, run:
 
-### Authenticating with a Permissions System
+```sh
+brew reinstall zed
+```
 
-In order to interact with a Permissions System, zed first needs a context: a permissions system and API token.
-zed stores API Tokens in your OS's keychain; all other non-sensitive data is stored in `$XDG_CONFIG_HOME/zed` with a fallback of `$HOME/.zed`.
+### Creating a context
 
-The `zed context` command has operations for setting the current, creating, listing, deleting contexts.
+In order to do anything useful, zed first needs a context: a Permissions System and API Token.
+
+The `zed context` subcommand has operations for setting the current, creating, listing, deleting contexts.
+
 `zed login` and `zed use` are aliases that make the most common commands more convenient.
 
-The environment variables `ZED_PERMISSIONS_SYSTEM`, `ZED_ENDPOINT`, and `ZED_TOKEN` can be used to override their respective values in the current context.
 
 ```sh
-$ zed login my_perms_system tc_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
-$ zed context list
-CURRENT	PERMISSIONS SYSTEM	ENDPOINT            	TOKEN
-   ✓   	my_perms_system   	grpc.authzed.com:443	tc_zed_my_laptop_<redacted>
+zed login my_perms_system tc_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
+zed context list
 ```
 
-### Schemas
+At any point in time, the `ZED_PERMISSIONS_SYSTEM`, `ZED_ENDPOINT`, and `ZED_TOKEN` environment variables can be used to override their respective values in the current context.
 
-The `schema write` command will write a Schema to a Permissions System.
+### Modifying a Permissions System
 
-```sh
-$ zed schema write my_perms_system.zed
-my_perms_system/user
-my_perms_system/document
-```
+For each type of noun used in Authzed, there is a zed subcommand:
 
-The `schema read` command prints the specified Object Definition(s) in a Permissions System's Schema.
+- `zed schema`
+- `zed relationship`
+- `zed permission`
 
-```sh
-$ zed schema read user document
-definition my_perms_system/user {}
-
-definition my_perms_system/document {
-	relation write: my_perms_system/user
-	relation read: my_perms_system/user
-
-	permission writer = write
-	permission reader = read + writer
-}
-```
-
-### Relationships
-
-Once a Permissions System has a Schema that defines Relations and Permissions for its Objects, it can be populated with Relationships -- think of them like unique rows in a database.
-Relationship updates always yield a new Zed Token, which can be optionally provided to improve performance on Permissions operations.
+For example, you can read Object Definitions in a Permissions System's Schema, check permissions, and even create or delete relationships.
 
 ```sh
-$ zed relationship create user:emilia writer document:firstdoc
-CAESAwiLBA==
-
-$ zed relationship delete user:beatrice writer document:firstdoc
-CAESAwiMBA==
-
-$ zed relationship create user:beatrice reader document:firstdoc
-CAESAwiMBA==
-```
-
-### Permissions
-
-After there are Relationships within a Permissions System, you can start performing operations on Permissions.
-
-The `permission check` command determines whether or not the Subject has a Permission on a particular Object.
-
-```sh
-$ zed permission check user:emilia writer document:firstdoc
-true
-
-$ zed permission check user:emilia reader document:firstdoc
-true
-
-$ zed permission check user:beatrice reader document:firstdoc
-true
-
-$ zed permission check user:beatrice writer document:firstdoc
-false
-```
-
-The `permission expand` command provides a tree view of the expanded structure of a particular Permission.
-
-```sh
-$ zed permission expand document:firstdoc reader
-document:firstdoc->reader
- └── union
-      ├── user:beatrice
-      └── document:firstdoc->writer
-           └── user:emilia
+zed schema read user document
+zed permission check user:emilia writer document:firstdoc
+zed relationship create user:beatrice reader document:firstdoc
+zed relationship delete user:beatrice reader document:firstdoc
 ```
 
 ### Open Policy Agent (OPA)
 
-Experimentally, zed embeds an instance of [OPA] that supports additional builtins specifically for accessing Authzed.
+Experimentally, zed embeds an instance of [OPA] that supports additional builtin functions for accessing Authzed.
 
 The following functions have been added:
 
@@ -150,3 +115,6 @@ $ zed experiment opa eval 'authzed.check("user:emilia", "reader", "document:firs
 }
 ```
 
+If you are interested in OPA, please feel free to [reach out] to provide feedback.
+
+[reach out]: https://authzed.com/contact/
