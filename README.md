@@ -3,6 +3,7 @@
 [![Docker Repository on Quay.io](https://quay.io/repository/authzed/zed/status "Docker Repository on Quay.io")](https://quay.io/repository/authzed/zed)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 [![Build Status](https://github.com/authzed/zed/workflows/build/badge.svg)](https://github.com/authzed/zed/actions)
+[![Mailing List](https://img.shields.io/badge/email-google%20groups-4285F4)](https://groups.google.com/g/authzed-oss)
 [![Discord Server](https://img.shields.io/discord/844600078504951838?color=7289da&logo=discord "Discord Server")](https://discord.gg/jTysUaxXzM)
 [![Twitter](https://img.shields.io/twitter/follow/authzed?color=%23179CF0&logo=twitter&style=flat-square)](https://twitter.com/authzed)
 
@@ -12,16 +13,19 @@ A command-line client for managing Authzed.
 
 Developers create a schema that models their permissions requirements and use a client, such as this one, to apply the schema to the database, insert data into the database, and query the data to efficiently check permissions in their applications.
 
-Features included:
+zed features include:
 - Unix-friendly interface for the [v0] and [v1alpha1] [Authzed APIs]
-- Store API Tokens in your OS keychain
+- Context switching that stores API Tokens securely in your OS keychain
 - An experimental [OPA] REPL with authzed builtin functions
+
+See [CONTRIBUTING.md] for instructions on how to contribute and perform common tasks like building the project and running tests.
 
 [Authzed]: https://authzed.com
 [v0]: https://docs.authzed.com/reference/api#authzedapiv0
 [v1alpha1]: https://docs.authzed.com/reference/api#authzedapiv1alpha1
 [Authzed APIs]: https://docs.authzed.com/reference/api
 [OPA]: https://openpolicyagent.org
+[CONTRIBUTING.md]: CONTRIBUTING.md
 
 ## Getting Started
 
