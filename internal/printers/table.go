@@ -2,14 +2,13 @@ package printers
 
 import (
 	"io"
-	"os"
 
 	"github.com/olekukonko/tablewriter"
 )
 
 // PrintTable writes an terminal-friendly table of the values to the target.
 func PrintTable(target io.Writer, headers []string, rows [][]string) {
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(target)
 	table.SetHeader(headers)
 	table.SetAutoWrapText(false)
 	table.SetAutoFormatHeaders(true)
