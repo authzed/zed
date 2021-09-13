@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/TylerBrock/colorjson"
-	"github.com/authzed/authzed-go/proto/authzed/api/v1alpha1"
-	authzedv1alpha1 "github.com/authzed/authzed-go/v1alpha1"
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/authzed-go/v1"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
@@ -39,8 +39,8 @@ var schemaCmd = &cobra.Command{
 }
 
 var schemaReadCmd = &cobra.Command{
-	Use:               "read <object definitions...>",
-	Args:              cobra.MinimumNArgs(1),
+	Use:               "read",
+	Args:              cobra.ExactArgs(0),
 	Short:             "read the Schema of current Permissions System",
 	PersistentPreRunE: persistentPreRunE,
 	RunE:              schemaReadCmdFunc,
@@ -67,7 +67,7 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzedv1alpha1.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 		objDefs = append(objDefs, arg)
 	}
 
-	request := &v1alpha1.ReadSchemaRequest{ObjectDefinitionsNames: objDefs}
+	request := &v1.ReadSchemaRequest{}
 	log.Trace().Interface("request", request).Msg("requesting schema read")
 
 	resp, err := client.ReadSchema(context.Background(), request)
@@ -98,7 +98,7 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Println(stringz.Join("\n\n", resp.ObjectDefinitions...))
+	fmt.Println(stringz.Join("\n\n", resp.SchemaText))
 	return nil
 }
 
@@ -113,7 +113,7 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzedv1alpha1.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 		log.Fatal().Msg("attempted to write empty schema")
 	}
 
-	request := &v1alpha1.WriteSchemaRequest{
+	request := &v1.WriteSchemaRequest{
 		Schema: string(schemaBytes),
 	}
 	log.Trace().Interface("request", request).Msg("writing schema")
@@ -158,7 +158,6 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("%s\n", stringz.Join("\n", resp.GetObjectDefinitionsNames()...))
 	return nil
 }
 

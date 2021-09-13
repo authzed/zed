@@ -4,62 +4,62 @@ import (
 	"fmt"
 
 	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/stringz"
 )
 
-func prettyUser(user *v0.User) string {
-	userset := user.GetUserset()
-	if userset.Relation == "..." {
+func prettySubject(subj *v1.SubjectReference) string {
+	if subj.OptionalRelation == "" {
 		return fmt.Sprintf(
 			"%s:%s",
-			stringz.TrimPrefixIndex(userset.Namespace, "/"),
-			userset.ObjectId,
+			stringz.TrimPrefixIndex(subj.Object.ObjectType, "/"),
+			subj.Object.ObjectId,
 		)
 	}
 	return fmt.Sprintf(
 		"%s:%s->%s",
-		stringz.TrimPrefixIndex(userset.Namespace, "/"),
-		userset.ObjectId,
-		userset.Relation,
+		stringz.TrimPrefixIndex(subj.Object.ObjectType, "/"),
+		subj.Object.ObjectId,
+		subj.OptionalRelation,
 	)
 }
 
 // TreeNodeTree walks an Authzed Tree Node and creates corresponding nodes
 // for a treeprinter.
-func TreeNodeTree(tp treeprinter.Node, treeNode *v0.RelationTupleTreeNode) {
-	if treeNode.Expanded != nil {
+func TreeNodeTree(tp treeprinter.Node, treeNode *v1.PermissionRelationshipTree) {
+	if treeNode.ExpandedObject != nil {
 		tp = tp.Child(fmt.Sprintf(
 			"%s:%s->%s",
-			stringz.TrimPrefixIndex(treeNode.Expanded.Namespace, "/"),
-			treeNode.Expanded.ObjectId,
-			treeNode.Expanded.Relation,
+			stringz.TrimPrefixIndex(treeNode.ExpandedObject.ObjectType, "/"),
+			treeNode.ExpandedObject.ObjectId,
+			treeNode.ExpandedRelation,
 		))
 	}
-	switch typed := treeNode.NodeType.(type) {
-	case *v0.RelationTupleTreeNode_IntermediateNode:
-		switch typed.IntermediateNode.Operation {
-		case v0.SetOperationUserset_UNION:
+	switch typed := treeNode.TreeType.(type) {
+	case *v1.PermissionRelationshipTree_Intermediate:
+		switch typed.Intermediate.Operation {
+		case v1.AlgebraicSubjectSet_OPERATION_UNION:
 			union := tp.Child("union")
-			for _, child := range typed.IntermediateNode.ChildNodes {
+			for _, child := range typed.Intermediate.Children {
 				TreeNodeTree(union, child)
 			}
-		case v0.SetOperationUserset_INTERSECTION:
+		case v1.AlgebraicSubjectSet_OPERATION_INTERSECTION:
 			intersection := tp.Child("intersection")
-			for _, child := range typed.IntermediateNode.ChildNodes {
+			for _, child := range typed.Intermediate.Children {
 				TreeNodeTree(intersection, child)
 			}
-		case v0.SetOperationUserset_EXCLUSION:
+		case v1.AlgebraicSubjectSet_OPERATION_EXCLUSION:
 			exclusion := tp.Child("exclusion")
-			for _, child := range typed.IntermediateNode.ChildNodes {
+			for _, child := range typed.Intermediate.Children {
 				TreeNodeTree(exclusion, child)
 			}
 		default:
 			panic("unknown expand operation")
 		}
-	case *v0.RelationTupleTreeNode_LeafNode:
-		for _, user := range typed.LeafNode.Users {
-			tp.Child(prettyUser(user))
+	case *v1.PermissionRelationshipTree_Leaf:
+		for _, subject := range typed.Leaf.Subjects {
+			tp.Child(prettySubject(subject))
 		}
 	default:
 		panic("unknown TreeNode type")

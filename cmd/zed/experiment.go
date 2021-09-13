@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 
-	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
-	authzed "github.com/authzed/authzed-go/v0"
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	authzed "github.com/authzed/authzed-go/v1"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/open-policy-agent/opa/ast"
@@ -89,29 +89,34 @@ func registerAuthzedBuiltins(system string, client *authzed.Client) {
 				return nil, err
 			}
 
-			request := &v0.CheckRequest{
-				TestUserset: &v0.ObjectAndRelation{
-					Namespace: stringz.Join("/", system, objectNS),
-					ObjectId:  objectID,
-					Relation:  relation,
+			request := &v1.CheckPermissionRequest{
+				Resource: &v1.ObjectReference{
+					ObjectType: stringz.Join("/", system, objectNS),
+					ObjectId:   objectID,
 				},
-				User: &v0.User{UserOneof: &v0.User_Userset{Userset: &v0.ObjectAndRelation{
-					Namespace: stringz.Join("/", system, subjectNS),
-					ObjectId:  subjectID,
-					Relation:  subjectRel,
-				}}},
+				Permission: relation,
+				Subject: &v1.SubjectReference{
+					Object: &v1.ObjectReference{
+						ObjectType: stringz.Join("/", system, subjectNS),
+						ObjectId:   subjectID,
+					},
+					OptionalRelation: subjectRel,
+				},
 			}
 
 			if zedtoken != "" {
-				request.AtRevision = &v0.Zookie{Token: zedtoken}
+				request.Consistency = &v1.Consistency{
+					Requirement: &v1.Consistency_AtLeastAsFresh{&v1.ZedToken{Token: zedtoken}},
+				}
 			}
 
-			resp, err := client.Check(context.Background(), request)
+			resp, err := client.CheckPermission(context.Background(), request)
 			if err != nil {
 				return nil, err
 			}
 
-			value, err := ast.InterfaceToValue(resp.IsMember)
+			isMember := resp.Permissionship == v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION
+			value, err := ast.InterfaceToValue(isMember)
 			if err != nil {
 				return nil, err
 			}

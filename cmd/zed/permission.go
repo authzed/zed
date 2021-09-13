@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 
-	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
-	"github.com/authzed/authzed-go/v0"
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/authzed-go/v1"
 	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
@@ -106,27 +107,29 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	request := &v0.CheckRequest{
-		TestUserset: &v0.ObjectAndRelation{
-			Namespace: stringz.Join("/", token.System, objectNS),
-			ObjectId:  objectID,
-			Relation:  relation,
+	request := &v1.CheckPermissionRequest{
+		Resource: &v1.ObjectReference{
+			ObjectType: stringz.Join("/", token.System, objectNS),
+			ObjectId:   objectID,
 		},
-		User: &v0.User{UserOneof: &v0.User_Userset{
-			Userset: &v0.ObjectAndRelation{
-				Namespace: stringz.Join("/", token.System, subjectNS),
-				ObjectId:  subjectID,
-				Relation:  subjectRel,
+		Permission: relation,
+		Subject: &v1.SubjectReference{
+			Object: &v1.ObjectReference{
+				ObjectType: stringz.Join("/", token.System, subjectNS),
+				ObjectId:   subjectID,
 			},
-		}},
+			OptionalRelation: subjectRel,
+		},
 	}
 
-	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
-		request.AtRevision = &v0.Zookie{Token: zedToken}
+	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
+		request.Consistency = &v1.Consistency{
+			Requirement: &v1.Consistency_AtLeastAsFresh{&v1.ZedToken{Token: zedtoken}},
+		}
 	}
 	log.Trace().Interface("request", request).Send()
 
-	resp, err := client.Check(context.Background(), request)
+	resp, err := client.CheckPermission(context.Background(), request)
 	if err != nil {
 		return err
 	}
@@ -141,8 +144,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Println(resp.Membership == v0.CheckResponse_MEMBER)
-
+	fmt.Println(resp.Permissionship == v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION)
 	return nil
 }
 
@@ -170,20 +172,22 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	request := &v0.ExpandRequest{
-		Userset: &v0.ObjectAndRelation{
-			Namespace: stringz.Join("/", token.System, objectNS),
-			ObjectId:  objectID,
-			Relation:  relation,
+	request := &v1.ExpandPermissionTreeRequest{
+		Resource: &v1.ObjectReference{
+			ObjectType: stringz.Join("/", token.System, objectNS),
+			ObjectId:   objectID,
 		},
+		Permission: relation,
 	}
 
-	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
-		request.AtRevision = &v0.Zookie{Token: zedToken}
+	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
+		request.Consistency = &v1.Consistency{
+			Requirement: &v1.Consistency_AtLeastAsFresh{&v1.ZedToken{Token: zedtoken}},
+		}
 	}
 	log.Trace().Interface("request", request).Send()
 
-	resp, err := client.Expand(context.Background(), request)
+	resp, err := client.ExpandPermissionTree(context.Background(), request)
 	if err != nil {
 		return err
 	}
@@ -199,7 +203,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	tp := treeprinter.New()
-	printers.TreeNodeTree(tp, resp.GetTreeNode())
+	printers.TreeNodeTree(tp, resp.TreeRoot)
 	fmt.Println(tp.String())
 
 	return nil
@@ -229,41 +233,50 @@ func lookupCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	request := &v0.LookupRequest{
-		ObjectRelation: &v0.RelationReference{
-			Namespace: stringz.Join("/", token.System, objectNS),
-			Relation:  relation,
-		},
-		User: &v0.ObjectAndRelation{
-			Namespace: stringz.Join("/", token.System, subjectNS),
-			ObjectId:  subjectID,
-			Relation:  subjectRel,
+	request := &v1.LookupResourcesRequest{
+		ResourceObjectType: stringz.Join("/", token.System, objectNS),
+		Permission:         relation,
+		Subject: &v1.SubjectReference{
+			Object: &v1.ObjectReference{
+				ObjectType: stringz.Join("/", token.System, subjectNS),
+				ObjectId:   subjectID,
+			},
+			OptionalRelation: subjectRel,
 		},
 	}
 
-	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
-		request.AtRevision = &v0.Zookie{Token: zedToken}
+	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
+		request.Consistency = &v1.Consistency{
+			Requirement: &v1.Consistency_AtLeastAsFresh{&v1.ZedToken{Token: zedtoken}},
+		}
 	}
 	log.Trace().Interface("request", request).Send()
 
-	resp, err := client.Lookup(context.Background(), request)
+	respStream, err := client.LookupResources(context.Background(), request)
 	if err != nil {
 		return err
 	}
 
-	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
-		prettyProto, err := prettyProto(resp)
-		if err != nil {
+	for {
+		resp, err := respStream.Recv()
+		switch {
+		case err == io.EOF:
+			return nil
+		case err != nil:
 			return err
+		default:
+			if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+				prettyProto, err := prettyProto(resp)
+				if err != nil {
+					return err
+				}
+
+				fmt.Println(string(prettyProto))
+				return nil
+			}
+
+			fmt.Println(resp.ResourceObjectId)
+			return nil
 		}
-
-		fmt.Println(string(prettyProto))
-		return nil
 	}
-
-	for _, objectID := range resp.ResolvedObjectIds {
-		fmt.Println(objectID)
-	}
-
-	return nil
 }
