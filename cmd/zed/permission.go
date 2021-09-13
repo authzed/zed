@@ -28,6 +28,10 @@ func registerPermissionCmd(rootCmd *cobra.Command) {
 	permissionCmd.AddCommand(expandCmd)
 	expandCmd.Flags().Bool("json", false, "output as JSON")
 	expandCmd.Flags().String("revision", "", "optional revision at which to check")
+
+	permissionCmd.AddCommand(lookupCmd)
+	lookupCmd.Flags().Bool("json", false, "output as JSON")
+	lookupCmd.Flags().String("revision", "", "optional revision at which to check")
 }
 
 var permissionCmd = &cobra.Command{
@@ -50,6 +54,14 @@ var expandCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(2),
 	PersistentPreRunE: persistentPreRunE,
 	RunE:              expandCmdFunc,
+}
+
+var lookupCmd = &cobra.Command{
+	Use:               "lookup <subject:id> <permission> <object>",
+	Short:             "lookup the Object Instances for which the Subject has Permission",
+	Args:              cobra.ExactArgs(3),
+	PersistentPreRunE: persistentPreRunE,
+	RunE:              lookupCmdFunc,
 }
 
 func parseSubject(s string) (namespace, id, relation string, err error) {
@@ -189,6 +201,69 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	tp := treeprinter.New()
 	printers.TreeNodeTree(tp, resp.GetTreeNode())
 	fmt.Println(tp.String())
+
+	return nil
+}
+
+func lookupCmdFunc(cmd *cobra.Command, args []string) error {
+	subjectNS, subjectID, subjectRel, err := parseSubject(args[0])
+	if err != nil {
+		return err
+	}
+
+	relation := args[1]
+	objectNS := args[2]
+
+	token, err := storage.DefaultToken(
+		cobrautil.MustGetString(cmd, "permissions-system"),
+		cobrautil.MustGetString(cmd, "endpoint"),
+		cobrautil.MustGetString(cmd, "token"),
+	)
+	if err != nil {
+		return err
+	}
+	log.Trace().Interface("token", token).Send()
+
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+	if err != nil {
+		return err
+	}
+
+	request := &v0.LookupRequest{
+		ObjectRelation: &v0.RelationReference{
+			Namespace: stringz.Join("/", token.System, objectNS),
+			Relation:  relation,
+		},
+		User: &v0.ObjectAndRelation{
+			Namespace: stringz.Join("/", token.System, subjectNS),
+			ObjectId:  subjectID,
+			Relation:  subjectRel,
+		},
+	}
+
+	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
+		request.AtRevision = &v0.Zookie{Token: zedToken}
+	}
+	log.Trace().Interface("request", request).Send()
+
+	resp, err := client.Lookup(context.Background(), request)
+	if err != nil {
+		return err
+	}
+
+	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+		prettyProto, err := prettyProto(resp)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(string(prettyProto))
+		return nil
+	}
+
+	for _, objectID := range resp.ResolvedObjectIds {
+		fmt.Println(objectID)
+	}
 
 	return nil
 }
