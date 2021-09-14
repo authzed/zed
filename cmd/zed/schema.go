@@ -54,8 +54,6 @@ var schemaWriteCmd = &cobra.Command{
 	RunE:              schemaWriteCmdFunc,
 }
 
-// TODO(jzelinskie): eventually make a variant that takes 0 args and returns
-// all object definitions in the schema.
 func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 	token, err := storage.DefaultToken(
 		cobrautil.MustGetString(cmd, "permissions-system"),
@@ -103,6 +101,10 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 && term.IsTerminal(int(os.Stdout.Fd())) {
+		return fmt.Errorf("must provide file path or contents via stdin")
+	}
+
 	token, err := storage.DefaultToken(
 		cobrautil.MustGetString(cmd, "permissions-system"),
 		cobrautil.MustGetString(cmd, "endpoint"),
