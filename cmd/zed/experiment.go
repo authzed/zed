@@ -65,16 +65,22 @@ func registerAuthzedBuiltins(system string, client *authzed.Client) {
 		},
 		func(bctx rego.BuiltinContext, subjectTerm, relationTerm, objectTerm, zedtokenTerm *ast.Term) (*ast.Term, error) {
 			var subjectStr, relation, objectStr, zedtoken string
-			if err := ast.As(subjectTerm.Value, &subjectStr); err != nil {
+			if err := ast.As(subjectTerm.Value, &objectStr); err != nil {
 				return nil, err
 			}
 			if err := ast.As(relationTerm.Value, &relation); err != nil {
 				return nil, err
 			}
-			if err := ast.As(objectTerm.Value, &objectStr); err != nil {
+			if err := ast.As(objectTerm.Value, &subjectStr); err != nil {
 				return nil, err
 			}
 			if err := ast.As(zedtokenTerm.Value, &zedtoken); err != nil {
+				return nil, err
+			}
+
+			var objectNS, objectID string
+			err := stringz.SplitExact(objectStr, ":", &objectNS, &objectID)
+			if err != nil {
 				return nil, err
 			}
 
@@ -83,21 +89,15 @@ func registerAuthzedBuiltins(system string, client *authzed.Client) {
 				return nil, err
 			}
 
-			var objectNS, objectID string
-			err = stringz.SplitExact(objectStr, ":", &objectNS, &objectID)
-			if err != nil {
-				return nil, err
-			}
-
 			request := &v1.CheckPermissionRequest{
 				Resource: &v1.ObjectReference{
-					ObjectType: stringz.Join("/", system, objectNS),
+					ObjectType: nsPrefix(objectNS, system),
 					ObjectId:   objectID,
 				},
 				Permission: relation,
 				Subject: &v1.SubjectReference{
 					Object: &v1.ObjectReference{
-						ObjectType: stringz.Join("/", system, subjectNS),
+						ObjectType: nsPrefix(subjectNS, system),
 						ObjectId:   subjectID,
 					},
 					OptionalRelation: subjectRel,

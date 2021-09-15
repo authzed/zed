@@ -42,7 +42,7 @@ var permissionCmd = &cobra.Command{
 }
 
 var checkCmd = &cobra.Command{
-	Use:               "check <subject:id> <permission> <object:id>",
+	Use:               "check <object:id> <permission> <subject:id>",
 	Short:             "check that a Permission exists for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
@@ -58,7 +58,7 @@ var expandCmd = &cobra.Command{
 }
 
 var lookupCmd = &cobra.Command{
-	Use:               "lookup <subject:id> <permission> <object>",
+	Use:               "lookup <object> <permission> <subject:id>",
 	Short:             "lookup the Object Instances for which the Subject has Permission",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
@@ -79,15 +79,15 @@ func parseSubject(s string) (namespace, id, relation string, err error) {
 }
 
 func checkCmdFunc(cmd *cobra.Command, args []string) error {
-	subjectNS, subjectID, subjectRel, err := parseSubject(args[0])
+	var objectNS, objectID string
+	err := stringz.SplitExact(args[0], ":", &objectNS, &objectID)
 	if err != nil {
 		return err
 	}
 
 	relation := args[1]
 
-	var objectNS, objectID string
-	err = stringz.SplitExact(args[2], ":", &objectNS, &objectID)
+	subjectNS, subjectID, subjectRel, err := parseSubject(args[2])
 	if err != nil {
 		return err
 	}
@@ -109,13 +109,13 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 
 	request := &v1.CheckPermissionRequest{
 		Resource: &v1.ObjectReference{
-			ObjectType: stringz.Join("/", token.System, objectNS),
+			ObjectType: nsPrefix(objectNS, token.System),
 			ObjectId:   objectID,
 		},
 		Permission: relation,
 		Subject: &v1.SubjectReference{
 			Object: &v1.ObjectReference{
-				ObjectType: stringz.Join("/", token.System, subjectNS),
+				ObjectType: nsPrefix(subjectNS, token.System),
 				ObjectId:   subjectID,
 			},
 			OptionalRelation: subjectRel,
@@ -174,7 +174,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 
 	request := &v1.ExpandPermissionTreeRequest{
 		Resource: &v1.ObjectReference{
-			ObjectType: stringz.Join("/", token.System, objectNS),
+			ObjectType: nsPrefix(objectNS, token.System),
 			ObjectId:   objectID,
 		},
 		Permission: relation,
@@ -210,13 +210,12 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func lookupCmdFunc(cmd *cobra.Command, args []string) error {
-	subjectNS, subjectID, subjectRel, err := parseSubject(args[0])
+	objectNS := args[0]
+	relation := args[1]
+	subjectNS, subjectID, subjectRel, err := parseSubject(args[2])
 	if err != nil {
 		return err
 	}
-
-	relation := args[1]
-	objectNS := args[2]
 
 	token, err := storage.DefaultToken(
 		cobrautil.MustGetString(cmd, "permissions-system"),
@@ -234,11 +233,11 @@ func lookupCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	request := &v1.LookupResourcesRequest{
-		ResourceObjectType: stringz.Join("/", token.System, objectNS),
+		ResourceObjectType: nsPrefix(objectNS, token.System),
 		Permission:         relation,
 		Subject: &v1.SubjectReference{
 			Object: &v1.ObjectReference{
-				ObjectType: stringz.Join("/", token.System, subjectNS),
+				ObjectType: nsPrefix(subjectNS, token.System),
 				ObjectId:   subjectID,
 			},
 			OptionalRelation: subjectRel,

@@ -35,7 +35,7 @@ var relationshipCmd = &cobra.Command{
 }
 
 var createCmd = &cobra.Command{
-	Use:               "create <subject:id> <relation> <object:id>",
+	Use:               "create <object:id> <relation> <subject:id>",
 	Short:             "create a Relationship for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
@@ -43,7 +43,7 @@ var createCmd = &cobra.Command{
 }
 
 var touchCmd = &cobra.Command{
-	Use:               "touch <subject:id> <relation> <object:id>",
+	Use:               "touch <object:id> <relation> <subject:id>",
 	Short:             "idempotently update a Relationship for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
@@ -51,7 +51,7 @@ var touchCmd = &cobra.Command{
 }
 
 var deleteCmd = &cobra.Command{
-	Use:               "delete <subject:id> <relation> <object:id>",
+	Use:               "delete <object:id> <relation> <subject:id>",
 	Short:             "delete a Relationship",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
@@ -60,15 +60,15 @@ var deleteCmd = &cobra.Command{
 
 func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		subjectNS, subjectID, subjectRel, err := parseSubject(args[0])
+		var objectNS, objectID string
+		err := stringz.SplitExact(args[0], ":", &objectNS, &objectID)
 		if err != nil {
 			return err
 		}
 
 		relation := args[1]
 
-		var objectNS, objectID string
-		err = stringz.SplitExact(args[2], ":", &objectNS, &objectID)
+		subjectNS, subjectID, subjectRel, err := parseSubject(args[2])
 		if err != nil {
 			return err
 		}
@@ -87,17 +87,17 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 
 		request := &v1.WriteRelationshipsRequest{
 			Updates: []*v1.RelationshipUpdate{
-				&v1.RelationshipUpdate{
+				{
 					Operation: operation,
 					Relationship: &v1.Relationship{
 						Resource: &v1.ObjectReference{
-							ObjectType: stringz.Join("/", token.System, objectNS),
+							ObjectType: nsPrefix(objectNS, token.System),
 							ObjectId:   objectID,
 						},
 						Relation: relation,
 						Subject: &v1.SubjectReference{
 							Object: &v1.ObjectReference{
-								ObjectType: stringz.Join("/", token.System, subjectNS),
+								ObjectType: nsPrefix(subjectNS, token.System),
 								ObjectId:   subjectID,
 							},
 							OptionalRelation: subjectRel,

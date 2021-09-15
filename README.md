@@ -62,7 +62,6 @@ The `zed context` subcommand has operations for setting the current, creating, l
 
 `zed login` and `zed use` are aliases that make the most common commands more convenient.
 
-
 ```sh
 zed login my_perms_system tc_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
 zed context list
@@ -81,10 +80,10 @@ For each type of noun used in Authzed, there is a zed subcommand:
 For example, you can read Object Definitions in a Permissions System's Schema, check permissions, and even create or delete relationships.
 
 ```sh
-zed schema read user document
-zed permission check user:emilia writer document:firstdoc
-zed relationship create user:beatrice reader document:firstdoc
-zed relationship delete user:beatrice reader document:firstdoc
+zed schema read
+zed permission check document:firstdoc writer user:emilia
+zed relationship create document:firstdoc reader user:beatrice
+zed relationship delete document:firstdoc reader user:beatrice
 ```
 
 ### Open Policy Agent (OPA)
@@ -94,20 +93,20 @@ Experimentally, zed embeds an instance of [OPA] that supports additional builtin
 The following functions have been added:
 
 ```rego
-authzed.check("subject:id", "permission", "object:id", "zedtoken")
+authzed.check("object:id", "permission", "subject:id", "zedtoken")
 ```
 
 It can be found under the `zed experiment opa` command:
 
 ```sh
-$ zed experiment opa eval 'authzed.check("user:emilia", "reader", "document:firstdoc", "")'
+$ zed experiment opa eval 'authzed.check("document:firstdoc", "reader", "user:emilia", "")'
 {
   "result": [
     {
       "expressions": [
         {
           "value": true,
-          "text": "authzed.check(\"user:emilia\", \"reader\", \"document:firstdoc\", \"\")",
+          "text": "authzed.check(\"document:firstdoc\", \"reader\", \"user:emilia\", \"\")",
           "location": {
             "row": 1,
             "col": 1
