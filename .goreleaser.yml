@@ -1,0 +1,102 @@
+build_common: &build_common
+  main: "./cmd/zed"
+  binary: "zed"
+  env:
+    - "CGO_ENABLED=1"
+  mod_timestamp: "{{ .CommitTimestamp }}"
+  asmflags: ["all=-trimpath={{ .Env.GOPATH }}"]
+  gcflags: ["all=-trimpath={{ .Env.GOPATH }}"]
+  ldflags:
+    - "-s -w"
+    - "-extldflags=-static"
+    - "-X {{ .ModulePath }}/internal/version.Version={{ .Version }}"
+
+builds:
+  - id: "linux-amd64"
+    <<: *build_common
+    goos: ["linux"]
+    goarch: ["amd64"]
+    env: ["CC=gcc"]
+  - id: "linux-arm64"
+    <<: *build_common
+    goos: ["linux"]
+    goarch: ["arm64"]
+    env: ["CC=aarch64-linux-gnu-gcc"]
+  - id: "windows-amd64"
+    <<: *build_common
+    goos: ["windows"]
+    goarch: ["amd64"]
+    env: ["CC=x86_64-w64-mingw32-gcc-posix"]
+
+nfpms:
+  - vendor: "authzed inc."
+    homepage: "https://authzed.com/"
+    maintainer: "authzed <support@authzed.com>"
+    description: "manage Authzed from your command line."
+    license: "Apache 2.0"
+    epoch: 0
+    formats:
+      - "apk"
+      - "deb"
+      - "rpm"
+
+brews:
+  - tap:
+      owner: "authzed"
+      name: "homebrew-tap"
+    url_template: "https://github.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    download_strategy: "CurlDownloadStrategy"
+    commit_author:
+      name: "authzedbot"
+      email: "infrastructure@authzed.com"
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: "https://authzed.com/"
+    description: "manage Authzed from your command line."
+    license: "Apache-2.0"
+    folder: "Formula"
+    custom_block: |
+      head "https://github.com/authzed/zed.git", :branch => "main"
+    dependencies:
+      - name: "go"
+        type: "build"
+    test: |
+      system "#{bin}/zed version"
+    install: |
+      bin.install "zed"
+
+dockers:
+  - image_templates:
+      - "quay.io/authzed/zed:{{ .Version }}-amd64"
+    ids: ["linux-amd64"]
+    goos: "linux"
+    goarch: "amd64"
+    use: "buildx"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+  - image_templates:
+      - "quay.io/authzed/zed:{{ .Version }}-arm64"
+    ids: ["linux-arm64"]
+    goos: "linux"
+    goarch: "arm64"
+    use: "buildx"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+docker_manifests:
+  - name_template: "quay.io/authzed/zed:{{ .Version }}"
+    image_templates:
+      - "quay.io/authzed/zed:{{ .Version }}-amd64"
+      - "quay.io/authzed/zed:{{ .Version }}-arm64"
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: "asc"
+
+release:
+  draft: true
+  prerelease: "auto"
