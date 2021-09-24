@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/99designs/keyring v1.1.6
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
-	github.com/authzed/authzed-go v0.1.1-0.20210915130746-921aebdebf91
+	github.com/authzed/authzed-go v0.1.1-0.20210924155106-b57087bfae56
 	github.com/authzed/grpcutil v0.0.0-20210913124023-cad23ae5a9e8
 	github.com/cockroachdb/cockroach v20.1.13+incompatible
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect

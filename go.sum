@@ -105,8 +105,8 @@ github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj
 github.com/aryann/difflib v0.0.0-20170710044230-e206f873d14a/go.mod h1:DAHtR1m6lCRdSC2Tm3DSWRPvIPr6xNKyeHdqDQSQT+A=
 github.com/ashanbrown/forbidigo v1.1.0/go.mod h1:vVW7PEdqEFqapJe95xHkTfB1+XvZXBFg8t0sG2FIxmI=
 github.com/ashanbrown/makezero v0.0.0-20210308000810-4155955488a0/go.mod h1:oG9Dnez7/ESBqc4EdrdNlryeo7d0KcW1ftXHm7nU/UU=
-github.com/authzed/authzed-go v0.1.1-0.20210915130746-921aebdebf91 h1:u+RLDC3zwImP7vFDNEK+ot0qr9RG/WECnKh6qXQZrzQ=
-github.com/authzed/authzed-go v0.1.1-0.20210915130746-921aebdebf91/go.mod h1:apdJkj5IcZlUM5baEQ2I8P/69T1wPYDh/fjNp89jCv0=
+github.com/authzed/authzed-go v0.1.1-0.20210924155106-b57087bfae56 h1:Aip7ZjgNVE6HkzfRCFmSaFOte0H0GekCjQjhWYnXZh8=
+github.com/authzed/authzed-go v0.1.1-0.20210924155106-b57087bfae56/go.mod h1:yFZS0kYwLQ9NYBmU7NQC9b7gwyVdR+7ba7ObAU+vNJU=
 github.com/authzed/grpcutil v0.0.0-20210913124023-cad23ae5a9e8 h1:HfDkRg7B2Ss2xhSD23535S29cCFFR+N3lt+MYUbc/Aw=
 github.com/authzed/grpcutil v0.0.0-20210913124023-cad23ae5a9e8/go.mod h1:HwO/KbRU3fWXEYHE96kvXnwxzi97tkXD1hfi5UaZ71Y=
 github.com/aws/aws-lambda-go v1.13.3/go.mod h1:4UKl9IzQMoD+QF79YdCuzCwp8VbmG4VAQwij/eHl5CU=
