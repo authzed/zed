@@ -5,7 +5,6 @@ COPY . /go/src/zed
 RUN go mod download
 RUN go install ./cmd/zed
 
-FROM alpine:3.13
-RUN apk --no-cache add ca-certificates
+FROM gcr.io/distroless/base
 COPY --from=build /go/bin/* /usr/local/bin/
 ENTRYPOINT ["zed"]
