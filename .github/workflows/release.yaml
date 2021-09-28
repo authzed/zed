@@ -28,7 +28,7 @@ jobs:
           go-version: "^1.17"
       - name: "build"
         run: |
-          go build -o darwin-zed ./cmd/zed
+          go build -o zed ./cmd/zed
           tar -cvf zed.tar.gz ./zed LICENSE README.md
       - uses: "actions/upload-release-asset@v1"
         env:
