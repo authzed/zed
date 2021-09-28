@@ -110,3 +110,5 @@ changelog:
 release:
   draft: true
   prerelease: "auto"
+  extra_files:
+    - glob: "zed_{{ .Version }}_darwin_amd64.tar.gz"
