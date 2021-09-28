@@ -9,14 +9,16 @@ jobs:
     outputs:
       upload_url: "${{ steps.release.outputs.upload_url }}"
     steps:
+      - id: "get_version"
+        uses: "battila7/get-version-action@v2"
       - uses: "actions/create-release@v1"
         id: "release"
         env:
           GITHUB_TOKEN: "${{ github.token }}"
         with:
           draft: true
-          tag_name: "${GITHUB_REF#refs/tags/}"
-          release_name: "${GITHUB_REF#refs/tags/}"
+          tag_name: "${{ steps.get_version.outputs.version }"
+          release_name: "${{ steps.get_version.outputs.version }"
 
   build-mac:
     needs: "create"
@@ -30,13 +32,15 @@ jobs:
         run: |
           go build -o zed ./cmd/zed
           tar -cvf zed.tar.gz ./zed LICENSE README.md
+      - id: "get_version"
+        uses: "battila7/get-version-action@v2"
       - uses: "actions/upload-release-asset@v1"
         env:
           GITHUB_TOKEN: "${{ github.token }}"
         with:
           upload_url: "${{ needs.create.outputs.upload_url }}"
           asset_path: "zed.tar.gz"
-          asset_name: "zed_${GITHUB_REF#refs/tags/}_darwin_amd64.tar.gz"
+          asset_name: "zed_${{ steps.get_version.outputs.version-without-v }}_darwin_amd64.tar.gz"
           asset_content_type: "application/octet-stream"
 
   goreleaser:
@@ -65,3 +69,4 @@ jobs:
           args: "release --rm-dist"
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          HOMEBREW_TAP_GITHUB_TOKEN: "${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}"
