@@ -15,8 +15,8 @@ jobs:
           GITHUB_TOKEN: "${{ github.token }}"
         with:
           draft: true
-          tag_name: "${{ github.ref }}"
-          release_name: "${{ github.ref }}"
+          tag_name: "${GITHUB_REF#refs/tags/}"
+          release_name: "${GITHUB_REF#refs/tags/}"
 
   build-mac:
     needs: "create"
@@ -36,7 +36,7 @@ jobs:
         with:
           upload_url: "${{ needs.create.outputs.upload_url }}"
           asset_path: "zed.tar.gz"
-          asset_name: "zed_${{ github.ref }}_darwin_amd64.tar.gz"
+          asset_name: "zed_${GITHUB_REF#refs/tags/}_darwin_amd64.tar.gz"
           asset_content_type: "application/octet-stream"
 
   goreleaser:

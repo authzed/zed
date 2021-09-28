@@ -51,6 +51,7 @@ brews:
   - tap:
       owner: "authzed"
       name: "homebrew-tap"
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     url_template: "https://github.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     download_strategy: "CurlDownloadStrategy"
     commit_author:
