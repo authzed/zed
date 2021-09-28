@@ -106,7 +106,6 @@ github.com/ashanbrown/forbidigo v1.1.0/go.mod h1:vVW7PEdqEFqapJe95xHkTfB1+XvZXBF
 github.com/ashanbrown/makezero v0.0.0-20210308000810-4155955488a0/go.mod h1:oG9Dnez7/ESBqc4EdrdNlryeo7d0KcW1ftXHm7nU/UU=
 github.com/authzed/authzed-go v0.0.0-20210706193116-47a8c1aba11e h1:WzvXbu+wiaJH7O786Cj24NT6Y2ZbB3QM6T6nKYm7s+8=
 github.com/authzed/authzed-go v0.0.0-20210706193116-47a8c1aba11e/go.mod h1:a1qVgqL5pcdZq6EXRciRITz/9KJFHyGhPn3Ng/X2bc0=
-github.com/authzed/grpcutil v0.0.0-20210702215403-5fe6e00b4101 h1:z29rHmtuSh2jqwh5AzBXLJ6oGYnW2lEGdDkw0506uqk=
 github.com/authzed/grpcutil v0.0.0-20210702215403-5fe6e00b4101/go.mod h1:ZWOuCUQ/qoVIAWUctRy/lWHI37OcahRzt5ylELzumus=
 github.com/authzed/grpcutil v0.0.0-20210709212005-3a705ca91827 h1:+Jmg0JaD6mjIzUGX+O5c4T7K1L+tlw4RbqYAtHwYLRk=
 github.com/authzed/grpcutil v0.0.0-20210709212005-3a705ca91827/go.mod h1:ZWOuCUQ/qoVIAWUctRy/lWHI37OcahRzt5ylELzumus=
@@ -499,8 +498,6 @@ github.com/juju/ratelimit v1.0.1/go.mod h1:qapgC/Gy+xNh9UxzV13HGGl/6UXNN+ct+vwSg
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8IZAc4RVcycCCAKdM=
 github.com/julz/importas v0.0.0-20210419104244-841f0c0fe66d/go.mod h1:oSFU2R4XK/P7kNBrnL/FEQlDGN1/6WoxXEjSSXO0DV0=
-github.com/jzelinskie/cobrautil v0.0.0-20210619202150-2fc07a6abd5e h1:L+iZASq0+VRhhKGZoCLDby3SBmrh/MjpEUrSGq+o8Qs=
-github.com/jzelinskie/cobrautil v0.0.0-20210619202150-2fc07a6abd5e/go.mod h1:SCYgxNGeeBswvNGD0nQ7OTOX93kPxvMy13czgMflbN0=
 github.com/jzelinskie/cobrautil v0.0.1 h1:XNz4uqmvmcz5q8DoXc21KFUyze9HF9rLYJaynP/iTfg=
 github.com/jzelinskie/cobrautil v0.0.1/go.mod h1:SCYgxNGeeBswvNGD0nQ7OTOX93kPxvMy13czgMflbN0=
 github.com/jzelinskie/stringz v0.0.0-20210414224931-d6a8ce844a70/go.mod h1:hHYbgxJuNLRw91CmpuFsYEOyQqpDVFg8pvEh23vy4P0=
@@ -1373,8 +1370,6 @@ google.golang.org/genproto v0.0.0-20210310155132-4ce2db91004e/go.mod h1:FWY/as6D
 google.golang.org/genproto v0.0.0-20210319143718-93e7006c17a6/go.mod h1:FWY/as6DDZQgahTzZj3fqbO1CbirC29ZNUFHwi0/+no=
 google.golang.org/genproto v0.0.0-20210402141018-6c239bbf2bb1/go.mod h1:9lPAdzaEmUacj36I+k7YKbEc5CXzPIeORRgDAUOu28A=
 google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c/go.mod h1:UODoCrxHCcBojKKwX1terBiRUaqAsFqJiF615XL43r0=
-google.golang.org/genproto v0.0.0-20210701191553-46259e63a0a9 h1:HBPuvo39L0DgfVn9eHR3ki/RjZoUFWa+em77e7KFDfs=
-google.golang.org/genproto v0.0.0-20210701191553-46259e63a0a9/go.mod h1:yiaVoXHpRzHGyxV3o4DktVWY4mSUErTKaeEOq6C3t3U=
 google.golang.org/genproto v0.0.0-20210708141623-e76da96a951f h1:khwpF3oSk7GIab/7DDMDyE8cPQEO6FAfOcWHIRAhO20=
 google.golang.org/genproto v0.0.0-20210708141623-e76da96a951f/go.mod h1:AxrInvYm1dci+enl5hChSFPOmmUF1+uAa/UsgNRWd7k=
 google.golang.org/grpc v1.8.0/go.mod h1:yo6s7OP7yaDglbqo1J04qKzAhqBH6lvTonzMVmEdcZw=
