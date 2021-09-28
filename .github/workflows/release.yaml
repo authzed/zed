@@ -17,8 +17,8 @@ jobs:
           GITHUB_TOKEN: "${{ github.token }}"
         with:
           draft: true
-          tag_name: "${{ steps.get_version.outputs.version }"
-          release_name: "${{ steps.get_version.outputs.version }"
+          tag_name: "${{ steps.get_version.outputs.version }}"
+          release_name: "${{ steps.get_version.outputs.version }}"
 
   build-mac:
     needs: "create"
