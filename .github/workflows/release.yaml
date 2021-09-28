@@ -45,6 +45,8 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - uses: "actions/checkout@v2"
+        with:
+          fetch-depth: 0
       - name: "Install linux cross-compilers"
         run: |
           sudo apt-get install -y gcc-aarch64-linux-gnu gcc-mingw-w64-x86-64

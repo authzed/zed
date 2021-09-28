@@ -6,8 +6,9 @@ builds:
     main: &main "./cmd/zed"
     binary:  &binary "zed"
     mod_timestamp:  &mod_timestamp "{{ .CommitTimestamp }}"
-    asmflags: &asmflags [ "all=-trimpath={{ .Env.GOPATH }}" ]
-    gcflags: &gcflags [ "all=-trimpath={{ .Env.GOPATH }}" ]
+    flags: &flags ["-trimpath"]
+    asmflags: &asmflags [ "all=-trimpath={{ .Env.GITHUB_WORKSPACE }}" ]
+    gcflags: &gcflags [ "all=-trimpath={{ .Env.GITHUB_WORKSPACE }}" ]
     ldflags: &ldflags
       - "-s -w"
       - "-X {{ .ModulePath }}/internal/version.Version={{ .Version }}"
@@ -18,6 +19,7 @@ builds:
     main: *main
     binary: *binary
     mod_timestamp: *mod_timestamp
+    flags: *flags
     asmflags: *asmflags
     gcflags: *gcflags
     ldflags: *ldflags
@@ -28,6 +30,7 @@ builds:
     main: *main
     binary: *binary
     mod_timestamp: *mod_timestamp
+    flags: *flags
     asmflags: *asmflags
     gcflags: *gcflags
     ldflags: *ldflags
