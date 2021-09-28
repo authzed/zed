@@ -1,0 +1,4 @@
+# vim: syntax=dockerfile
+FROM gcr.io/distroless/base
+COPY zed /
+ENTRYPOINT ["/zed"]

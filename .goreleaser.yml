@@ -73,16 +73,18 @@ brews:
 
 dockers:
   - image_templates:
-      - "quay.io/authzed/zed:{{ .Version }}-amd64"
+      - &amd_image "quay.io/authzed/zed:{{ .Version }}-amd64"
     ids: ["linux-amd64"]
+    dockerfile: &dockerfile "Dockerfile.release"
     goos: "linux"
     goarch: "amd64"
     use: "buildx"
     build_flag_templates:
       - "--platform=linux/amd64"
   - image_templates:
-      - "quay.io/authzed/zed:{{ .Version }}-arm64"
+      - &arm_image "quay.io/authzed/zed:{{ .Version }}-arm64"
     ids: ["linux-arm64"]
+    dockerfile: *dockerfile
     goos: "linux"
     goarch: "arm64"
     use: "buildx"
@@ -92,8 +94,8 @@ dockers:
 docker_manifests:
   - name_template: "quay.io/authzed/zed:{{ .Version }}"
     image_templates:
-      - "quay.io/authzed/zed:{{ .Version }}-amd64"
-      - "quay.io/authzed/zed:{{ .Version }}-arm64"
+      - *amd_image
+      - *arm_image
 
 checksum:
   name_template: "checksums.txt"
