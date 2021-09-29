@@ -55,10 +55,12 @@ var schemaWriteCmd = &cobra.Command{
 }
 
 func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
+	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "permissions-system"),
 		cobrautil.MustGetString(cmd, "endpoint"),
 		cobrautil.MustGetString(cmd, "token"),
+		configStore,
+		secretStore,
 	)
 	if err != nil {
 		return err
@@ -105,10 +107,12 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("must provide file path or contents via stdin")
 	}
 
+	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "permissions-system"),
 		cobrautil.MustGetString(cmd, "endpoint"),
 		cobrautil.MustGetString(cmd, "token"),
+		configStore,
+		secretStore,
 	)
 	if err != nil {
 		return err

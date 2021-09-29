@@ -73,14 +73,19 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 			return err
 		}
 
+		configStore, secretStore := defaultStorage()
 		token, err := storage.DefaultToken(
-			cobrautil.MustGetString(cmd, "permissions-system"),
 			cobrautil.MustGetString(cmd, "endpoint"),
 			cobrautil.MustGetString(cmd, "token"),
+			configStore,
+			secretStore,
 		)
+		if err != nil {
+			return err
+		}
 		log.Trace().Interface("token", token).Send()
 
-		client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+		client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
 		if err != nil {
 			return err
 		}

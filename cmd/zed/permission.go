@@ -92,17 +92,19 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "permissions-system"),
 		cobrautil.MustGetString(cmd, "endpoint"),
 		cobrautil.MustGetString(cmd, "token"),
+		configStore,
+		secretStore,
 	)
 	if err != nil {
 		return err
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
 	if err != nil {
 		return err
 	}
@@ -157,17 +159,19 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "permissions-system"),
 		cobrautil.MustGetString(cmd, "endpoint"),
 		cobrautil.MustGetString(cmd, "token"),
+		configStore,
+		secretStore,
 	)
 	if err != nil {
 		return err
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
 	if err != nil {
 		return err
 	}
@@ -217,17 +221,19 @@ func lookupCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "permissions-system"),
 		cobrautil.MustGetString(cmd, "endpoint"),
 		cobrautil.MustGetString(cmd, "token"),
+		configStore,
+		secretStore,
 	)
 	if err != nil {
 		return err
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
 	if err != nil {
 		return err
 	}

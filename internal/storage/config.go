@@ -6,25 +6,20 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mitchellh/go-homedir"
+	"github.com/jzelinskie/stringz"
 	"tailscale.com/atomicfile"
 )
 
-const configFile = "config.json"
+const configFileName = "config.json"
 
-var (
-	// DefaultConfigStore is the ConfigStore that should be used unless otherwise
-	// specified.
-	DefaultConfigStore = HomeJSONConfigStore{}
-
-	// ErrConfigNotFound is returned if there is no Config in a ConfigStore.
-	ErrConfigNotFound = errors.New("config did not exist")
-)
+// ErrConfigNotFound is returned if there is no Config in a ConfigStore.
+var ErrConfigNotFound = errors.New("config did not exist")
 
 // Config represents the contents of a zed configuration file.
 type Config struct {
 	Version      string
 	CurrentToken string
+	Tokens       []Token
 }
 
 // ConfigStore is anything that can persistently store a Config.
@@ -33,23 +28,50 @@ type ConfigStore interface {
 	Put(Config) error
 }
 
+var ErrMissingToken = errors.New("could not find token")
+
+// DefaultToken creates a Token from input, filling any missing values in
+// with the current context's defaults.
+func DefaultToken(overrideEndpoint, overrideApiToken string, cs ConfigStore, ss SecretStore) (Token, error) {
+	if overrideEndpoint != "" && overrideApiToken != "" {
+		return Token{
+			Name:     "env",
+			Endpoint: overrideEndpoint,
+			ApiToken: overrideApiToken,
+		}, nil
+	}
+
+	token, err := CurrentToken(cs, ss)
+	if err != nil {
+		if errors.Is(err, ErrConfigNotFound) {
+			return Token{}, errors.New("must first save a token: see `zed token save --help`")
+		}
+		return Token{}, err
+	}
+
+	return Token{
+		Name:     token.Name,
+		Endpoint: stringz.DefaultEmpty(overrideEndpoint, token.Endpoint),
+		ApiToken: stringz.DefaultEmpty(overrideApiToken, token.ApiToken),
+	}, nil
+}
+
 // CurrentToken is convenient way to obtain the CurrentToken field from the
 // current Config.
-func CurrentToken(cs ConfigStore, ts TokenStore) (Token, error) {
+func CurrentToken(cs ConfigStore, ss SecretStore) (Token, error) {
 	cfg, err := cs.Get()
 	if err != nil {
 		return Token{}, err
 	}
 
-	return ts.Get(cfg.CurrentToken)
+	return GetToken(cfg.CurrentToken, ss)
 }
 
 // SetCurrentToken is a convenient way to set the CurrentToken field in a
 // the current config.
-func SetCurrentToken(name string, cs ConfigStore, ts TokenStore) error {
+func SetCurrentToken(name string, cs ConfigStore, ss SecretStore) error {
 	// Ensure the token exists
-	_, err := ts.Get(name)
-	if err != nil {
+	if _, err := GetToken(name, ss); err != nil {
 		return err
 	}
 
@@ -66,33 +88,17 @@ func SetCurrentToken(name string, cs ConfigStore, ts TokenStore) error {
 	return cs.Put(cfg)
 }
 
-// HomeJSONConfigStore implements a ConfigStore that stores its Config in the
-// file "${XDG_CONFIG_HOME:-$HOME/.zed}/config.json".
-type HomeJSONConfigStore struct{}
-
-// Enforce that our implementation satisfies the interface.
-var _ ConfigStore = HomeJSONConfigStore{}
-
-func localConfigPath() (string, error) {
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "zed"), nil
-	}
-
-	home, err := homedir.Dir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".zed"), nil
+// JSONConfigStore implements a ConfigStore that stores its Config in a JSON file at the provided ConfigPath.
+type JSONConfigStore struct {
+	ConfigPath string
 }
 
-// Get parses a Config from the filesystem.
-func (s HomeJSONConfigStore) Get() (Config, error) {
-	path, err := localConfigPath()
-	if err != nil {
-		return Config{}, err
-	}
+// Enforce that our implementation satisfies the interface.
+var _ ConfigStore = JSONConfigStore{}
 
-	cfgBytes, err := os.ReadFile(filepath.Join(path, configFile))
+// Get parses a Config from the filesystem.
+func (s JSONConfigStore) Get() (Config, error) {
+	cfgBytes, err := os.ReadFile(filepath.Join(s.ConfigPath, configFileName))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Config{}, ErrConfigNotFound
@@ -109,12 +115,8 @@ func (s HomeJSONConfigStore) Get() (Config, error) {
 }
 
 // Put overwrites a Config on the filesystem.
-func (s HomeJSONConfigStore) Put(cfg Config) error {
-	path, err := localConfigPath()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(path, 0o774); err != nil {
+func (s JSONConfigStore) Put(cfg Config) error {
+	if err := os.MkdirAll(s.ConfigPath, 0o774); err != nil {
 		return err
 	}
 
@@ -123,5 +125,5 @@ func (s HomeJSONConfigStore) Put(cfg Config) error {
 		return err
 	}
 
-	return atomicfile.WriteFile(filepath.Join(path, configFile), cfgBytes, 0o774)
+	return atomicfile.WriteFile(filepath.Join(s.ConfigPath, configFileName), cfgBytes, 0o774)
 }

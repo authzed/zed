@@ -3,16 +3,30 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/authzed/grpcutil"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
+	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 
+	"github.com/authzed/zed/internal/storage"
 	"github.com/authzed/zed/internal/version"
 )
+
+func defaultStorage() (storage.ConfigStore, storage.SecretStore) {
+	var home string
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		home = filepath.Join(xdg, "zed")
+	} else {
+		homedir, _ := homedir.Dir()
+		home = filepath.Join(homedir, ".zed")
+	}
+	return storage.JSONConfigStore{ConfigPath: home}, storage.KeychainSecretStore{ConfigPath: home}
+}
 
 func dialOptsFromFlags(cmd *cobra.Command, token string) []grpc.DialOption {
 	var opts []grpc.DialOption
