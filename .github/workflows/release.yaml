@@ -17,10 +17,10 @@ jobs:
         run: |
           go build -o zed ./cmd/zed
           tar -cvf zed_${{ steps.get_version.outputs.version-without-v }}_darwin_amd64.tar.gz ./zed LICENSE README.md
-      - uses: actions/upload-artifact@v2
+      - uses: "actions/upload-artifact@v2"
         with:
-          name: darwin_zed
-          path: zed_${{ steps.get_version.outputs.version-without-v }}_darwin_amd64.tar.gz
+          name: "darwin_zed"
+          path: "zed_${{ steps.get_version.outputs.version-without-v }}_darwin_amd64.tar.gz"
 
   goreleaser:
     # goreleaser will create the homebrew update, needs the mac build to exist
@@ -35,12 +35,15 @@ jobs:
           registry: "quay.io"
           username: "${{ secrets.QUAY_USERNAME }}"
           password: "${{ secrets.QUAY_ROBOT_TOKEN }}"
+      - name: "create dist dir"
+        run: |
+          mkdir dist
       - id: "get_version"
         uses: "battila7/get-version-action@v2"
-      - uses: actions/download-artifact@v2
+      - uses: "actions/download-artifact@v2"
         with:
-          name: darwin_zed
-          path: zed_${{ steps.get_version.outputs.version-without-v }}_darwin_amd64.tar.gz
+          name: "darwin_zed"
+          path: "dist/zed_${{ steps.get_version.outputs.version-without-v }}_darwin_amd64.tar.gz"
       - name: "Install linux cross-compilers"
         run: |
           sudo apt-get install -y gcc-aarch64-linux-gnu gcc-mingw-w64-x86-64
