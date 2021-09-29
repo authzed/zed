@@ -77,13 +77,7 @@ func main() {
 
 	// Register root-level aliases
 	rootCmd.AddCommand(&cobra.Command{
-		Use:               "login <system> <token>",
-		Short:             "an alias for `zed context set`",
-		PersistentPreRunE: persistentPreRunE,
-		RunE:              contextSetCmdFunc,
-	})
-	rootCmd.AddCommand(&cobra.Command{
-		Use:               "use <system>",
+		Use:               "use <context>",
 		Short:             "an alias for `zed context use`",
 		Args:              cobra.MaximumNArgs(1),
 		PersistentPreRunE: persistentPreRunE,

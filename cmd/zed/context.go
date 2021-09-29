@@ -38,9 +38,9 @@ var contextListCmd = &cobra.Command{
 }
 
 var contextSetCmd = &cobra.Command{
-	Use:               "set <name> <api-token>",
+	Use:               "set <name> <endpoint> <api-token>",
 	Short:             "create or overwrite a context",
-	Args:              cobra.ExactArgs(2),
+	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
 	RunE:              contextSetCmdFunc,
 }
@@ -99,8 +99,8 @@ func contextListCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
-	var name, apiToken string
-	err := stringz.Unpack(args, &name, &apiToken)
+	var name, endpoint, apiToken string
+	err := stringz.Unpack(args, &name, &endpoint, &apiToken)
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 	cfgStore, secretStore := defaultStorage()
 	err = storage.PutToken(storage.Token{
 		Name:     name,
-		Endpoint: stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "endpoint"), "grpc.authzed.com:443"),
+		Endpoint: stringz.DefaultEmpty(endpoint, "grpc.authzed.com:443"),
 		ApiToken: apiToken,
 	}, secretStore)
 	if err != nil {
