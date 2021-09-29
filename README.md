@@ -93,7 +93,7 @@ Experimentally, zed embeds an instance of [OPA] that supports additional builtin
 The following functions have been added:
 
 ```rego
-authzed.check("object:id", "permission", "subject:id", "zedtoken")
+authzed.check("resource:id", "permission", "subject:id", "zedtoken")
 ```
 
 It can be found under the `zed experiment opa` command:

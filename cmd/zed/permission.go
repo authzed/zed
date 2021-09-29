@@ -42,7 +42,7 @@ var permissionCmd = &cobra.Command{
 }
 
 var checkCmd = &cobra.Command{
-	Use:               "check <object:id> <permission> <subject:id>",
+	Use:               "check <resource:id> <permission> <subject:id>",
 	Short:             "check that a Permission exists for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
@@ -50,7 +50,7 @@ var checkCmd = &cobra.Command{
 }
 
 var expandCmd = &cobra.Command{
-	Use:               "expand <permission> <object:id>",
+	Use:               "expand <permission> <resource:id>",
 	Short:             "expand the structure of a Permission",
 	Args:              cobra.ExactArgs(2),
 	PersistentPreRunE: persistentPreRunE,
@@ -58,8 +58,8 @@ var expandCmd = &cobra.Command{
 }
 
 var lookupCmd = &cobra.Command{
-	Use:               "lookup <object> <permission> <subject:id>",
-	Short:             "lookup the Object Instances for which the Subject has Permission",
+	Use:               "lookup <type> <permission> <subject:id>",
+	Short:             "lookup the Resources of a given type for which the Subject has Permission",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
 	RunE:              lookupCmdFunc,

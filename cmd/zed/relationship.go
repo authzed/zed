@@ -35,7 +35,7 @@ var relationshipCmd = &cobra.Command{
 }
 
 var createCmd = &cobra.Command{
-	Use:               "create <object:id> <relation> <subject:id>",
+	Use:               "create <resource:id> <relation> <subject:id>",
 	Short:             "create a Relationship for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
@@ -43,7 +43,7 @@ var createCmd = &cobra.Command{
 }
 
 var touchCmd = &cobra.Command{
-	Use:               "touch <object:id> <relation> <subject:id>",
+	Use:               "touch <resource:id> <relation> <subject:id>",
 	Short:             "idempotently update a Relationship for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
@@ -51,7 +51,7 @@ var touchCmd = &cobra.Command{
 }
 
 var deleteCmd = &cobra.Command{
-	Use:               "delete <object:id> <relation> <subject:id>",
+	Use:               "delete <resource:id> <relation> <subject:id>",
 	Short:             "delete a Relationship",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
