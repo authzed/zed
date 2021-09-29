@@ -14,15 +14,14 @@ A command-line client for managing Authzed.
 Developers create a schema that models their permissions requirements and use a client, such as this one, to apply the schema to the database, insert data into the database, and query the data to efficiently check permissions in their applications.
 
 zed features include:
-- Unix-friendly interface for the [v0] and [v1alpha1] [Authzed APIs]
+- Unix-friendly interface for the [v1] [Authzed APIs]
 - Context switching that stores API Tokens securely in your OS keychain
 - An experimental [OPA] REPL with authzed builtin functions
 
 See [CONTRIBUTING.md] for instructions on how to contribute and perform common tasks like building the project and running tests.
 
 [Authzed]: https://authzed.com
-[v0]: https://docs.authzed.com/reference/api#authzedapiv0
-[v1alpha1]: https://docs.authzed.com/reference/api#authzedapiv1alpha1
+[v1]: https://buf.build/authzed/api/docs/main/authzed.api.v1
 [Authzed APIs]: https://docs.authzed.com/reference/api
 [OPA]: https://openpolicyagent.org
 [CONTRIBUTING.md]: CONTRIBUTING.md
