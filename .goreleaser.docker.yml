@@ -49,3 +49,6 @@ docker_manifests:
     image_templates:
       - *amd_image
       - *arm_image
+
+release:
+  disable: true
