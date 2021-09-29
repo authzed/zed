@@ -2,7 +2,7 @@ builds:
   - id: "linux-amd64"
     goos: ["linux"]
     goarch: ["amd64"]
-    env: ["CC=gcc", "CGO_ENABLED=1"]
+    env: ["CC=x86_64-unknown-linux-gnu-gcc", "CGO_ENABLED=1"]
     main: &main "./cmd/zed"
     binary:  &binary "zed"
     mod_timestamp:  &mod_timestamp "{{ .CommitTimestamp }}"
@@ -15,7 +15,7 @@ builds:
   - id: "linux-arm64"
     goos: ["linux"]
     goarch: ["arm64"]
-    env: ["CC=aarch64-linux-gnu-gcc", "CGO_ENABLED=1"]
+    env: ["CC=aarch64-unknown-linux-gnu-gcc", "CGO_ENABLED=1"]
     main: *main
     binary: *binary
     mod_timestamp: *mod_timestamp
@@ -26,7 +26,29 @@ builds:
   - id: "windows-amd64"
     goos: ["windows"]
     goarch: ["amd64"]
-    env: ["CC=x86_64-w64-mingw32-gcc-posix", "CGO_ENABLED=1"]
+    env: ["CC=x86_64-w64-mingw32-gcc", "CGO_ENABLED=1"]
+    main: *main
+    binary: *binary
+    mod_timestamp: *mod_timestamp
+    flags: *flags
+    asmflags: *asmflags
+    gcflags: *gcflags
+    ldflags: *ldflags
+  - id: "darwin-amd64"
+    goos: ["darwin"]
+    goarch: ["amd64"]
+    env: ["CGO_ENABLED=1"]
+    main: *main
+    binary: *binary
+    mod_timestamp: *mod_timestamp
+    flags: *flags
+    asmflags: *asmflags
+    gcflags: *gcflags
+    ldflags: *ldflags
+  - id: "darwin-arm64"
+    goos: ["darwin"]
+    goarch: ["arm64"]
+    env: ["CGO_ENABLED=1"]
     main: *main
     binary: *binary
     mod_timestamp: *mod_timestamp
@@ -110,5 +132,3 @@ changelog:
 release:
   draft: true
   prerelease: "auto"
-  extra_files:
-    - glob: "**/*darwin*.tar.gz"
