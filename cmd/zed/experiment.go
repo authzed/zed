@@ -53,12 +53,12 @@ func opaPreRunCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	registerAuthzedBuiltins(token.System, client)
+	registerAuthzedBuiltins(client)
 
 	return nil
 }
 
-func registerAuthzedBuiltins(system string, client *authzed.Client) {
+func registerAuthzedBuiltins(client *authzed.Client) {
 	rego.RegisterBuiltin4(
 		&rego.Function{
 			Name:    "authzed.check",

@@ -38,7 +38,7 @@ var contextListCmd = &cobra.Command{
 }
 
 var contextSetCmd = &cobra.Command{
-	Use:               "set <system> <token>",
+	Use:               "set <name> <api-token>",
 	Short:             "create or overwrite a context",
 	Args:              cobra.ExactArgs(2),
 	PersistentPreRunE: persistentPreRunE,
@@ -62,59 +62,66 @@ var contextUseCmd = &cobra.Command{
 }
 
 func contextListCmdFunc(cmd *cobra.Command, args []string) error {
-	tokens, err := storage.DefaultTokenStore.List(cobrautil.MustGetBool(cmd, "reveal-tokens"))
+	cfgStore, secretStore := defaultStorage()
+	secrets, err := secretStore.Get()
 	if err != nil {
 		return err
 	}
 
-	cfg, err := storage.DefaultConfigStore.Get()
+	cfg, err := cfgStore.Get()
 	if err != nil {
 		return err
 	}
 
 	var rows [][]string
-	for _, token := range tokens {
+	for _, token := range secrets.Tokens {
 		current := ""
-		if token.System == cfg.CurrentToken {
+		if token.Name == cfg.CurrentToken {
 			current = "   ✓   "
 		}
-		secret := token.Secret
-		if token.Prefix != "" {
-			secret = stringz.Join("_", token.Prefix, token.Secret)
+		secret := token.ApiToken
+		if !cobrautil.MustGetBool(cmd, "reveal-tokens") {
+			prefix, _ := token.SplitApiToken()
+			secret = stringz.Join("_", prefix, "<redacted>")
 		}
 
 		rows = append(rows, []string{
 			current,
-			token.System,
+			token.Name,
 			token.Endpoint,
 			secret,
 		})
 	}
 
-	printers.PrintTable(os.Stdout, []string{"current", "permissions system", "endpoint", "token"}, rows)
+	printers.PrintTable(os.Stdout, []string{"current", "name", "endpoint", "token"}, rows)
 
 	return nil
 }
 
 func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
-	var name, token string
-	err := stringz.Unpack(args, &name, &token)
-	if err != nil {
-		return err
-	}
-	endpoint := stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "endpoint"), "grpc.authzed.com:443")
-
-	err = storage.DefaultTokenStore.Put(name, endpoint, token)
+	var name, apiToken string
+	err := stringz.Unpack(args, &name, &apiToken)
 	if err != nil {
 		return err
 	}
 
-	return storage.SetCurrentToken(name, storage.DefaultConfigStore, storage.DefaultTokenStore)
+	cfgStore, secretStore := defaultStorage()
+	err = storage.PutToken(storage.Token{
+		Name:     name,
+		Endpoint: stringz.DefaultEmpty(cobrautil.MustGetString(cmd, "endpoint"), "grpc.authzed.com:443"),
+		ApiToken: apiToken,
+	}, secretStore)
+	if err != nil {
+		return err
+	}
+
+	return storage.SetCurrentToken(name, cfgStore, secretStore)
 }
 
 func contextRemoveCmdFunc(cmd *cobra.Command, args []string) error {
 	// If the token is what's currently being used, remove it from the config.
-	cfg, err := storage.DefaultConfigStore.Get()
+	cfgStore, secretStore := defaultStorage()
+	cfg, err := cfgStore.Get()
 	if err != nil {
 		return err
 	}
@@ -122,25 +129,26 @@ func contextRemoveCmdFunc(cmd *cobra.Command, args []string) error {
 	if cfg.CurrentToken == args[0] {
 		cfg.CurrentToken = ""
 	}
-	err = storage.DefaultConfigStore.Put(cfg)
+
+	err = cfgStore.Put(cfg)
 	if err != nil {
 		return err
 	}
 
-	return storage.DefaultTokenStore.Delete(args[0])
+	return storage.RemoveToken(args[0], secretStore)
 }
 
 func contextUseCmdFunc(cmd *cobra.Command, args []string) error {
+	cfgStore, secretStore := defaultStorage()
 	switch len(args) {
 	case 0:
-		cfg, err := storage.DefaultConfigStore.Get()
+		cfg, err := cfgStore.Get()
 		if err != nil {
 			return err
 		}
 		fmt.Println(cfg.CurrentToken)
-
 	case 1:
-		return storage.SetCurrentToken(args[0], storage.DefaultConfigStore, storage.DefaultTokenStore)
+		return storage.SetCurrentToken(args[0], cfgStore, secretStore)
 	default:
 		panic("cobra command did not enforce valid number of args")
 	}

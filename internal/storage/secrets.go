@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/99designs/keyring"
 	"golang.org/x/term"
@@ -18,6 +19,11 @@ type Token struct {
 	Name     string
 	Endpoint string
 	ApiToken string
+}
+
+func (t Token) SplitApiToken() (prefix, secret string) {
+	exploded := strings.Split(t.ApiToken, "_")
+	return strings.Join(exploded[:len(exploded)-1], "_"), exploded[len(exploded)-1]
 }
 
 type Secrets struct {
@@ -42,6 +48,43 @@ func GetToken(name string, ss SecretStore) (Token, error) {
 	}
 
 	return Token{}, ErrTokenNotFound
+}
+
+func PutToken(t Token, ss SecretStore) error {
+	secrets, err := ss.Get()
+	if err != nil {
+		return err
+	}
+
+	replaced := false
+	for i, token := range secrets.Tokens {
+		if token.Name == t.Name {
+			secrets.Tokens[i] = t
+			replaced = true
+		}
+	}
+
+	if !replaced {
+		secrets.Tokens = append(secrets.Tokens, t)
+	}
+
+	return ss.Put(secrets)
+}
+
+func RemoveToken(name string, ss SecretStore) error {
+	secrets, err := ss.Get()
+	if err != nil {
+		return err
+	}
+
+	for i, token := range secrets.Tokens {
+		if token.Name == name {
+			secrets.Tokens = append(secrets.Tokens[:i], secrets.Tokens[i+1:]...)
+			break
+		}
+	}
+
+	return ss.Put(secrets)
 }
 
 type KeychainSecretStore struct {

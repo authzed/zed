@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strings"
 
 	"github.com/TylerBrock/colorjson"
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -67,16 +66,13 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
 	if err != nil {
 		return err
 	}
 
 	var objDefs []string
 	for _, arg := range args {
-		if !strings.Contains(arg, "/") {
-			arg = stringz.Join("/", token.System, arg)
-		}
 		objDefs = append(objDefs, arg)
 	}
 
@@ -119,7 +115,7 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
 	if err != nil {
 		return err
 	}
