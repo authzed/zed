@@ -1,0 +1,51 @@
+builds:
+  - id: "linux-amd64"
+    goos: [ "linux" ]
+    goarch: [ "amd64" ]
+    env: [ "CC=gcc", "CGO_ENABLED=1" ]
+    main: &main "./cmd/zed"
+    binary: &binary "zed"
+    mod_timestamp: &mod_timestamp "{{ .CommitTimestamp }}"
+    flags: &flags [ "-trimpath" ]
+    asmflags: &asmflags [ "all=-trimpath={{ .Env.GITHUB_WORKSPACE }}" ]
+    gcflags: &gcflags [ "all=-trimpath={{ .Env.GITHUB_WORKSPACE }}" ]
+    ldflags: &ldflags
+      - "-s -w"
+      - "-X {{ .ModulePath }}/internal/version.Version={{ .Version }}"
+  - id: "linux-arm64"
+    goos: [ "linux" ]
+    goarch: [ "arm64" ]
+    env: [ "CC=aarch64-linux-gnu-gcc", "CGO_ENABLED=1" ]
+    main: *main
+    binary: *binary
+    mod_timestamp: *mod_timestamp
+    flags: *flags
+    asmflags: *asmflags
+    gcflags: *gcflags
+    ldflags: *ldflags
+
+dockers:
+  - image_templates:
+      - &amd_image "quay.io/authzed/zed:{{ .Version }}-amd64"
+    ids: ["linux-amd64"]
+    dockerfile: &dockerfile "Dockerfile.release"
+    goos: "linux"
+    goarch: "amd64"
+    use: "buildx"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+  - image_templates:
+      - &arm_image "quay.io/authzed/zed:{{ .Version }}-arm64"
+    ids: ["linux-arm64"]
+    dockerfile: *dockerfile
+    goos: "linux"
+    goarch: "arm64"
+    use: "buildx"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+docker_manifests:
+  - name_template: "quay.io/authzed/zed:{{ .Version }}"
+    image_templates:
+      - *amd_image
+      - *arm_image
