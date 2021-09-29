@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/authzed/grpcutil"
 	"github.com/jzelinskie/cobrautil"
-	"github.com/jzelinskie/stringz"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -41,13 +39,6 @@ func dialOptsFromFlags(cmd *cobra.Command, token string) []grpc.DialOption {
 	}
 
 	return opts
-}
-
-func nsPrefix(ns, system string) string {
-	if strings.Contains(ns, "/") {
-		return ns
-	}
-	return stringz.Join("/", system, ns)
 }
 
 var persistentPreRunE = cobrautil.CommandStack(

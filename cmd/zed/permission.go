@@ -111,13 +111,13 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 
 	request := &v1.CheckPermissionRequest{
 		Resource: &v1.ObjectReference{
-			ObjectType: nsPrefix(objectNS, token.System),
+			ObjectType: objectNS,
 			ObjectId:   objectID,
 		},
 		Permission: relation,
 		Subject: &v1.SubjectReference{
 			Object: &v1.ObjectReference{
-				ObjectType: nsPrefix(subjectNS, token.System),
+				ObjectType: subjectNS,
 				ObjectId:   subjectID,
 			},
 			OptionalRelation: subjectRel,
@@ -178,7 +178,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 
 	request := &v1.ExpandPermissionTreeRequest{
 		Resource: &v1.ObjectReference{
-			ObjectType: nsPrefix(objectNS, token.System),
+			ObjectType: objectNS,
 			ObjectId:   objectID,
 		},
 		Permission: relation,
@@ -239,11 +239,11 @@ func lookupCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	request := &v1.LookupResourcesRequest{
-		ResourceObjectType: nsPrefix(objectNS, token.System),
+		ResourceObjectType: objectNS,
 		Permission:         relation,
 		Subject: &v1.SubjectReference{
 			Object: &v1.ObjectReference{
-				ObjectType: nsPrefix(subjectNS, token.System),
+				ObjectType: subjectNS,
 				ObjectId:   subjectID,
 			},
 			OptionalRelation: subjectRel,

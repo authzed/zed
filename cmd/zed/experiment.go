@@ -93,13 +93,13 @@ func registerAuthzedBuiltins(system string, client *authzed.Client) {
 
 			request := &v1.CheckPermissionRequest{
 				Resource: &v1.ObjectReference{
-					ObjectType: nsPrefix(objectNS, system),
+					ObjectType: objectNS,
 					ObjectId:   objectID,
 				},
 				Permission: relation,
 				Subject: &v1.SubjectReference{
 					Object: &v1.ObjectReference{
-						ObjectType: nsPrefix(subjectNS, system),
+						ObjectType: subjectNS,
 						ObjectId:   subjectID,
 					},
 					OptionalRelation: subjectRel,

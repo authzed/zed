@@ -96,13 +96,13 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 					Operation: operation,
 					Relationship: &v1.Relationship{
 						Resource: &v1.ObjectReference{
-							ObjectType: nsPrefix(objectNS, token.System),
+							ObjectType: objectNS,
 							ObjectId:   objectID,
 						},
 						Relation: relation,
 						Subject: &v1.SubjectReference{
 							Object: &v1.ObjectReference{
-								ObjectType: nsPrefix(subjectNS, token.System),
+								ObjectType: subjectNS,
 								ObjectId:   subjectID,
 							},
 							OptionalRelation: subjectRel,
