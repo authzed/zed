@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 
-	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
-	"github.com/authzed/authzed-go/v0"
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/authzed-go/v1"
 	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
@@ -41,7 +42,7 @@ var permissionCmd = &cobra.Command{
 }
 
 var checkCmd = &cobra.Command{
-	Use:               "check <subject:id> <permission> <object:id>",
+	Use:               "check <resource:id> <permission> <subject:id>",
 	Short:             "check that a Permission exists for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
@@ -49,7 +50,7 @@ var checkCmd = &cobra.Command{
 }
 
 var expandCmd = &cobra.Command{
-	Use:               "expand <permission> <object:id>",
+	Use:               "expand <permission> <resource:id>",
 	Short:             "expand the structure of a Permission",
 	Args:              cobra.ExactArgs(2),
 	PersistentPreRunE: persistentPreRunE,
@@ -57,8 +58,8 @@ var expandCmd = &cobra.Command{
 }
 
 var lookupCmd = &cobra.Command{
-	Use:               "lookup <subject:id> <permission> <object>",
-	Short:             "lookup the Object Instances for which the Subject has Permission",
+	Use:               "lookup <type> <permission> <subject:id>",
+	Short:             "lookup the Resources of a given type for which the Subject has Permission",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
 	RunE:              lookupCmdFunc,
@@ -78,55 +79,59 @@ func parseSubject(s string) (namespace, id, relation string, err error) {
 }
 
 func checkCmdFunc(cmd *cobra.Command, args []string) error {
-	subjectNS, subjectID, subjectRel, err := parseSubject(args[0])
+	var objectNS, objectID string
+	err := stringz.SplitExact(args[0], ":", &objectNS, &objectID)
 	if err != nil {
 		return err
 	}
 
 	relation := args[1]
 
-	var objectNS, objectID string
-	err = stringz.SplitExact(args[2], ":", &objectNS, &objectID)
+	subjectNS, subjectID, subjectRel, err := parseSubject(args[2])
 	if err != nil {
 		return err
 	}
 
+	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "permissions-system"),
 		cobrautil.MustGetString(cmd, "endpoint"),
 		cobrautil.MustGetString(cmd, "token"),
+		configStore,
+		secretStore,
 	)
 	if err != nil {
 		return err
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
 	if err != nil {
 		return err
 	}
 
-	request := &v0.CheckRequest{
-		TestUserset: &v0.ObjectAndRelation{
-			Namespace: stringz.Join("/", token.System, objectNS),
-			ObjectId:  objectID,
-			Relation:  relation,
+	request := &v1.CheckPermissionRequest{
+		Resource: &v1.ObjectReference{
+			ObjectType: objectNS,
+			ObjectId:   objectID,
 		},
-		User: &v0.User{UserOneof: &v0.User_Userset{
-			Userset: &v0.ObjectAndRelation{
-				Namespace: stringz.Join("/", token.System, subjectNS),
-				ObjectId:  subjectID,
-				Relation:  subjectRel,
+		Permission: relation,
+		Subject: &v1.SubjectReference{
+			Object: &v1.ObjectReference{
+				ObjectType: subjectNS,
+				ObjectId:   subjectID,
 			},
-		}},
+			OptionalRelation: subjectRel,
+		},
 	}
 
-	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
-		request.AtRevision = &v0.Zookie{Token: zedToken}
+	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
+		request.Consistency = &v1.Consistency{
+			Requirement: &v1.Consistency_AtLeastAsFresh{&v1.ZedToken{Token: zedtoken}},
+		}
 	}
 	log.Trace().Interface("request", request).Send()
 
-	resp, err := client.Check(context.Background(), request)
+	resp, err := client.CheckPermission(context.Background(), request)
 	if err != nil {
 		return err
 	}
@@ -141,8 +146,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Println(resp.Membership == v0.CheckResponse_MEMBER)
-
+	fmt.Println(resp.Permissionship == v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION)
 	return nil
 }
 
@@ -155,35 +159,39 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "permissions-system"),
 		cobrautil.MustGetString(cmd, "endpoint"),
 		cobrautil.MustGetString(cmd, "token"),
+		configStore,
+		secretStore,
 	)
 	if err != nil {
 		return err
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
 	if err != nil {
 		return err
 	}
 
-	request := &v0.ExpandRequest{
-		Userset: &v0.ObjectAndRelation{
-			Namespace: stringz.Join("/", token.System, objectNS),
-			ObjectId:  objectID,
-			Relation:  relation,
+	request := &v1.ExpandPermissionTreeRequest{
+		Resource: &v1.ObjectReference{
+			ObjectType: objectNS,
+			ObjectId:   objectID,
 		},
+		Permission: relation,
 	}
 
-	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
-		request.AtRevision = &v0.Zookie{Token: zedToken}
+	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
+		request.Consistency = &v1.Consistency{
+			Requirement: &v1.Consistency_AtLeastAsFresh{&v1.ZedToken{Token: zedtoken}},
+		}
 	}
 	log.Trace().Interface("request", request).Send()
 
-	resp, err := client.Expand(context.Background(), request)
+	resp, err := client.ExpandPermissionTree(context.Background(), request)
 	if err != nil {
 		return err
 	}
@@ -199,71 +207,81 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	tp := treeprinter.New()
-	printers.TreeNodeTree(tp, resp.GetTreeNode())
+	printers.TreeNodeTree(tp, resp.TreeRoot)
 	fmt.Println(tp.String())
 
 	return nil
 }
 
 func lookupCmdFunc(cmd *cobra.Command, args []string) error {
-	subjectNS, subjectID, subjectRel, err := parseSubject(args[0])
+	objectNS := args[0]
+	relation := args[1]
+	subjectNS, subjectID, subjectRel, err := parseSubject(args[2])
 	if err != nil {
 		return err
 	}
 
-	relation := args[1]
-	objectNS := args[2]
-
+	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "permissions-system"),
 		cobrautil.MustGetString(cmd, "endpoint"),
 		cobrautil.MustGetString(cmd, "token"),
+		configStore,
+		secretStore,
 	)
 	if err != nil {
 		return err
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
 	if err != nil {
 		return err
 	}
 
-	request := &v0.LookupRequest{
-		ObjectRelation: &v0.RelationReference{
-			Namespace: stringz.Join("/", token.System, objectNS),
-			Relation:  relation,
-		},
-		User: &v0.ObjectAndRelation{
-			Namespace: stringz.Join("/", token.System, subjectNS),
-			ObjectId:  subjectID,
-			Relation:  subjectRel,
+	request := &v1.LookupResourcesRequest{
+		ResourceObjectType: objectNS,
+		Permission:         relation,
+		Subject: &v1.SubjectReference{
+			Object: &v1.ObjectReference{
+				ObjectType: subjectNS,
+				ObjectId:   subjectID,
+			},
+			OptionalRelation: subjectRel,
 		},
 	}
 
-	if zedToken := cobrautil.MustGetString(cmd, "revision"); zedToken != "" {
-		request.AtRevision = &v0.Zookie{Token: zedToken}
+	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
+		request.Consistency = &v1.Consistency{
+			Requirement: &v1.Consistency_AtLeastAsFresh{&v1.ZedToken{Token: zedtoken}},
+		}
 	}
 	log.Trace().Interface("request", request).Send()
 
-	resp, err := client.Lookup(context.Background(), request)
+	respStream, err := client.LookupResources(context.Background(), request)
 	if err != nil {
 		return err
 	}
 
-	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
-		prettyProto, err := prettyProto(resp)
-		if err != nil {
+	for {
+		resp, err := respStream.Recv()
+		switch {
+		case err == io.EOF:
+			return nil
+		case err != nil:
 			return err
+		default:
+			if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+				prettyProto, err := prettyProto(resp)
+				if err != nil {
+					return err
+				}
+
+				fmt.Println(string(prettyProto))
+				return nil
+			}
+
+			fmt.Println(resp.ResourceObjectId)
+			return nil
 		}
-
-		fmt.Println(string(prettyProto))
-		return nil
 	}
-
-	for _, objectID := range resp.ResolvedObjectIds {
-		fmt.Println(objectID)
-	}
-
-	return nil
 }

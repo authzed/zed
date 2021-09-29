@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
-	"github.com/authzed/authzed-go/v0"
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/authzed-go/v1"
 	"github.com/authzed/zed/internal/storage"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
@@ -35,73 +35,86 @@ var relationshipCmd = &cobra.Command{
 }
 
 var createCmd = &cobra.Command{
-	Use:               "create <subject:id> <relation> <object:id>",
+	Use:               "create <resource:id> <relation> <subject:id>",
 	Short:             "create a Relationship for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
-	RunE:              writeRelationshipCmdFunc(v0.RelationTupleUpdate_CREATE),
+	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE),
 }
 
 var touchCmd = &cobra.Command{
-	Use:               "touch <subject:id> <relation> <object:id>",
+	Use:               "touch <resource:id> <relation> <subject:id>",
 	Short:             "idempotently update a Relationship for a Subject",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
-	RunE:              writeRelationshipCmdFunc(v0.RelationTupleUpdate_TOUCH),
+	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH),
 }
 
 var deleteCmd = &cobra.Command{
-	Use:               "delete <subject:id> <relation> <object:id>",
+	Use:               "delete <resource:id> <relation> <subject:id>",
 	Short:             "delete a Relationship",
 	Args:              cobra.ExactArgs(3),
 	PersistentPreRunE: persistentPreRunE,
-	RunE:              writeRelationshipCmdFunc(v0.RelationTupleUpdate_DELETE),
+	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE),
 }
 
-func writeRelationshipCmdFunc(operation v0.RelationTupleUpdate_Operation) func(cmd *cobra.Command, args []string) error {
+func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		subjectNS, subjectID, subjectRel, err := parseSubject(args[0])
+		var objectNS, objectID string
+		err := stringz.SplitExact(args[0], ":", &objectNS, &objectID)
 		if err != nil {
 			return err
 		}
 
 		relation := args[1]
 
-		var objectNS, objectID string
-		err = stringz.SplitExact(args[2], ":", &objectNS, &objectID)
+		subjectNS, subjectID, subjectRel, err := parseSubject(args[2])
 		if err != nil {
 			return err
 		}
 
+		configStore, secretStore := defaultStorage()
 		token, err := storage.DefaultToken(
-			cobrautil.MustGetString(cmd, "permissions-system"),
 			cobrautil.MustGetString(cmd, "endpoint"),
 			cobrautil.MustGetString(cmd, "token"),
+			configStore,
+			secretStore,
 		)
+		if err != nil {
+			return err
+		}
 		log.Trace().Interface("token", token).Send()
 
-		client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.Secret)...)
+		client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
 		if err != nil {
 			return err
 		}
 
-		request := &v0.WriteRequest{Updates: []*v0.RelationTupleUpdate{{
-			Operation: operation,
-			Tuple: &v0.RelationTuple{
-				ObjectAndRelation: &v0.ObjectAndRelation{
-					Namespace: stringz.Join("/", token.System, objectNS),
-					ObjectId:  objectID,
-					Relation:  relation,
+		request := &v1.WriteRelationshipsRequest{
+			Updates: []*v1.RelationshipUpdate{
+				{
+					Operation: operation,
+					Relationship: &v1.Relationship{
+						Resource: &v1.ObjectReference{
+							ObjectType: objectNS,
+							ObjectId:   objectID,
+						},
+						Relation: relation,
+						Subject: &v1.SubjectReference{
+							Object: &v1.ObjectReference{
+								ObjectType: subjectNS,
+								ObjectId:   subjectID,
+							},
+							OptionalRelation: subjectRel,
+						},
+					},
 				},
-				User: &v0.User{UserOneof: &v0.User_Userset{Userset: &v0.ObjectAndRelation{
-					Namespace: stringz.Join("/", token.System, subjectNS),
-					ObjectId:  subjectID,
-					Relation:  subjectRel,
-				}}},
 			},
-		}}}
+			OptionalPreconditions: nil,
+		}
+		log.Trace().Interface("request", request).Send()
 
-		resp, err := client.Write(context.Background(), request)
+		resp, err := client.WriteRelationships(context.Background(), request)
 		if err != nil {
 			return err
 		}
@@ -116,8 +129,7 @@ func writeRelationshipCmdFunc(operation v0.RelationTupleUpdate_Operation) func(c
 			return nil
 		}
 
-		fmt.Println(resp.GetRevision().GetToken())
-
+		fmt.Println(resp.WrittenAt.GetToken())
 		return nil
 	}
 }

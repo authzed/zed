@@ -3,14 +3,28 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/authzed/grpcutil"
 	"github.com/jzelinskie/cobrautil"
+	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 
+	"github.com/authzed/zed/internal/storage"
 	"github.com/authzed/zed/internal/version"
 )
+
+func defaultStorage() (storage.ConfigStore, storage.SecretStore) {
+	var home string
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		home = filepath.Join(xdg, "zed")
+	} else {
+		homedir, _ := homedir.Dir()
+		home = filepath.Join(homedir, ".zed")
+	}
+	return storage.JSONConfigStore{ConfigPath: home}, storage.KeychainSecretStore{ConfigPath: home}
+}
 
 func dialOptsFromFlags(cmd *cobra.Command, token string) []grpc.DialOption {
 	var opts []grpc.DialOption
@@ -63,13 +77,7 @@ func main() {
 
 	// Register root-level aliases
 	rootCmd.AddCommand(&cobra.Command{
-		Use:               "login <system> <token>",
-		Short:             "an alias for `zed context set`",
-		PersistentPreRunE: persistentPreRunE,
-		RunE:              contextSetCmdFunc,
-	})
-	rootCmd.AddCommand(&cobra.Command{
-		Use:               "use <system>",
+		Use:               "use <context>",
 		Short:             "an alias for `zed context use`",
 		Args:              cobra.MaximumNArgs(1),
 		PersistentPreRunE: persistentPreRunE,
@@ -81,7 +89,6 @@ func main() {
 	registerPermissionCmd(rootCmd)
 	registerRelationshipCmd(rootCmd)
 	registerExperimentCmd(rootCmd)
-	registerPlugins(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
