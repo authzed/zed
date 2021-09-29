@@ -4,22 +4,6 @@ on:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 jobs:
-  create:
-    runs-on: "ubuntu-latest"
-    outputs:
-      upload_url: "${{ steps.release.outputs.upload_url }}"
-    steps:
-      - id: "get_version"
-        uses: "battila7/get-version-action@v2"
-      - uses: "actions/create-release@v1"
-        id: "release"
-        env:
-          GITHUB_TOKEN: "${{ github.token }}"
-        with:
-          draft: true
-          tag_name: "${{ steps.get_version.outputs.version }}"
-          release_name: "${{ steps.get_version.outputs.version }}"
-
   build-mac:
     needs: "create"
     runs-on: "macos-latest"
@@ -28,20 +12,16 @@ jobs:
       - uses: "actions/setup-go@v2"
         with:
           go-version: "^1.17"
+      - id: "get_version"
+        uses: "battila7/get-version-action@v2"
       - name: "build"
         run: |
           go build -o zed ./cmd/zed
-          tar -cvf zed.tar.gz ./zed LICENSE README.md
-      - id: "get_version"
-        uses: "battila7/get-version-action@v2"
-      - uses: "actions/upload-release-asset@v1"
-        env:
-          GITHUB_TOKEN: "${{ github.token }}"
+          tar -cvf zed_${{ steps.get_version.outputs.version-without-v }}_darwin_amd64.tar.gz ./zed LICENSE README.md
+      - uses: actions/upload-artifact@v2
         with:
-          upload_url: "${{ needs.create.outputs.upload_url }}"
-          asset_path: "zed.tar.gz"
-          asset_name: "zed_${{ steps.get_version.outputs.version-without-v }}_darwin_amd64.tar.gz"
-          asset_content_type: "application/octet-stream"
+          name: darwin_zed
+          path: zed_${{ steps.get_version.outputs.version-without-v }}_darwin_amd64.tar.gz
 
   goreleaser:
     # goreleaser will create the homebrew update, needs the mac build to exist
@@ -56,6 +36,12 @@ jobs:
           registry: "quay.io"
           username: "${{ secrets.QUAY_USERNAME }}"
           password: "${{ secrets.QUAY_ROBOT_TOKEN }}"
+      - id: "get_version"
+        uses: "battila7/get-version-action@v2"
+      - uses: actions/download-artifact@v2
+        with:
+          name: darwin_zed
+          path: zed_${{ steps.get_version.outputs.version-without-v }}_darwin_amd64.tar.gz
       - name: "Install linux cross-compilers"
         run: |
           sudo apt-get install -y gcc-aarch64-linux-gnu gcc-mingw-w64-x86-64
