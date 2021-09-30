@@ -72,7 +72,7 @@ func parseSubject(s string) (namespace, id, relation string, err error) {
 	}
 	err = stringz.SplitExact(id, "#", &id, &relation)
 	if err != nil {
-		relation = "..."
+		relation = ""
 		err = nil
 	}
 	return
