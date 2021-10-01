@@ -96,6 +96,9 @@ brews:
         system "go build --ldflags \"-s -w -X github.com/authzed/zed/internal/version.Version=$(git describe --always --abbrev=7 --dirty)\" ./cmd/zed"
       end
       bin.install "zed"
+      (bash_completion/"zed").write Utils.safe_popen_read("#{bin}/zed", "completion", "bash")
+      (zsh_completion/"_zed").write Utils.safe_popen_read("#{bin}/zed", "completion", "zsh")
+      (fish_completion/"zed.fish").write Utils.safe_popen_read("#{bin}/zed", "completion", "fish")
 
 checksum:
   name_template: "checksums.txt"
