@@ -277,11 +277,8 @@ func lookupCmdFunc(cmd *cobra.Command, args []string) error {
 				}
 
 				fmt.Println(string(prettyProto))
-				return nil
 			}
-
 			fmt.Println(resp.ResourceObjectId)
-			return nil
 		}
 	}
 }
