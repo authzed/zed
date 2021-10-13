@@ -29,29 +29,42 @@ func registerSchemaCmd(rootCmd *cobra.Command) {
 
 	schemaCmd.AddCommand(schemaWriteCmd)
 	schemaWriteCmd.Flags().Bool("json", false, "output as JSON")
+
+	schemaCmd.AddCommand(schemaCopyCmd)
+	schemaCopyCmd.Flags().Bool("json", false, "output as JSON")
 }
 
-var schemaCmd = &cobra.Command{
-	Use:               "schema <subcommand>",
-	Short:             "read and write to a Schema for a Permissions System",
-	PersistentPreRunE: persistentPreRunE,
-}
+var (
+	schemaCmd = &cobra.Command{
+		Use:               "schema <subcommand>",
+		Short:             "read and write to a Schema for a Permissions System",
+		PersistentPreRunE: persistentPreRunE,
+	}
 
-var schemaReadCmd = &cobra.Command{
-	Use:               "read",
-	Args:              cobra.ExactArgs(0),
-	Short:             "read the Schema of current Permissions System",
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              schemaReadCmdFunc,
-}
+	schemaReadCmd = &cobra.Command{
+		Use:               "read",
+		Args:              cobra.ExactArgs(0),
+		Short:             "read the Schema of current Permissions System",
+		PersistentPreRunE: persistentPreRunE,
+		RunE:              schemaReadCmdFunc,
+	}
 
-var schemaWriteCmd = &cobra.Command{
-	Use:               "write <file?>",
-	Args:              cobra.MaximumNArgs(1),
-	Short:             "write a Schema file (or stdin) to the current Permissions System",
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              schemaWriteCmdFunc,
-}
+	schemaWriteCmd = &cobra.Command{
+		Use:               "write <file?>",
+		Args:              cobra.MaximumNArgs(1),
+		Short:             "write a Schema file (or stdin) to the current Permissions System",
+		PersistentPreRunE: persistentPreRunE,
+		RunE:              schemaWriteCmdFunc,
+	}
+
+	schemaCopyCmd = &cobra.Command{
+		Use:               "copy <src context> <dest context>",
+		Args:              cobra.ExactArgs(2),
+		Short:             "copy a Schema from one context into another",
+		PersistentPreRunE: persistentPreRunE,
+		RunE:              schemaCopyCmdFunc,
+	}
+)
 
 func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 	configStore, secretStore := defaultStorage()
@@ -69,11 +82,6 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
 	if err != nil {
 		return err
-	}
-
-	var objDefs []string
-	for _, arg := range args {
-		objDefs = append(objDefs, arg)
 	}
 
 	request := &v1.ReadSchemaRequest{}
@@ -182,4 +190,54 @@ func prettyProto(m proto.Message) ([]byte, error) {
 	}
 
 	return pretty, nil
+}
+
+func clientForContext(cmd *cobra.Command, contextName string, secretStore storage.SecretStore) (*authzed.Client, error) {
+	token, err := storage.GetToken(contextName, secretStore)
+	if err != nil {
+		return nil, err
+	}
+	log.Trace().Interface("token", token).Send()
+
+	return authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+}
+
+func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
+	_, secretStore := defaultStorage()
+	srcClient, err := clientForContext(cmd, args[0], secretStore)
+	if err != nil {
+		return err
+	}
+	destClient, err := clientForContext(cmd, args[1], secretStore)
+	if err != nil {
+		return err
+	}
+
+	readRequest := &v1.ReadSchemaRequest{}
+	log.Trace().Interface("request", readRequest).Msg("requesting schema read")
+	readResp, err := srcClient.ReadSchema(context.Background(), readRequest)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read schema")
+	}
+	log.Trace().Interface("response", readResp).Msg("read schema")
+
+	writeRequest := &v1.WriteSchemaRequest{Schema: string(readResp.SchemaText)}
+	log.Trace().Interface("request", writeRequest).Msg("writing schema")
+	resp, err := destClient.WriteSchema(context.Background(), writeRequest)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write schema")
+	}
+	log.Trace().Interface("response", resp).Msg("wrote schema")
+
+	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+		prettyProto, err := prettyProto(resp)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to convert schema to JSON")
+		}
+
+		fmt.Println(string(prettyProto))
+		return nil
+	}
+
+	return nil
 }

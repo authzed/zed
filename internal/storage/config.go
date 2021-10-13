@@ -19,7 +19,6 @@ var ErrConfigNotFound = errors.New("config did not exist")
 type Config struct {
 	Version      string
 	CurrentToken string
-	Tokens       []Token
 }
 
 // ConfigStore is anything that can persistently store a Config.

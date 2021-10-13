@@ -12,7 +12,7 @@ import (
 	"golang.org/x/term"
 )
 
-// ErrTokenNotFound is returned if there is no Config in a ConfigStore.
+// ErrTokenNotFound is returned if there is no Token in a ConfigStore.
 var ErrTokenNotFound = errors.New("token does not exist")
 
 type Token struct {
