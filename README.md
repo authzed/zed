@@ -1,6 +1,6 @@
 # zed
 
-[![Docker Repository on Quay.io](https://quay.io/repository/authzed/zed/status "Docker Repository on Quay.io")](https://quay.io/repository/authzed/zed)
+[![Container Image](https://img.shields.io/github/v/release/authzed/zed?color=%232496ED&label=container&logo=docker "Container Image")](https://quay.io/repository/authzed/zed?tab=tags)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 [![Build Status](https://github.com/authzed/zed/workflows/build/badge.svg)](https://github.com/authzed/zed/actions)
 [![Mailing List](https://img.shields.io/badge/email-google%20groups-4285F4)](https://groups.google.com/g/authzed-oss)
