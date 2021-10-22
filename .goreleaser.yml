@@ -1,14 +1,15 @@
+---
 builds:
   - id: "linux-amd64"
     goos: ["linux"]
     goarch: ["amd64"]
     env: ["CC=x86_64-unknown-linux-gnu-gcc", "CGO_ENABLED=1"]
     main: &main "./cmd/zed"
-    binary:  &binary "zed"
-    mod_timestamp:  &mod_timestamp "{{ .CommitTimestamp }}"
+    binary: &binary "zed"
+    mod_timestamp: &mod_timestamp "{{ .CommitTimestamp }}"
     flags: &flags ["-trimpath"]
-    asmflags: &asmflags [ "all=-trimpath={{ .Env.GITHUB_WORKSPACE }}" ]
-    gcflags: &gcflags [ "all=-trimpath={{ .Env.GITHUB_WORKSPACE }}" ]
+    asmflags: &asmflags ["all=-trimpath={{ .Env.GITHUB_WORKSPACE }}"]
+    gcflags: &gcflags ["all=-trimpath={{ .Env.GITHUB_WORKSPACE }}"]
     ldflags: &ldflags
       - "-s -w"
       - "-X {{ .ModulePath }}/internal/version.Version={{ .Version }}"
