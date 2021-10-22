@@ -1,55 +1,59 @@
+---
 name: "build"
 on:
   push:
     branches:
-    - "!dependabot/*"
-    - "*"
+      - "!dependabot/*"
+      - "*"
   pull_request:
     branches:
-    - "*"
+      - "*"
 jobs:
-  lint: 
+  lint:
     name: "Lint"
     runs-on: "ubuntu-latest"
     steps:
-    - uses: "actions/checkout@v2"
-    - uses: "actions/setup-go@v2"
-      with:
-        go-version: ^1.16
-    - name: "go fmt/imports"
-      run: |
-        go install mvdan.cc/gofumpt/gofumports@latest
-        GOFUMPT_OUTPUT="$(gofumports -d .)"
-        if [ -n "$GOFUMPT_OUTPUT" ]; then
-          echo "All the following files are not correctly formatted"
-          echo "${GOFUMPT_OUTPUT}"
-          exit 1
-        fi
-    - name: "go lint"
-      run: |
-        go install github.com/mgechev/revive@latest
-        revive ./...
-    - name: "go mod tidy"
-      run: |
-        GO_MOD_OUPUT="$(go mod tidy -v 2>&1)"
+      - uses: "actions/checkout@v2"
+      - uses: "actions/setup-go@v2"
+        with:
+          go-version: "^1.17"
+      - uses: "bewuethr/yamllint-action@v1.1.1"
+        with:
+          config-file: ".yamllint"
+      - name: "go fmt/imports"
+        run: |
+          go install mvdan.cc/gofumpt/gofumports@latest
+          GOFUMPT_OUTPUT="$(gofumports -d .)"
+          if [ -n "$GOFUMPT_OUTPUT" ]; then
+            echo "All the following files are not correctly formatted"
+            echo "${GOFUMPT_OUTPUT}"
+            exit 1
+          fi
+      - name: "go lint"
+        run: |
+          go install github.com/mgechev/revive@latest
+          revive ./...
+      - name: "go mod tidy"
+        run: |
+          GO_MOD_OUPUT="$(go mod tidy -v 2>&1)"
 
-        if [[ $GO_MOD_OUPUT == *"unused"* ]]; then
-          echo "${GO_MOD_OUPUT}"
-          exit 1
-        fi
+          if [[ $GO_MOD_OUPUT == *"unused"* ]]; then
+            echo "${GO_MOD_OUPUT}"
+            exit 1
+          fi
 
   test:
     name: "Test"
     runs-on: "ubuntu-latest"
     steps:
-    - uses: "actions/checkout@v2"
-    - uses: "actions/setup-go@v2"
-      with:
-        go-version: ^1.16
-    - name: "go build"
-      run: "go build ./cmd/zed"
-    - uses: "authzed/action-testserver@main"
-    - name: "ensure test server online"
-      run: "curl localhost:50051 | base64"
-    - name: "go test"
-      run: "go test ./..."
+      - uses: "actions/checkout@v2"
+      - uses: "actions/setup-go@v2"
+        with:
+          go-version: "^1.17"
+      - name: "go build"
+        run: "go build ./cmd/zed"
+      - uses: "authzed/action-testserver@main"
+      - name: "ensure test server online"
+        run: "curl localhost:50051 | base64"
+      - name: "go test"
+        run: "go test ./..."
