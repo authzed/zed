@@ -92,7 +92,7 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+	if cobrautil.MustGetBool(cmd, "json") {
 		prettyProto, err := prettyProto(resp)
 		if err != nil {
 			return err
@@ -158,7 +158,7 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("response", resp).Msg("wrote schema")
 
-	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+	if cobrautil.MustGetBool(cmd, "json") {
 		prettyProto, err := prettyProto(resp)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to convert schema to JSON")
@@ -229,7 +229,7 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("response", resp).Msg("wrote schema")
 
-	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+	if cobrautil.MustGetBool(cmd, "json") {
 		prettyProto, err := prettyProto(resp)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to convert schema to JSON")

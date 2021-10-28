@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -14,7 +13,6 @@ import (
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 func registerRelationshipCmd(rootCmd *cobra.Command) {
@@ -154,7 +152,7 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+		if cobrautil.MustGetBool(cmd, "json") {
 			prettyProto, err := prettyProto(msg)
 			if err != nil {
 				return err
@@ -232,7 +230,7 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 			return err
 		}
 
-		if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+		if cobrautil.MustGetBool(cmd, "json") {
 			prettyProto, err := prettyProto(resp)
 			if err != nil {
 				return err
