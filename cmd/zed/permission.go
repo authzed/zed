@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
@@ -13,7 +12,6 @@ import (
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/authzed/zed/internal/printers"
 	"github.com/authzed/zed/internal/storage"
@@ -136,7 +134,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+	if cobrautil.MustGetBool(cmd, "json") {
 		prettyProto, err := prettyProto(resp)
 		if err != nil {
 			return err
@@ -196,7 +194,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+	if cobrautil.MustGetBool(cmd, "json") {
 		prettyProto, err := prettyProto(resp)
 		if err != nil {
 			return err
@@ -270,7 +268,7 @@ func lookupCmdFunc(cmd *cobra.Command, args []string) error {
 		case err != nil:
 			return err
 		default:
-			if cobrautil.MustGetBool(cmd, "json") || !term.IsTerminal(int(os.Stdout.Fd())) {
+			if cobrautil.MustGetBool(cmd, "json") {
 				prettyProto, err := prettyProto(resp)
 				if err != nil {
 					return err
