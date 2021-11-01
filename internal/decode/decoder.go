@@ -6,10 +6,14 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 
+	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 )
+
+var playgroundPattern = regexp.MustCompile("^.*/s/.*/schema|relationships|assertions|expected.*$")
 
 // SchemaRelationships holds the schema (as a string) and a list of
 // relationships (as a string) in the format from the devtools download API.
@@ -51,15 +55,17 @@ func httpDecoder(u *url.URL) DecodeFunc {
 }
 
 func rewriteURL(u *url.URL) {
+	// match playground urls
+	if playgroundPattern.MatchString(u.Path) {
+		u.Path = u.Path[:strings.LastIndex(u.Path, "/")]
+		u.Path += "/download"
+		return
+	}
+
 	switch u.Hostname() {
 	case "gist.github.com":
 		u.Host = "gist.githubusercontent.com"
 		u.Path = path.Join(u.Path, "/raw")
-	case "play.authzed.com":
-		if ok, _ := path.Match("/s/*/*", u.Path); ok {
-			u.Path = u.Path[:strings.LastIndex(u.Path, "/")]
-			u.Path += "/download"
-		}
 	case "pastebin.com":
 		if ok, _ := path.Match("/raw/*", u.Path); ok {
 			return
@@ -70,6 +76,7 @@ func rewriteURL(u *url.URL) {
 
 func directHttpDecoder(u *url.URL) DecodeFunc {
 	return func(out *SchemaRelationships) error {
+		log.Debug().Stringer("url", u).Send()
 		r, err := http.Get(u.String())
 		if err != nil {
 			return err
