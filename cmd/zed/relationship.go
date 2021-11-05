@@ -33,9 +33,11 @@ func registerRelationshipCmd(rootCmd *cobra.Command) {
 	relationshipCmd.AddCommand(readCmd)
 	readCmd.Flags().Bool("json", false, "output as JSON")
 	readCmd.Flags().String("revision", "", "optional revision at which to check")
+	readCmd.Flags().String("subject-filter", "", "optional subject filter")
 
 	relationshipCmd.AddCommand(bulkDeleteCmd)
 	bulkDeleteCmd.Flags().Bool("force", false, "force deletion immediately without confirmation")
+	bulkDeleteCmd.Flags().String("subject-filter", "", "optional subject filter")
 }
 
 var relationshipCmd = &cobra.Command{
@@ -181,9 +183,14 @@ func buildReadRequest(cmd *cobra.Command, args []string) (*v1.ReadRelationshipsR
 		readFilter.OptionalRelation = args[1]
 	}
 
-	if len(args) == 3 {
-		if strings.Contains(args[2], ":") {
-			subjectNS, subjectID, subjectRel, err := parseSubject(args[2])
+	if len(args) == 3 || cobrautil.MustGetString(cmd, "subject-filter") != "" {
+		filter := cobrautil.MustGetString(cmd, "subject-filter")
+		if filter == "" && len(args) == 3 {
+			filter = args[2]
+		}
+
+		if strings.Contains(filter, ":") {
+			subjectNS, subjectID, subjectRel, err := parseSubject(filter)
 			if err != nil {
 				return nil, err
 			}
@@ -197,7 +204,7 @@ func buildReadRequest(cmd *cobra.Command, args []string) (*v1.ReadRelationshipsR
 			}
 		} else {
 			readFilter.OptionalSubjectFilter = &v1.SubjectFilter{
-				SubjectType: args[2],
+				SubjectType: filter,
 			}
 		}
 	}
