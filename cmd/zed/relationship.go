@@ -1,13 +1,15 @@
 package main
 
 import (
-	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/jzelinskie/cobrautil"
@@ -38,6 +40,7 @@ func registerRelationshipCmd(rootCmd *cobra.Command) {
 	relationshipCmd.AddCommand(bulkDeleteCmd)
 	bulkDeleteCmd.Flags().Bool("force", false, "force deletion immediately without confirmation")
 	bulkDeleteCmd.Flags().String("subject-filter", "", "optional subject filter")
+	bulkDeleteCmd.Flags().Bool("estimate-count", true, "estimate the count of relationships to be deleted")
 }
 
 var relationshipCmd = &cobra.Command{
@@ -109,19 +112,23 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if !cobrautil.MustGetBool(cmd, "force") {
+	counter := -1
+	if cobrautil.MustGetBool(cmd, "estimate-count") {
 		request.Consistency = &v1.Consistency{
 			Requirement: &v1.Consistency_FullyConsistent{FullyConsistent: true},
 		}
 
 		log.Trace().Interface("request", request).Send()
 
-		resp, err := client.ReadRelationships(context.Background(), request)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		resp, err := client.ReadRelationships(ctx, request)
 		if err != nil {
 			return err
 		}
 
-		counter := 0
+		counter = 0
 		for {
 			_, err := resp.Recv()
 			if err == io.EOF {
@@ -134,27 +141,35 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 
 			counter++
 			if counter > 1000 {
+				cancel()
 				break
 			}
 		}
+	}
 
-		if counter == 0 {
-			fmt.Println("No matching relationships found")
-			return nil
-		} else if counter > 1000 {
-			fmt.Print("Will delete 1000+ relationships. Continue? [y/N]: ")
-		} else {
-			fmt.Printf("Will delete %d relationships. Continue? [y/N]: ", counter)
+	if !cobrautil.MustGetBool(cmd, "force") {
+		message := fmt.Sprintf("Will delete %d relationships. Continue?", counter)
+		if counter > 1000 {
+			message = "Will delete 1000+ relationships. Continue?"
+		}
+		if counter < 0 {
+			message = "Will delete all matching relationships. Continue?"
 		}
 
-		reader := bufio.NewReader(os.Stdin)
-		response, err := reader.ReadString('\n')
+		response := false
+		err := survey.AskOne(&survey.Confirm{
+			Message: message,
+		}, &response)
 		if err != nil {
+			if err == terminal.InterruptErr {
+				os.Exit(0)
+			}
+
 			return err
 		}
 
-		if strings.ToLower(strings.TrimSpace(response)) != "y" {
-			return nil
+		if !response {
+			os.Exit(1)
 		}
 	}
 
@@ -185,7 +200,11 @@ func buildReadRequest(cmd *cobra.Command, args []string) (*v1.ReadRelationshipsR
 
 	if len(args) == 3 || cobrautil.MustGetString(cmd, "subject-filter") != "" {
 		filter := cobrautil.MustGetString(cmd, "subject-filter")
-		if filter == "" && len(args) == 3 {
+		if len(args) == 3 {
+			if filter != "" {
+				return nil, errors.New("cannot specify subject filter both positionally and via --subject-filter")
+			}
+
 			filter = args[2]
 		}
 

@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/99designs/keyring v1.1.6
+	github.com/AlecAivazis/survey/v2 v2.3.2
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
 	github.com/authzed/authzed-go v0.3.0
 	github.com/authzed/connector-postgresql v0.2.0
@@ -20,7 +21,7 @@ require (
 	github.com/rs/zerolog v1.25.0
 	github.com/spf13/cobra v1.2.1
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/term v0.0.0-20201207232118-ee85cb95a76b
+	golang.org/x/term v0.0.0-20210503060354-a79de5458b56
 	google.golang.org/grpc v1.41.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
