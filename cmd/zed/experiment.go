@@ -4,7 +4,9 @@ import (
 	"context"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	authzed "github.com/authzed/authzed-go/v1"
+	"github.com/authzed/authzed-go/v1"
+	"github.com/authzed/connector-postgresql/pkg/cmd/importer"
+	"github.com/authzed/connector-postgresql/pkg/streams"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/open-policy-agent/opa/ast"
@@ -20,6 +22,12 @@ import (
 func registerExperimentCmd(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(experimentCmd)
 
+	experimentCmd.AddCommand(experimentImportCmd)
+
+	ctx := context.Background()
+	stdio := streams.NewStdIO()
+	experimentImportCmd.AddCommand(NewImportPostgresCmd(ctx, stdio))
+
 	experimentCmd.AddCommand(opacmd.RootCommand)
 	opacmd.RootCommand.Use = "opa"
 	opacmd.RootCommand.PersistentPreRunE = opaPreRunCmdFunc
@@ -29,6 +37,51 @@ var experimentCmd = &cobra.Command{
 	Use:               "experiment <subcommand>",
 	Short:             "experimental functionality",
 	PersistentPreRunE: persistentPreRunE,
+}
+
+var experimentImportCmd = &cobra.Command{
+	Use:               "import <subcommand>",
+	Short:             "import relationships and schemas from external data sources",
+	PersistentPreRunE: persistentPreRunE,
+}
+
+// NewImportPostgresCmd configures a new cobra command that imports data from postgres
+func NewImportPostgresCmd(ctx context.Context, streams streams.IO) *cobra.Command {
+	o := importer.NewOptions(streams)
+	cmd := &cobra.Command{
+		Use:   "postgres",
+		Short: "import data from Postgres into SpiceDB",
+		Example: `
+  zed experiment import postgres "postgres://postgres:password@localhost:5432/postgres?sslmode=disable"
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configStore, secretStore := defaultStorage()
+			token, err := storage.DefaultToken(
+				cobrautil.MustGetString(cmd, "endpoint"),
+				cobrautil.MustGetString(cmd, "token"),
+				configStore,
+				secretStore,
+			)
+			if err != nil {
+				return err
+			}
+			client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+			if err != nil {
+				return err
+			}
+			o.Client = client
+			if err := o.Complete(ctx, args); err != nil {
+				return err
+			}
+			return o.Run(ctx)
+		},
+	}
+	cmd.Flags().StringVar(&o.PostgresURI, "postgres", "", "address for the postgres endpoint. example: \"postgres://postgres:password@localhost:5432/postgres?sslmode=disable\"")
+	cmd.Flags().BoolVar(&o.DryRun, "dry-run", true, "log tuples that would be written without calling spicedb")
+	cmd.Flags().StringVar(&o.MappingFile, "config", "", "path to a file containing the config that maps between pg tables and spicedb relationships")
+	cmd.Flags().BoolVar(&o.AppendSchema, "append-schema", true, "append the config's (zed) schema to the schema in spicedb")
+
+	return cmd
 }
 
 func opaPreRunCmdFunc(cmd *cobra.Command, args []string) error {

@@ -8,11 +8,12 @@ import (
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
-	"github.com/authzed/zed/internal/storage"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	"github.com/authzed/zed/internal/storage"
 )
 
 func registerRelationshipCmd(rootCmd *cobra.Command) {
