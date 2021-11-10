@@ -22,7 +22,7 @@ jobs:
           config-file: ".yamllint"
       - name: "go fmt/imports"
         run: |
-          go install mvdan.cc/gofumpt/gofumports@latest
+          go install mvdan.cc/gofumpt/gofumports@v0.1.1
           GOFUMPT_OUTPUT="$(gofumports -d .)"
           if [ -n "$GOFUMPT_OUTPUT" ]; then
             echo "All the following files are not correctly formatted"
