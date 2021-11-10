@@ -8,6 +8,7 @@ import (
 	"github.com/authzed/grpcutil"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/mitchellh/go-homedir"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 
@@ -43,7 +44,7 @@ func dialOptsFromFlags(cmd *cobra.Command, token string) []grpc.DialOption {
 
 var persistentPreRunE = cobrautil.CommandStack(
 	cobrautil.SyncViperPreRunE("ZED"),
-	cobrautil.ZeroLogPreRunE,
+	cobrautil.ZeroLogPreRunE("log", zerolog.DebugLevel),
 )
 
 func main() {
@@ -54,7 +55,7 @@ func main() {
 		PersistentPreRunE: persistentPreRunE,
 	}
 
-	cobrautil.RegisterZeroLogFlags(rootCmd.PersistentFlags())
+	cobrautil.RegisterZeroLogFlags(rootCmd.PersistentFlags(), "log")
 
 	rootCmd.PersistentFlags().String("endpoint", "", "authzed gRPC API endpoint")
 	rootCmd.PersistentFlags().String("permissions-system", "", "permissions system to query")
@@ -65,9 +66,8 @@ func main() {
 	_ = rootCmd.PersistentFlags().MarkHidden("debug") // This cannot return its error.
 
 	versionCmd := &cobra.Command{
-		Use:               "version",
-		Short:             "display zed version information",
-		PersistentPreRunE: persistentPreRunE,
+		Use:   "version",
+		Short: "display zed version information",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println(version.UsageVersion(cobrautil.MustGetBool(cmd, "include-deps")))
 		},
