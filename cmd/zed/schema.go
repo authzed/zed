@@ -143,9 +143,7 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 		log.Fatal().Msg("attempted to write empty schema")
 	}
 
-	request := &v1.WriteSchemaRequest{
-		Schema: string(schemaBytes),
-	}
+	request := &v1.WriteSchemaRequest{Schema: string(schemaBytes)}
 	log.Trace().Interface("request", request).Msg("writing schema")
 
 	resp, err := client.WriteSchema(context.Background(), request)
@@ -211,6 +209,7 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 
 	readRequest := &v1.ReadSchemaRequest{}
 	log.Trace().Interface("request", readRequest).Msg("requesting schema read")
+
 	readResp, err := srcClient.ReadSchema(context.Background(), readRequest)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read schema")
@@ -219,6 +218,7 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 
 	writeRequest := &v1.WriteSchemaRequest{Schema: string(readResp.SchemaText)}
 	log.Trace().Interface("request", writeRequest).Msg("writing schema")
+
 	resp, err := destClient.WriteSchema(context.Background(), writeRequest)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write schema")

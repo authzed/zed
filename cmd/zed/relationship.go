@@ -176,9 +176,10 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	resp, err := client.DeleteRelationships(context.Background(), &v1.DeleteRelationshipsRequest{
-		RelationshipFilter: request.RelationshipFilter,
-	})
+	delRequest := &v1.DeleteRelationshipsRequest{RelationshipFilter: request.RelationshipFilter}
+	log.Trace().Interface("request", delRequest).Msg("deleting relationships")
+
+	resp, err := client.DeleteRelationships(context.Background(), delRequest)
 	if err != nil {
 		return err
 	}
@@ -253,8 +254,6 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	log.Trace().Interface("request", request).Send()
-
 	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
 		cobrautil.MustGetString(cmd, "endpoint"),
@@ -272,6 +271,7 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	log.Trace().Interface("request", request).Msg("reading relationships")
 	resp, err := client.ReadRelationships(context.Background(), request)
 	if err != nil {
 		return err
@@ -358,8 +358,8 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 			},
 			OptionalPreconditions: nil,
 		}
-		log.Trace().Interface("request", request).Send()
 
+		log.Trace().Interface("request", request).Msg("writing relationships")
 		resp, err := client.WriteRelationships(context.Background(), request)
 		if err != nil {
 			return err
