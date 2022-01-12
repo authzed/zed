@@ -9,7 +9,7 @@ require (
 	github.com/authzed/authzed-go v0.4.1
 	github.com/authzed/connector-postgresql v0.2.1-0.20211110161636-5a22597732ae
 	github.com/authzed/grpcutil v0.0.0-20211020204402-aba1876830e6
-	github.com/authzed/spicedb v1.1.0
+	github.com/authzed/spicedb v1.4.0
 	github.com/cockroachdb/cockroach v20.1.13+incompatible
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/hokaccha/go-prettyjson v0.0.0-20210113012101-fb4e108d2519 // indirect
