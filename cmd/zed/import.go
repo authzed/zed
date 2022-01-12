@@ -49,9 +49,8 @@ var importCmd = &cobra.Command{
 	Only relationships:
 		zed import --schema=false file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
 `,
-	Args:              cobra.ExactArgs(1),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              importCmdFunc,
+	Args: cobra.ExactArgs(1),
+	RunE: cobrautil.CommandStack(LogCmdFunc, importCmdFunc),
 }
 
 func importCmdFunc(cmd *cobra.Command, args []string) error {
@@ -104,10 +103,14 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 func importSchema(client *authzed.Client, schema string) error {
 	log.Info().Msg("importing schema")
 
-	_, err := client.WriteSchema(context.Background(), &v1.WriteSchemaRequest{
-		Schema: schema,
-	})
-	return err
+	request := &v1.WriteSchemaRequest{Schema: schema}
+	log.Trace().Interface("request", request).Msg("writing schema")
+
+	if _, err := client.WriteSchema(context.Background(), request); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func importRelationships(client *authzed.Client, relationships string) error {
@@ -134,9 +137,14 @@ func importRelationships(client *authzed.Client, relationships string) error {
 	if err := scanner.Err(); err != nil {
 		return err
 	}
+
+	request := &v1.WriteRelationshipsRequest{Updates: relationshipUpdates}
+	log.Trace().Interface("request", request).Msg("writing relationships")
 	log.Info().Int("count", len(relationshipUpdates)).Msg("importing relationships")
-	_, err := client.WriteRelationships(context.Background(), &v1.WriteRelationshipsRequest{
-		Updates: relationshipUpdates,
-	})
-	return err
+
+	if _, err := client.WriteRelationships(context.Background(), request); err != nil {
+		return err
+	}
+
+	return nil
 }

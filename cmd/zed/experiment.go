@@ -30,19 +30,20 @@ func registerExperimentCmd(rootCmd *cobra.Command) {
 
 	experimentCmd.AddCommand(opacmd.RootCommand)
 	opacmd.RootCommand.Use = "opa"
-	opacmd.RootCommand.PersistentPreRunE = opaPreRunCmdFunc
+	opacmd.RootCommand.PersistentPreRunE = cobrautil.CommandStack(
+		SyncFlagsCmdFunc,
+		opaPreRunCmdFunc,
+	)
 }
 
 var experimentCmd = &cobra.Command{
-	Use:               "experiment <subcommand>",
-	Short:             "experimental functionality",
-	PersistentPreRunE: persistentPreRunE,
+	Use:   "experiment <subcommand>",
+	Short: "experimental functionality",
 }
 
 var experimentImportCmd = &cobra.Command{
-	Use:               "import <subcommand>",
-	Short:             "import relationships and schemas from external data sources",
-	PersistentPreRunE: persistentPreRunE,
+	Use:   "import <subcommand>",
+	Short: "import relationships and schemas from external data sources",
 }
 
 // NewImportPostgresCmd configures a new cobra command that imports data from postgres
@@ -85,10 +86,6 @@ func NewImportPostgresCmd(ctx context.Context, streams streams.IO) *cobra.Comman
 }
 
 func opaPreRunCmdFunc(cmd *cobra.Command, args []string) error {
-	if err := persistentPreRunE(cmd, args); err != nil {
-		return err
-	}
-
 	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
 		cobrautil.MustGetString(cmd, "endpoint"),

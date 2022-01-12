@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 
+	zgrpcutil "github.com/authzed/zed/internal/grpcutil"
 	"github.com/authzed/zed/internal/storage"
 	"github.com/authzed/zed/internal/version"
 )
@@ -28,7 +29,9 @@ func defaultStorage() (storage.ConfigStore, storage.SecretStore) {
 }
 
 func dialOptsFromFlags(cmd *cobra.Command, token string) []grpc.DialOption {
-	var opts []grpc.DialOption
+	opts := []grpc.DialOption{
+		grpc.WithUnaryInterceptor(zgrpcutil.LogDispatchTrailers),
+	}
 
 	if cobrautil.MustGetBool(cmd, "insecure") {
 		opts = append(opts, grpc.WithInsecure())
@@ -42,9 +45,9 @@ func dialOptsFromFlags(cmd *cobra.Command, token string) []grpc.DialOption {
 	return opts
 }
 
-var persistentPreRunE = cobrautil.CommandStack(
-	cobrautil.SyncViperPreRunE("ZED"),
-	cobrautil.ZeroLogPreRunE("log", zerolog.DebugLevel),
+var (
+	SyncFlagsCmdFunc = cobrautil.SyncViperPreRunE("ZED")
+	LogCmdFunc       = cobrautil.ZeroLogRunE("log", zerolog.DebugLevel)
 )
 
 func main() {
@@ -52,7 +55,7 @@ func main() {
 		Use:               "zed",
 		Short:             "The Authzed CLI",
 		Long:              "A client for managing Authzed from your command line.",
-		PersistentPreRunE: persistentPreRunE,
+		PersistentPreRunE: SyncFlagsCmdFunc,
 	}
 
 	cobrautil.RegisterZeroLogFlags(rootCmd.PersistentFlags(), "log")
@@ -77,11 +80,13 @@ func main() {
 
 	// Register root-level aliases
 	rootCmd.AddCommand(&cobra.Command{
-		Use:               "use <context>",
-		Short:             "an alias for `zed context use`",
-		Args:              cobra.MaximumNArgs(1),
-		PersistentPreRunE: persistentPreRunE,
-		RunE:              contextUseCmdFunc,
+		Use:   "use <context>",
+		Short: "an alias for `zed context use`",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: cobrautil.CommandStack(
+			LogCmdFunc,
+			contextUseCmdFunc,
+		),
 	})
 
 	registerContextCmd(rootCmd)

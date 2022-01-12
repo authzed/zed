@@ -44,49 +44,52 @@ func registerRelationshipCmd(rootCmd *cobra.Command) {
 }
 
 var relationshipCmd = &cobra.Command{
-	Use:               "relationship <subcommand>",
-	Short:             "perform CRUD operations on the Relationships in a Permissions System",
-	PersistentPreRunE: persistentPreRunE,
+	Use:   "relationship <subcommand>",
+	Short: "perform CRUD operations on the Relationships in a Permissions System",
 }
 
 var createCmd = &cobra.Command{
-	Use:               "create <resource:id> <relation> <subject:id>",
-	Short:             "create a Relationship for a Subject",
-	Args:              cobra.ExactArgs(3),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE),
+	Use:   "create <resource:id> <relation> <subject:id>",
+	Short: "create a Relationship for a Subject",
+	Args:  cobra.ExactArgs(3),
+	RunE: cobrautil.CommandStack(
+		LogCmdFunc,
+		writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE),
+	),
 }
 
 var touchCmd = &cobra.Command{
-	Use:               "touch <resource:id> <relation> <subject:id>",
-	Short:             "idempotently update a Relationship for a Subject",
-	Args:              cobra.ExactArgs(3),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH),
+	Use:   "touch <resource:id> <relation> <subject:id>",
+	Short: "idempotently update a Relationship for a Subject",
+	Args:  cobra.ExactArgs(3),
+	RunE: cobrautil.CommandStack(
+		LogCmdFunc,
+		writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH),
+	),
 }
 
 var deleteCmd = &cobra.Command{
-	Use:               "delete <resource:id> <relation> <subject:id>",
-	Short:             "delete a Relationship",
-	Args:              cobra.ExactArgs(3),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE),
+	Use:   "delete <resource:id> <relation> <subject:id>",
+	Short: "delete a Relationship",
+	Args:  cobra.ExactArgs(3),
+	RunE: cobrautil.CommandStack(
+		LogCmdFunc,
+		writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE),
+	),
 }
 
 var readCmd = &cobra.Command{
-	Use:               "read <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
-	Short:             "reads Relationships",
-	Args:              cobra.RangeArgs(1, 3),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              readRelationships,
+	Use:   "read <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
+	Short: "reads Relationships",
+	Args:  cobra.RangeArgs(1, 3),
+	RunE:  cobrautil.CommandStack(LogCmdFunc, readRelationships),
 }
 
 var bulkDeleteCmd = &cobra.Command{
-	Use:               "bulk-delete <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
-	Short:             "bulk delete Relationships",
-	Args:              cobra.RangeArgs(1, 3),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              bulkDeleteRelationships,
+	Use:   "bulk-delete <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
+	Short: "bulk delete Relationships",
+	Args:  cobra.RangeArgs(1, 3),
+	RunE:  cobrautil.CommandStack(LogCmdFunc, bulkDeleteRelationships),
 }
 
 func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
@@ -173,9 +176,10 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	resp, err := client.DeleteRelationships(context.Background(), &v1.DeleteRelationshipsRequest{
-		RelationshipFilter: request.RelationshipFilter,
-	})
+	delRequest := &v1.DeleteRelationshipsRequest{RelationshipFilter: request.RelationshipFilter}
+	log.Trace().Interface("request", delRequest).Msg("deleting relationships")
+
+	resp, err := client.DeleteRelationships(context.Background(), delRequest)
 	if err != nil {
 		return err
 	}
@@ -194,22 +198,21 @@ func buildReadRequest(cmd *cobra.Command, args []string) (*v1.ReadRelationshipsR
 		}
 	}
 
-	if len(args) > 1 {
+	subjectFilter := cobrautil.MustGetString(cmd, "subject-filter")
+	switch {
+	case len(args) > 1:
 		readFilter.OptionalRelation = args[1]
-	}
 
-	if len(args) == 3 || cobrautil.MustGetString(cmd, "subject-filter") != "" {
-		filter := cobrautil.MustGetString(cmd, "subject-filter")
-		if len(args) == 3 {
-			if filter != "" {
-				return nil, errors.New("cannot specify subject filter both positionally and via --subject-filter")
-			}
-
-			filter = args[2]
+	case len(args) == 3:
+		if subjectFilter != "" {
+			return nil, errors.New("cannot specify subject filter both positionally and via --subject-filter")
 		}
+		subjectFilter = args[2]
+		fallthrough
 
-		if strings.Contains(filter, ":") {
-			subjectNS, subjectID, subjectRel, err := parseSubject(filter)
+	case subjectFilter != "":
+		if strings.Contains(subjectFilter, ":") {
+			subjectNS, subjectID, subjectRel, err := parseSubject(subjectFilter)
 			if err != nil {
 				return nil, err
 			}
@@ -223,15 +226,14 @@ func buildReadRequest(cmd *cobra.Command, args []string) (*v1.ReadRelationshipsR
 			}
 		} else {
 			readFilter.OptionalSubjectFilter = &v1.SubjectFilter{
-				SubjectType: filter,
+				SubjectType: subjectFilter,
 			}
 		}
 	}
 
-	request := &v1.ReadRelationshipsRequest{
+	return &v1.ReadRelationshipsRequest{
 		RelationshipFilter: readFilter,
-	}
-	return request, nil
+	}, nil
 }
 
 func readRelationships(cmd *cobra.Command, args []string) error {
@@ -250,8 +252,6 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	log.Trace().Interface("request", request).Send()
-
 	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
 		cobrautil.MustGetString(cmd, "endpoint"),
@@ -269,6 +269,7 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	log.Trace().Interface("request", request).Msg("reading relationships")
 	resp, err := client.ReadRelationships(context.Background(), request)
 	if err != nil {
 		return err
@@ -355,8 +356,8 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 			},
 			OptionalPreconditions: nil,
 		}
-		log.Trace().Interface("request", request).Send()
 
+		log.Trace().Interface("request", request).Msg("writing relationships")
 		resp, err := client.WriteRelationships(context.Background(), request)
 		if err != nil {
 			return err

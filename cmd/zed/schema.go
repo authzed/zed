@@ -36,33 +36,29 @@ func registerSchemaCmd(rootCmd *cobra.Command) {
 
 var (
 	schemaCmd = &cobra.Command{
-		Use:               "schema <subcommand>",
-		Short:             "read and write to a Schema for a Permissions System",
-		PersistentPreRunE: persistentPreRunE,
+		Use:   "schema <subcommand>",
+		Short: "read and write to a Schema for a Permissions System",
 	}
 
 	schemaReadCmd = &cobra.Command{
-		Use:               "read",
-		Args:              cobra.ExactArgs(0),
-		Short:             "read the Schema of current Permissions System",
-		PersistentPreRunE: persistentPreRunE,
-		RunE:              schemaReadCmdFunc,
+		Use:   "read",
+		Args:  cobra.ExactArgs(0),
+		Short: "read the Schema of current Permissions System",
+		RunE:  cobrautil.CommandStack(LogCmdFunc, schemaReadCmdFunc),
 	}
 
 	schemaWriteCmd = &cobra.Command{
-		Use:               "write <file?>",
-		Args:              cobra.MaximumNArgs(1),
-		Short:             "write a Schema file (or stdin) to the current Permissions System",
-		PersistentPreRunE: persistentPreRunE,
-		RunE:              schemaWriteCmdFunc,
+		Use:   "write <file?>",
+		Args:  cobra.MaximumNArgs(1),
+		Short: "write a Schema file (or stdin) to the current Permissions System",
+		RunE:  cobrautil.CommandStack(LogCmdFunc, schemaWriteCmdFunc),
 	}
 
 	schemaCopyCmd = &cobra.Command{
-		Use:               "copy <src context> <dest context>",
-		Args:              cobra.ExactArgs(2),
-		Short:             "copy a Schema from one context into another",
-		PersistentPreRunE: persistentPreRunE,
-		RunE:              schemaCopyCmdFunc,
+		Use:   "copy <src context> <dest context>",
+		Args:  cobra.ExactArgs(2),
+		Short: "copy a Schema from one context into another",
+		RunE:  cobrautil.CommandStack(LogCmdFunc, schemaCopyCmdFunc),
 	}
 )
 
@@ -147,9 +143,7 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 		log.Fatal().Msg("attempted to write empty schema")
 	}
 
-	request := &v1.WriteSchemaRequest{
-		Schema: string(schemaBytes),
-	}
+	request := &v1.WriteSchemaRequest{Schema: string(schemaBytes)}
 	log.Trace().Interface("request", request).Msg("writing schema")
 
 	resp, err := client.WriteSchema(context.Background(), request)
@@ -215,6 +209,7 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 
 	readRequest := &v1.ReadSchemaRequest{}
 	log.Trace().Interface("request", readRequest).Msg("requesting schema read")
+
 	readResp, err := srcClient.ReadSchema(context.Background(), readRequest)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read schema")
@@ -223,6 +218,7 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 
 	writeRequest := &v1.WriteSchemaRequest{Schema: string(readResp.SchemaText)}
 	log.Trace().Interface("request", writeRequest).Msg("writing schema")
+
 	resp, err := destClient.WriteSchema(context.Background(), writeRequest)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write schema")
