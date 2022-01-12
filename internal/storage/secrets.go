@@ -3,13 +3,9 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
-	"github.com/99designs/keyring"
-	"golang.org/x/term"
+	"github.com/zalando/go-keyring"
 )
 
 // ErrTokenNotFound is returned if there is no Token in a ConfigStore.
@@ -95,58 +91,25 @@ const keyringEntryName = "zed secrets"
 
 var _ SecretStore = KeychainSecretStore{}
 
-func openKeyring(configPath string) (keyring.Keyring, error) {
-	return keyring.Open(keyring.Config{
-		ServiceName: "zed",
-		FileDir:     filepath.Join(configPath, "keyring.jwt"),
-		FilePasswordFunc: func(prompt string) (string, error) {
-			if password, ok := os.LookupEnv("ZED_KEYRING_PASSWORD"); ok {
-				return password, nil
-			}
-
-			fmt.Fprintf(os.Stderr, "%s: ", prompt)
-			b, err := term.ReadPassword(int(os.Stdin.Fd()))
-			if err != nil {
-				return "", err
-			}
-			fmt.Println()
-			return string(b), nil
-		},
-	})
-}
-
 func (k KeychainSecretStore) Get() (Secrets, error) {
-	ring, err := openKeyring(k.ConfigPath)
+	entry, err := keyring.Get("zed", keyringEntryName)
 	if err != nil {
-		return Secrets{}, err
-	}
-
-	entry, err := ring.Get(keyringEntryName)
-	if err != nil {
-		if errors.Is(err, keyring.ErrKeyNotFound) {
+		if errors.Is(err, keyring.ErrNotFound) {
 			return Secrets{}, nil // empty is okay!
 		}
 		return Secrets{}, err
 	}
 
 	var s Secrets
-	err = json.Unmarshal(entry.Data, &s)
+	err = json.Unmarshal([]byte(entry), &s)
 	return s, err
 }
 
 func (k KeychainSecretStore) Put(s Secrets) error {
-	ring, err := openKeyring(k.ConfigPath)
-	if err != nil {
-		return err
-	}
-
 	data, err := json.Marshal(s)
 	if err != nil {
 		return err
 	}
 
-	return ring.Set(keyring.Item{
-		Key:  keyringEntryName,
-		Data: data,
-	})
+	return keyring.Set("zed", keyringEntryName, string(data))
 }
