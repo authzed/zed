@@ -34,33 +34,29 @@ func registerPermissionCmd(rootCmd *cobra.Command) {
 }
 
 var permissionCmd = &cobra.Command{
-	Use:               "permission <subcommand>",
-	Short:             "perform queries on the Permissions in a Permissions System",
-	PersistentPreRunE: persistentPreRunE,
+	Use:   "permission <subcommand>",
+	Short: "perform queries on the Permissions in a Permissions System",
 }
 
 var checkCmd = &cobra.Command{
-	Use:               "check <resource:id> <permission> <subject:id>",
-	Short:             "check that a Permission exists for a Subject",
-	Args:              cobra.ExactArgs(3),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              checkCmdFunc,
+	Use:   "check <resource:id> <permission> <subject:id>",
+	Short: "check that a Permission exists for a Subject",
+	Args:  cobra.ExactArgs(3),
+	RunE:  cobrautil.CommandStack(LogCmdFunc, checkCmdFunc),
 }
 
 var expandCmd = &cobra.Command{
-	Use:               "expand <permission> <resource:id>",
-	Short:             "expand the structure of a Permission",
-	Args:              cobra.ExactArgs(2),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              expandCmdFunc,
+	Use:   "expand <permission> <resource:id>",
+	Short: "expand the structure of a Permission",
+	Args:  cobra.ExactArgs(2),
+	RunE:  cobrautil.CommandStack(LogCmdFunc, expandCmdFunc),
 }
 
 var lookupCmd = &cobra.Command{
-	Use:               "lookup <type> <permission> <subject:id>",
-	Short:             "lookup the Resources of a given type for which the Subject has Permission",
-	Args:              cobra.ExactArgs(3),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              lookupCmdFunc,
+	Use:   "lookup <type> <permission> <subject:id>",
+	Short: "lookup the Resources of a given type for which the Subject has Permission",
+	Args:  cobra.ExactArgs(3),
+	RunE:  cobrautil.CommandStack(LogCmdFunc, lookupCmdFunc),
 }
 
 func parseSubject(s string) (namespace, id, relation string, err error) {

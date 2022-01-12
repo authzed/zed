@@ -24,41 +24,36 @@ func registerContextCmd(rootCmd *cobra.Command) {
 }
 
 var contextCmd = &cobra.Command{
-	Use:               "context <subcommand>",
-	Short:             "manage your machines Authzed credentials",
-	PersistentPreRunE: persistentPreRunE,
+	Use:   "context <subcommand>",
+	Short: "manage your machines Authzed credentials",
 }
 
 var contextListCmd = &cobra.Command{
-	Use:               "list",
-	Short:             "list all contexts",
-	Args:              cobra.ExactArgs(0),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              contextListCmdFunc,
+	Use:   "list",
+	Short: "list all contexts",
+	Args:  cobra.ExactArgs(0),
+	RunE:  cobrautil.CommandStack(LogCmdFunc, contextListCmdFunc),
 }
 
 var contextSetCmd = &cobra.Command{
-	Use:               "set <name> <endpoint> <api-token>",
-	Short:             "create or overwrite a context",
-	Args:              cobra.ExactArgs(3),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              contextSetCmdFunc,
+	Use:   "set <name> <endpoint> <api-token>",
+	Short: "create or overwrite a context",
+	Args:  cobra.ExactArgs(3),
+	RunE:  cobrautil.CommandStack(LogCmdFunc, contextSetCmdFunc),
 }
 
 var contextRemoveCmd = &cobra.Command{
-	Use:               "remove <system>",
-	Short:             "remove a context",
-	Args:              cobra.ExactArgs(1),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              contextRemoveCmdFunc,
+	Use:   "remove <system>",
+	Short: "remove a context",
+	Args:  cobra.ExactArgs(1),
+	RunE:  cobrautil.CommandStack(LogCmdFunc, contextRemoveCmdFunc),
 }
 
 var contextUseCmd = &cobra.Command{
-	Use:               "use <system>",
-	Short:             "set a context as the current context",
-	Args:              cobra.MaximumNArgs(1),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              contextUseCmdFunc,
+	Use:   "use <system>",
+	Short: "set a context as the current context",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  cobrautil.CommandStack(LogCmdFunc, contextUseCmdFunc),
 }
 
 func contextListCmdFunc(cmd *cobra.Command, args []string) error {

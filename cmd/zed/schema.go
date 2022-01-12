@@ -36,33 +36,29 @@ func registerSchemaCmd(rootCmd *cobra.Command) {
 
 var (
 	schemaCmd = &cobra.Command{
-		Use:               "schema <subcommand>",
-		Short:             "read and write to a Schema for a Permissions System",
-		PersistentPreRunE: persistentPreRunE,
+		Use:   "schema <subcommand>",
+		Short: "read and write to a Schema for a Permissions System",
 	}
 
 	schemaReadCmd = &cobra.Command{
-		Use:               "read",
-		Args:              cobra.ExactArgs(0),
-		Short:             "read the Schema of current Permissions System",
-		PersistentPreRunE: persistentPreRunE,
-		RunE:              schemaReadCmdFunc,
+		Use:   "read",
+		Args:  cobra.ExactArgs(0),
+		Short: "read the Schema of current Permissions System",
+		RunE:  cobrautil.CommandStack(LogCmdFunc, schemaReadCmdFunc),
 	}
 
 	schemaWriteCmd = &cobra.Command{
-		Use:               "write <file?>",
-		Args:              cobra.MaximumNArgs(1),
-		Short:             "write a Schema file (or stdin) to the current Permissions System",
-		PersistentPreRunE: persistentPreRunE,
-		RunE:              schemaWriteCmdFunc,
+		Use:   "write <file?>",
+		Args:  cobra.MaximumNArgs(1),
+		Short: "write a Schema file (or stdin) to the current Permissions System",
+		RunE:  cobrautil.CommandStack(LogCmdFunc, schemaWriteCmdFunc),
 	}
 
 	schemaCopyCmd = &cobra.Command{
-		Use:               "copy <src context> <dest context>",
-		Args:              cobra.ExactArgs(2),
-		Short:             "copy a Schema from one context into another",
-		PersistentPreRunE: persistentPreRunE,
-		RunE:              schemaCopyCmdFunc,
+		Use:   "copy <src context> <dest context>",
+		Args:  cobra.ExactArgs(2),
+		Short: "copy a Schema from one context into another",
+		RunE:  cobrautil.CommandStack(LogCmdFunc, schemaCopyCmdFunc),
 	}
 )
 

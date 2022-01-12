@@ -49,9 +49,8 @@ var importCmd = &cobra.Command{
 	Only relationships:
 		zed import --schema=false file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
 `,
-	Args:              cobra.ExactArgs(1),
-	PersistentPreRunE: persistentPreRunE,
-	RunE:              importCmdFunc,
+	Args: cobra.ExactArgs(1),
+	RunE: cobrautil.CommandStack(LogCmdFunc, importCmdFunc),
 }
 
 func importCmdFunc(cmd *cobra.Command, args []string) error {
