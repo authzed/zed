@@ -10,7 +10,7 @@ require (
 	github.com/authzed/connector-postgresql v0.2.1-0.20211110161636-5a22597732ae
 	github.com/authzed/grpcutil v0.0.0-20211020204402-aba1876830e6
 	github.com/authzed/spicedb v1.1.0
-	github.com/cockroachdb/cockroach v20.1.13+incompatible
+	github.com/cockroachdb/cockroach v20.1.17+incompatible
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/hokaccha/go-prettyjson v0.0.0-20210113012101-fb4e108d2519 // indirect
 	github.com/jzelinskie/cobrautil v0.0.8-0.20220111193536-0ffd41c0b812
