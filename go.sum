@@ -135,8 +135,9 @@ github.com/aryann/difflib v0.0.0-20170710044230-e206f873d14a/go.mod h1:DAHtR1m6l
 github.com/ashanbrown/forbidigo v1.1.0/go.mod h1:vVW7PEdqEFqapJe95xHkTfB1+XvZXBFg8t0sG2FIxmI=
 github.com/ashanbrown/makezero v0.0.0-20210308000810-4155955488a0/go.mod h1:oG9Dnez7/ESBqc4EdrdNlryeo7d0KcW1ftXHm7nU/UU=
 github.com/authzed/authzed-go v0.2.0/go.mod h1:yFZS0kYwLQ9NYBmU7NQC9b7gwyVdR+7ba7ObAU+vNJU=
-github.com/authzed/authzed-go v0.3.0 h1:m5eqPX9p1mhdbd8jrFhNORx5PvnHQ2e1bISweEwja+E=
 github.com/authzed/authzed-go v0.3.0/go.mod h1:bsUniBRroq4l5WZMYLO+T9osQa/P2qMwZ+Af8zoJK8Y=
+github.com/authzed/authzed-go v0.4.1 h1:EVTP1ZXGnZ8sA8Ojqi5k9Io/nsbaH7lSNqPLiUgwvPE=
+github.com/authzed/authzed-go v0.4.1/go.mod h1:bsUniBRroq4l5WZMYLO+T9osQa/P2qMwZ+Af8zoJK8Y=
 github.com/authzed/connector-postgresql v0.2.1-0.20211110161636-5a22597732ae h1:F06ooPMVSIWbk0K/3zhLRqjJOgWBXl1dpzBiS3qs/qY=
 github.com/authzed/connector-postgresql v0.2.1-0.20211110161636-5a22597732ae/go.mod h1:3CPIAMRVWw1Tn4l3q31X+5iYtOmfjoZdeVSCay8TBjU=
 github.com/authzed/grpcutil v0.0.0-20210913124023-cad23ae5a9e8/go.mod h1:HwO/KbRU3fWXEYHE96kvXnwxzi97tkXD1hfi5UaZ71Y=

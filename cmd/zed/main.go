@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 
+	zgrpcutil "github.com/authzed/zed/internal/grpcutil"
 	"github.com/authzed/zed/internal/storage"
 	"github.com/authzed/zed/internal/version"
 )
@@ -28,7 +29,9 @@ func defaultStorage() (storage.ConfigStore, storage.SecretStore) {
 }
 
 func dialOptsFromFlags(cmd *cobra.Command, token string) []grpc.DialOption {
-	var opts []grpc.DialOption
+	opts := []grpc.DialOption{
+		grpc.WithUnaryInterceptor(zgrpcutil.LogDispatchTrailers),
+	}
 
 	if cobrautil.MustGetBool(cmd, "insecure") {
 		opts = append(opts, grpc.WithInsecure())
