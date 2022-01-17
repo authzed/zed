@@ -31,12 +31,12 @@ var ErrMissingToken = errors.New("could not find token")
 
 // DefaultToken creates a Token from input, filling any missing values in
 // with the current context's defaults.
-func DefaultToken(overrideEndpoint, overrideApiToken string, cs ConfigStore, ss SecretStore) (Token, error) {
-	if overrideEndpoint != "" && overrideApiToken != "" {
+func DefaultToken(overrideEndpoint, overrideAPIToken string, cs ConfigStore, ss SecretStore) (Token, error) {
+	if overrideEndpoint != "" && overrideAPIToken != "" {
 		return Token{
 			Name:     "env",
 			Endpoint: overrideEndpoint,
-			ApiToken: overrideApiToken,
+			APIToken: overrideAPIToken,
 		}, nil
 	}
 
@@ -51,7 +51,7 @@ func DefaultToken(overrideEndpoint, overrideApiToken string, cs ConfigStore, ss 
 	return Token{
 		Name:     token.Name,
 		Endpoint: stringz.DefaultEmpty(overrideEndpoint, token.Endpoint),
-		ApiToken: stringz.DefaultEmpty(overrideApiToken, token.ApiToken),
+		APIToken: stringz.DefaultEmpty(overrideAPIToken, token.APIToken),
 	}, nil
 }
 

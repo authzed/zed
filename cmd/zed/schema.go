@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -75,7 +76,7 @@ func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
 	if err != nil {
 		return err
 	}
@@ -119,7 +120,7 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
 	if err != nil {
 		return err
 	}
@@ -128,11 +129,14 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 	switch len(args) {
 	case 1:
 		schemaBytes, err = os.ReadFile(args[0])
+		if err != nil {
+			return fmt.Errorf("failed to read schema file: %w", err)
+		}
 		log.Trace().Str("schema", string(schemaBytes)).Str("file", args[0]).Msg("read schema from file")
 	case 0:
 		schemaBytes, err = ioutil.ReadAll(os.Stdin)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to read schema file: %w", err)
 		}
 		log.Trace().Str("schema", string(schemaBytes)).Msg("read schema from stdin")
 	default:
@@ -140,7 +144,7 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(schemaBytes) == 0 {
-		log.Fatal().Msg("attempted to write empty schema")
+		return errors.New("attempted to write empty schema")
 	}
 
 	request := &v1.WriteSchemaRequest{Schema: string(schemaBytes)}
@@ -193,7 +197,7 @@ func clientForContext(cmd *cobra.Command, contextName string, secretStore storag
 	}
 	log.Trace().Interface("token", token).Send()
 
-	return authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+	return authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
 }
 
 func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
@@ -216,7 +220,7 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("response", readResp).Msg("read schema")
 
-	writeRequest := &v1.WriteSchemaRequest{Schema: string(readResp.SchemaText)}
+	writeRequest := &v1.WriteSchemaRequest{Schema: readResp.SchemaText}
 	log.Trace().Interface("request", writeRequest).Msg("writing schema")
 
 	resp, err := destClient.WriteSchema(context.Background(), writeRequest)

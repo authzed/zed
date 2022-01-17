@@ -66,7 +66,7 @@ func NewImportPostgresCmd(ctx context.Context, streams streams.IO) *cobra.Comman
 			if err != nil {
 				return err
 			}
-			client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+			client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
 			if err != nil {
 				return err
 			}
@@ -98,7 +98,7 @@ func opaPreRunCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
 	if err != nil {
 		return err
 	}
@@ -157,9 +157,7 @@ func registerAuthzedBuiltins(client *authzed.Client) {
 			}
 
 			if zedtoken != "" {
-				request.Consistency = &v1.Consistency{
-					Requirement: &v1.Consistency_AtLeastAsFresh{&v1.ZedToken{Token: zedtoken}},
-				}
+				request.Consistency = atLeastAsFresh(zedtoken)
 			}
 
 			resp, err := client.CheckPermission(context.Background(), request)

@@ -68,15 +68,15 @@ func contextListCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var rows [][]string
+	rows := make([][]string, 0, len(secrets.Tokens))
 	for _, token := range secrets.Tokens {
 		current := ""
 		if token.Name == cfg.CurrentToken {
 			current = "   ✓   "
 		}
-		secret := token.ApiToken
+		secret := token.APIToken
 		if !cobrautil.MustGetBool(cmd, "reveal-tokens") {
-			prefix, _ := token.SplitApiToken()
+			prefix, _ := token.SplitAPIToken()
 			secret = stringz.Join("_", prefix, "<redacted>")
 		}
 
@@ -104,7 +104,7 @@ func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 	err = storage.PutToken(storage.Token{
 		Name:     name,
 		Endpoint: stringz.DefaultEmpty(endpoint, "grpc.authzed.com:443"),
-		ApiToken: apiToken,
+		APIToken: apiToken,
 	}, secretStore)
 	if err != nil {
 		return err
