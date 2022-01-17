@@ -10,6 +10,7 @@
 A command-line client for managing [SpiceDB] and [Authzed].
 
 zed features include:
+
 - Unix-friendly interface for the [v1] Authzed [API]
 - Context switching that stores credentials securely in your OS keychain
 - An experimental [OPA] REPL with additional builtins for checking permissions
@@ -56,7 +57,6 @@ zed context list
 ```
 
 At any point in time, the `ZED_ENDPOINT` and `ZED_TOKEN` environment variables can be used to override their respective values in the current context.
-
 
 ### Viewing & modifying data
 
