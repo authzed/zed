@@ -9,15 +9,15 @@ require (
 	github.com/authzed/authzed-go v0.4.1
 	github.com/authzed/connector-postgresql v0.2.1-0.20211110161636-5a22597732ae
 	github.com/authzed/grpcutil v0.0.0-20211020204402-aba1876830e6
-	github.com/authzed/spicedb v1.1.0
-	github.com/cockroachdb/cockroach v20.1.13+incompatible
+	github.com/authzed/spicedb v1.4.0
+	github.com/cockroachdb/cockroach v20.1.17+incompatible
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/hokaccha/go-prettyjson v0.0.0-20210113012101-fb4e108d2519 // indirect
 	github.com/jzelinskie/cobrautil v0.0.8-0.20220111193536-0ffd41c0b812
 	github.com/jzelinskie/stringz v0.0.1
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/open-policy-agent/opa v0.29.4
+	github.com/open-policy-agent/opa v0.36.0
 	github.com/rs/zerolog v1.26.1
 	github.com/spf13/afero v1.8.0 // indirect
 	github.com/spf13/cobra v1.3.0
@@ -31,5 +31,5 @@ require (
 	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
-	tailscale.com v1.6.0
+	tailscale.com v1.18.2
 )
