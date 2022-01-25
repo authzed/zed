@@ -22,12 +22,12 @@ type SchemaRelationships struct {
 	Relationships string `yaml:"relationships"`
 }
 
-// DecodeFunc will decode into the SchemaRelationships object.
-type DecodeFunc func(out *SchemaRelationships) error
+// Func will decode into the SchemaRelationships object.
+type Func func(out *SchemaRelationships) error
 
 // DecoderForURL returns the appropriate decoder for a given URL.
 // Some URLs have special handling to dereference to the actual file.
-func DecoderForURL(u *url.URL) (d DecodeFunc, err error) {
+func DecoderForURL(u *url.URL) (d Func, err error) {
 	switch s := u.Scheme; s {
 	case "file":
 		d = fileDecoder(u)
@@ -39,7 +39,7 @@ func DecoderForURL(u *url.URL) (d DecodeFunc, err error) {
 	return
 }
 
-func fileDecoder(u *url.URL) DecodeFunc {
+func fileDecoder(u *url.URL) Func {
 	return func(out *SchemaRelationships) error {
 		file, err := os.Open(u.Path)
 		if err != nil {
@@ -49,9 +49,9 @@ func fileDecoder(u *url.URL) DecodeFunc {
 	}
 }
 
-func httpDecoder(u *url.URL) DecodeFunc {
+func httpDecoder(u *url.URL) Func {
 	rewriteURL(u)
-	return directHttpDecoder(u)
+	return directHTTPDecoder(u)
 }
 
 func rewriteURL(u *url.URL) {
@@ -74,13 +74,14 @@ func rewriteURL(u *url.URL) {
 	}
 }
 
-func directHttpDecoder(u *url.URL) DecodeFunc {
+func directHTTPDecoder(u *url.URL) Func {
 	return func(out *SchemaRelationships) error {
 		log.Debug().Stringer("url", u).Send()
 		r, err := http.Get(u.String())
 		if err != nil {
 			return err
 		}
+		defer r.Body.Close()
 		return yaml.NewDecoder(r.Body).Decode(&out)
 	}
 }

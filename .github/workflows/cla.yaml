@@ -1,5 +1,5 @@
 ---
-name: "CLA Assistant"
+name: "CLA"
 on:
   issue_comment:
     types:
@@ -12,6 +12,7 @@ on:
 
 jobs:
   CLAssistant:
+    name: "Check Signature"
     runs-on: "ubuntu-latest"
     steps:
       - name: "CLA Assistant"

@@ -92,6 +92,10 @@ var bulkDeleteCmd = &cobra.Command{
 	RunE:  cobrautil.CommandStack(LogCmdFunc, bulkDeleteRelationships),
 }
 
+var fullyConsistent = &v1.Consistency{
+	Requirement: &v1.Consistency_FullyConsistent{FullyConsistent: true},
+}
+
 func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
@@ -105,7 +109,7 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
 	if err != nil {
 		return err
 	}
@@ -117,9 +121,7 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 
 	counter := -1
 	if cobrautil.MustGetBool(cmd, "estimate-count") {
-		request.Consistency = &v1.Consistency{
-			Requirement: &v1.Consistency_FullyConsistent{FullyConsistent: true},
-		}
+		request.Consistency = fullyConsistent
 
 		log.Trace().Interface("request", request).Send()
 
@@ -134,7 +136,7 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 		counter = 0
 		for {
 			_, err := resp.Recv()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 
@@ -164,7 +166,7 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 			Message: message,
 		}, &response)
 		if err != nil {
-			if err == terminal.InterruptErr {
+			if errors.Is(err, terminal.InterruptErr) {
 				os.Exit(0)
 			}
 
@@ -243,13 +245,9 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 	}
 
 	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
-		request.Consistency = &v1.Consistency{
-			Requirement: &v1.Consistency_AtLeastAsFresh{&v1.ZedToken{Token: zedtoken}},
-		}
+		request.Consistency = atLeastAsFresh(zedtoken)
 	} else {
-		request.Consistency = &v1.Consistency{
-			Requirement: &v1.Consistency_FullyConsistent{FullyConsistent: true},
-		}
+		request.Consistency = fullyConsistent
 	}
 
 	configStore, secretStore := defaultStorage()
@@ -264,7 +262,7 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
 	if err != nil {
 		return err
 	}
@@ -277,7 +275,7 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 
 	for {
 		msg, err := resp.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 
@@ -329,7 +327,7 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 		}
 		log.Trace().Interface("token", token).Send()
 
-		client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+		client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
 		if err != nil {
 			return err
 		}

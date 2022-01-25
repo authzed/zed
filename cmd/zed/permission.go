@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -98,7 +99,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
 	if err != nil {
 		return err
 	}
@@ -119,9 +120,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
-		request.Consistency = &v1.Consistency{
-			Requirement: &v1.Consistency_AtLeastAsFresh{&v1.ZedToken{Token: zedtoken}},
-		}
+		request.Consistency = atLeastAsFresh(zedtoken)
 	}
 	log.Trace().Interface("request", request).Send()
 
@@ -165,7 +164,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
 	if err != nil {
 		return err
 	}
@@ -179,9 +178,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
-		request.Consistency = &v1.Consistency{
-			Requirement: &v1.Consistency_AtLeastAsFresh{&v1.ZedToken{Token: zedtoken}},
-		}
+		request.Consistency = atLeastAsFresh(zedtoken)
 	}
 	log.Trace().Interface("request", request).Send()
 
@@ -227,7 +224,7 @@ func lookupCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.ApiToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
 	if err != nil {
 		return err
 	}
@@ -245,9 +242,7 @@ func lookupCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
-		request.Consistency = &v1.Consistency{
-			Requirement: &v1.Consistency_AtLeastAsFresh{&v1.ZedToken{Token: zedtoken}},
-		}
+		request.Consistency = atLeastAsFresh(zedtoken)
 	}
 	log.Trace().Interface("request", request).Send()
 
@@ -259,7 +254,7 @@ func lookupCmdFunc(cmd *cobra.Command, args []string) error {
 	for {
 		resp, err := respStream.Recv()
 		switch {
-		case err == io.EOF:
+		case errors.Is(err, io.EOF):
 			return nil
 		case err != nil:
 			return err

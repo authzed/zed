@@ -5,17 +5,27 @@ import (
 	"os"
 	"path/filepath"
 
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/grpcutil"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/mitchellh/go-homedir"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	zgrpcutil "github.com/authzed/zed/internal/grpcutil"
 	"github.com/authzed/zed/internal/storage"
 	"github.com/authzed/zed/internal/version"
 )
+
+func atLeastAsFresh(zedtoken string) *v1.Consistency {
+	return &v1.Consistency{
+		Requirement: &v1.Consistency_AtLeastAsFresh{
+			AtLeastAsFresh: &v1.ZedToken{Token: zedtoken},
+		},
+	}
+}
 
 func defaultStorage() (storage.ConfigStore, storage.SecretStore) {
 	var home string
@@ -34,12 +44,11 @@ func dialOptsFromFlags(cmd *cobra.Command, token string) []grpc.DialOption {
 	}
 
 	if cobrautil.MustGetBool(cmd, "insecure") {
-		opts = append(opts, grpc.WithInsecure())
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		opts = append(opts, grpcutil.WithInsecureBearerToken(token))
 	} else {
 		opts = append(opts, grpcutil.WithBearerToken(token))
-		tlsOpt := grpcutil.WithSystemCerts(cobrautil.MustGetBool(cmd, "no-verify-ca"))
-		opts = append(opts, tlsOpt)
+		opts = append(opts, grpcutil.WithSystemCerts(cobrautil.MustGetBool(cmd, "no-verify-ca")))
 	}
 
 	return opts

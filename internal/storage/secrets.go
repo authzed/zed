@@ -18,11 +18,11 @@ var ErrTokenNotFound = errors.New("token does not exist")
 type Token struct {
 	Name     string
 	Endpoint string
-	ApiToken string
+	APIToken string
 }
 
-func (t Token) SplitApiToken() (prefix, secret string) {
-	exploded := strings.Split(t.ApiToken, "_")
+func (t Token) SplitAPIToken() (prefix, secret string) {
+	exploded := strings.Split(t.APIToken, "_")
 	return strings.Join(exploded[:len(exploded)-1], "_"), exploded[len(exploded)-1]
 }
 

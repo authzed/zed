@@ -2,7 +2,7 @@
 
 [![Container Image](https://img.shields.io/github/v/release/authzed/zed?color=%232496ED&label=container&logo=docker "Container Image")](https://quay.io/repository/authzed/zed?tab=tags)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
-[![Build Status](https://github.com/authzed/zed/workflows/build/badge.svg)](https://github.com/authzed/zed/actions)
+[![Build Status](https://github.com/authzed/zed/workflows/Build%20&%20Test/badge.svg)](https://github.com/authzed/zed/actions)
 [![Mailing List](https://img.shields.io/badge/email-google%20groups-4285F4)](https://groups.google.com/g/authzed-oss)
 [![Discord Server](https://img.shields.io/discord/844600078504951838?color=7289da&logo=discord "Discord Server")](https://discord.gg/jTysUaxXzM)
 [![Twitter](https://img.shields.io/twitter/follow/authzed?color=%23179CF0&logo=twitter&style=flat-square)](https://twitter.com/authzed)
@@ -10,6 +10,7 @@
 A command-line client for managing [SpiceDB] and [Authzed].
 
 zed features include:
+
 - Unix-friendly interface for the [v1] Authzed [API]
 - Context switching that stores credentials securely in your OS keychain
 - An experimental [OPA] REPL with additional builtins for checking permissions
@@ -56,7 +57,6 @@ zed context list
 ```
 
 At any point in time, the `ZED_ENDPOINT` and `ZED_TOKEN` environment variables can be used to override their respective values in the current context.
-
 
 ### Viewing & modifying data
 
