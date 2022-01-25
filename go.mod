@@ -6,7 +6,7 @@ require (
 	github.com/99designs/keyring v1.1.6
 	github.com/AlecAivazis/survey/v2 v2.3.2
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
-	github.com/authzed/authzed-go v0.4.1
+	github.com/authzed/authzed-go v0.4.2-0.20220112232750-c1a3c1b2d699
 	github.com/authzed/connector-postgresql v0.2.1-0.20211110161636-5a22597732ae
 	github.com/authzed/grpcutil v0.0.0-20211020204402-aba1876830e6
 	github.com/authzed/spicedb v1.4.0

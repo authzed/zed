@@ -25,13 +25,14 @@ func LogDispatchTrailers(
 ) error {
 	var trailerMD metadata.MD
 	err := invoker(ctx, method, req, reply, cc, append(callOpts, grpc.Trailer(&trailerMD))...)
+	log.Trace().Interface("trailers", trailerMD).Msg("parsed trailers")
 
 	dispatchCount, trailerErr := responsemeta.GetIntResponseTrailerMetadata(
 		trailerMD,
 		responsemeta.DispatchedOperationsCount,
 	)
 	if trailerErr != nil {
-		log.Warn().Err(trailerErr).Msg("error reading dispatched operations trailer")
+		log.Debug().Err(trailerErr).Msg("error reading dispatched operations trailer")
 	}
 
 	cachedCount, trailerErr := responsemeta.GetIntResponseTrailerMetadata(
@@ -39,7 +40,7 @@ func LogDispatchTrailers(
 		responsemeta.CachedOperationsCount,
 	)
 	if trailerErr != nil {
-		log.Warn().Err(trailerErr).Msg("error reading cached operations trailer")
+		log.Debug().Err(trailerErr).Msg("error reading cached operations trailer")
 	}
 
 	log.Debug().

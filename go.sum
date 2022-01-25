@@ -108,8 +108,9 @@ github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj
 github.com/armon/go-radix v1.0.0/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/authzed/authzed-go v0.2.0/go.mod h1:yFZS0kYwLQ9NYBmU7NQC9b7gwyVdR+7ba7ObAU+vNJU=
-github.com/authzed/authzed-go v0.4.1 h1:EVTP1ZXGnZ8sA8Ojqi5k9Io/nsbaH7lSNqPLiUgwvPE=
 github.com/authzed/authzed-go v0.4.1/go.mod h1:bsUniBRroq4l5WZMYLO+T9osQa/P2qMwZ+Af8zoJK8Y=
+github.com/authzed/authzed-go v0.4.2-0.20220112232750-c1a3c1b2d699 h1:rABxUh/Isy7u8ENP/3u21x+ZRzaTNVVd4SvhInVwXdA=
+github.com/authzed/authzed-go v0.4.2-0.20220112232750-c1a3c1b2d699/go.mod h1:bsUniBRroq4l5WZMYLO+T9osQa/P2qMwZ+Af8zoJK8Y=
 github.com/authzed/connector-postgresql v0.2.1-0.20211110161636-5a22597732ae h1:F06ooPMVSIWbk0K/3zhLRqjJOgWBXl1dpzBiS3qs/qY=
 github.com/authzed/connector-postgresql v0.2.1-0.20211110161636-5a22597732ae/go.mod h1:3CPIAMRVWw1Tn4l3q31X+5iYtOmfjoZdeVSCay8TBjU=
 github.com/authzed/grpcutil v0.0.0-20210913124023-cad23ae5a9e8/go.mod h1:HwO/KbRU3fWXEYHE96kvXnwxzi97tkXD1hfi5UaZ71Y=
