@@ -17,7 +17,7 @@ require (
 	github.com/jzelinskie/stringz v0.0.1
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/open-policy-agent/opa v0.36.0
+	github.com/open-policy-agent/opa v0.36.1
 	github.com/rs/zerolog v1.26.1
 	github.com/spf13/afero v1.8.0 // indirect
 	github.com/spf13/cobra v1.3.0
