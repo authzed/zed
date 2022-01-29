@@ -14,9 +14,7 @@ jobs:
       - name: "Install cross-compilers"
         run: |
           brew tap messense/macos-cross-toolchains
-          brew install x86_64-unknown-linux-gnu
-          brew install aarch64-unknown-linux-gnu
-          brew install mingw-w64
+          brew install x86_64-unknown-linux-gnu x86_64-unknown-linux-musl aarch64-unknown-linux-gnu aarch64-unknown-linux-musl mingw-w64
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> $GITHUB_ENV
       - uses: "actions/setup-go@v2"
         with:
@@ -42,8 +40,7 @@ jobs:
           username: "${{ secrets.QUAY_USERNAME }}"
           password: "${{ secrets.QUAY_ROBOT_TOKEN }}"
       - name: "Install linux cross-compilers"
-        run: |
-          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-mingw-w64-x86-64
+        run: "sudo apt-get install -y gcc-aarch64-linux-gnu gcc-mingw-w64-x86-64"
       - uses: "actions/setup-go@v2"
         with:
           go-version: "^1.17"

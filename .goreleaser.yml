@@ -1,6 +1,6 @@
 ---
 builds:
-  - id: "linux-amd64"
+  - id: "linux-amd64-gnu"
     goos: ["linux"]
     goarch: ["amd64"]
     env: ["CC=x86_64-unknown-linux-gnu-gcc", "CGO_ENABLED=1"]
@@ -13,10 +13,32 @@ builds:
     ldflags: &ldflags
       - "-s -w"
       - "-X {{ .ModulePath }}/internal/version.Version={{ .Version }}"
-  - id: "linux-arm64"
+  - id: "linux-amd64-musl"
+    goos: ["linux"]
+    goarch: ["amd64"]
+    env: ["CC=x86_64-unknown-linux-musl-gcc", "CGO_ENABLED=1"]
+    main: *main
+    binary: *binary
+    mod_timestamp: *mod_timestamp
+    flags: *flags
+    asmflags: *asmflags
+    gcflags: *gcflags
+    ldflags: *ldflags
+  - id: "linux-arm64-gnu"
     goos: ["linux"]
     goarch: ["arm64"]
     env: ["CC=aarch64-unknown-linux-gnu-gcc", "CGO_ENABLED=1"]
+    main: *main
+    binary: *binary
+    mod_timestamp: *mod_timestamp
+    flags: *flags
+    asmflags: *asmflags
+    gcflags: *gcflags
+    ldflags: *ldflags
+  - id: "linux-arm64-musl"
+    goos: ["linux"]
+    goarch: ["arm64"]
+    env: ["CC=aarch64-unknown-linux-musl-gcc", "CGO_ENABLED=1"]
     main: *main
     binary: *binary
     mod_timestamp: *mod_timestamp
@@ -58,23 +80,49 @@ builds:
     gcflags: *gcflags
     ldflags: *ldflags
 
+archives:
+  - id: "gnu"
+    builds:
+      - "linux-amd64-gnu"
+      - "linux-arm64-gnu"
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}_gnu"
+  - id: "musl"
+    builds:
+      - "linux-amd64-musl"
+      - "linux-arm64-musl"
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}_musl"
+  - id: "other"
+    builds:
+      - "darwin-amd64"
+      - "darwin-arm64"
+      - "windows-amd64"
+
 nfpms:
-  - vendor: "authzed inc."
-    homepage: "https://authzed.com/"
-    maintainer: "authzed <support@authzed.com>"
-    description: "manage Authzed from your command line."
-    license: "Apache 2.0"
-    epoch: 0
-    formats:
-      - "apk"
-      - "deb"
-      - "rpm"
+  - id: "gnu"
+    vendor: &vendor "authzed inc."
+    homepage: &homepage "https://authzed.com/"
+    maintainer: &maintainer "authzed <support@authzed.com>"
+    description: &description "manage Authzed from your command line."
+    license: &license "Apache 2.0"
+    epoch: &epoch "0"
+    builds: ["linux-amd64-gnu", "linux-arm64-gnu"]
+    formats: ["deb", "rpm"]
+  - id: "musl"
+    vendor: *vendor
+    homepage: *homepage
+    maintainer: *maintainer
+    description: *description
+    license: *license
+    epoch: *epoch
+    builds: ["linux-amd64-musl", "linux-arm64-musl"]
+    formats: ["apk"]
 
 brews:
   - tap:
       owner: "authzed"
       name: "homebrew-tap"
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    ids: ["gnu", "other"]
     url_template: "https://github.com/authzed/zed/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     download_strategy: "CurlDownloadStrategy"
     commit_author:
