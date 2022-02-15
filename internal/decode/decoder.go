@@ -2,6 +2,7 @@ package decode
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,8 +23,8 @@ type SchemaRelationships struct {
 	Relationships string `yaml:"relationships"`
 }
 
-// Func will decode into the SchemaRelationships object.
-type Func func(out *SchemaRelationships) error
+// Func will decode into the supplied object.
+type Func func(out interface{}) ([]byte, error)
 
 // DecoderForURL returns the appropriate decoder for a given URL.
 // Some URLs have special handling to dereference to the actual file.
@@ -33,6 +34,8 @@ func DecoderForURL(u *url.URL) (d Func, err error) {
 		d = fileDecoder(u)
 	case "http", "https":
 		d = httpDecoder(u)
+	case "":
+		d = fileDecoder(u)
 	default:
 		err = fmt.Errorf("%s scheme not supported", s)
 	}
@@ -40,12 +43,16 @@ func DecoderForURL(u *url.URL) (d Func, err error) {
 }
 
 func fileDecoder(u *url.URL) Func {
-	return func(out *SchemaRelationships) error {
+	return func(out interface{}) ([]byte, error) {
 		file, err := os.Open(u.Path)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		return yaml.NewDecoder(file).Decode(&out)
+		data, err := io.ReadAll(file)
+		if err != nil {
+			return nil, err
+		}
+		return data, yaml.Unmarshal(data, out)
 	}
 }
 
@@ -75,13 +82,18 @@ func rewriteURL(u *url.URL) {
 }
 
 func directHTTPDecoder(u *url.URL) Func {
-	return func(out *SchemaRelationships) error {
+	return func(out interface{}) ([]byte, error) {
 		log.Debug().Stringer("url", u).Send()
 		r, err := http.Get(u.String())
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer r.Body.Close()
-		return yaml.NewDecoder(r.Body).Decode(&out)
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		return data, yaml.Unmarshal(data, out)
 	}
 }

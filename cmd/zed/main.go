@@ -104,6 +104,7 @@ func main() {
 	registerRelationshipCmd(rootCmd)
 	registerExperimentCmd(rootCmd)
 	registerImportCmd(rootCmd)
+	registerValidateCmd(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

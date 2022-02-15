@@ -40,8 +40,11 @@ var importCmd = &cobra.Command{
 	From a devtools instance:
 		zed import https://localhost:8443/download
 
-	From a local file:
+	From a local file (with prefix):
 		zed import file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
+
+	From a local file (no prefix):
+		zed import authzed-x7izWU8_2Gw3.yaml
 
 	Only schema: 
 		zed import --relationships=false file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
@@ -81,7 +84,7 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	var p decode.SchemaRelationships
-	if err := decoder(&p); err != nil {
+	if _, err := decoder(&p); err != nil {
 		return err
 	}
 
