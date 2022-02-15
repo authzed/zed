@@ -2112,5 +2112,5 @@ sigs.k8s.io/yaml v1.3.0 h1:a2VclLzOGrwOHDiV8EfBGhvjHvP46CtW5j6POvhYGGo=
 sigs.k8s.io/yaml v1.3.0/go.mod h1:GeOyir5tyXNByN85N/dRIT9es5UQNerPYEKK56eTBm8=
 software.sslmate.com/src/go-pkcs12 v0.0.0-20180114231543-2291e8f0f237/go.mod h1:/xvNRWUqm0+/ZMiF4EX00vrSCMsE4/NHb+Pt3freEeQ=
 software.sslmate.com/src/go-pkcs12 v0.0.0-20210415151418-c5206de65a78/go.mod h1:B7Wf0Ya4DHF9Yw+qfZuJijQYkWicqDa+79Ytmmq3Kjg=
-tailscale.com v1.20.2 h1:Vk6SVGmczDFSx+PYjbKMa8gIC9Y9Rq+vT1XoZni+fkA=
-tailscale.com v1.20.2/go.mod h1:kjVy3ji2OH5lZhPLIIRacoY3CN4Bo3Yyb2mtoM8nfJ4=
+tailscale.com v1.20.4 h1:7cl/Q2Sbo2Jb2dX7zA+Exbbl7DT5UGZ4iGhQ2xj23X0=
+tailscale.com v1.20.4/go.mod h1:kjVy3ji2OH5lZhPLIIRacoY3CN4Bo3Yyb2mtoM8nfJ4=
