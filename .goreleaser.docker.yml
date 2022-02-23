@@ -54,6 +54,10 @@ docker_manifests:
     image_templates:
       - *amd_image
       - *arm_image
+  - name_template: "quay.io/authzed/zed:latest"
+    image_templates:
+      - *amd_image
+      - *arm_image
 
 release:
   disable: true
