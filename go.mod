@@ -3,7 +3,7 @@ module github.com/authzed/zed
 go 1.16
 
 require (
-	github.com/99designs/keyring v1.1.6
+	github.com/99designs/keyring v1.2.0
 	github.com/AlecAivazis/survey/v2 v2.3.2
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
 	github.com/authzed/authzed-go v0.4.2-0.20220207230446-c781fa7fa969
