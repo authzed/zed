@@ -18,6 +18,8 @@ import (
 	"github.com/authzed/zed/internal/storage"
 )
 
+const importBatchSize = 5000
+
 func registerImportCmd(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(importCmd)
 	importCmd.Flags().Bool("schema", true, "import schema")
@@ -46,7 +48,7 @@ var importCmd = &cobra.Command{
 	From a local file (no prefix):
 		zed import authzed-x7izWU8_2Gw3.yaml
 
-	Only schema: 
+	Only schema:
 		zed import --relationships=false file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
 
 	Only relationships:
@@ -140,13 +142,34 @@ func importRelationships(client *authzed.Client, relationships string) error {
 	if err := scanner.Err(); err != nil {
 		return err
 	}
+	log.Info().Int("count", len(relationshipUpdates)).Msg("parsed relationships")
 
-	request := &v1.WriteRelationshipsRequest{Updates: relationshipUpdates}
-	log.Trace().Interface("request", request).Msg("writing relationships")
-	log.Info().Int("count", len(relationshipUpdates)).Msg("importing relationships")
+	return batchRequests(client, relationshipUpdates, importBatchSize)
+}
 
-	if _, err := client.WriteRelationships(context.Background(), request); err != nil {
-		return err
+func batchRequests(client *authzed.Client, updates []*v1.RelationshipUpdate, batchSize int) error {
+	totalBatches := (len(updates) + batchSize - 1) / batchSize
+	log.Info().Int("batch_size", batchSize).Int("total_batches", totalBatches).Msg("batching relationship writes")
+
+	for i := 0; i < totalBatches; i++ {
+		start := i * batchSize
+		end := start + batchSize
+		if end > len(updates) {
+			end = len(updates)
+		}
+
+		request := &v1.WriteRelationshipsRequest{Updates: updates[start:end]}
+
+		log.Trace().Interface("request", request).Msg("writing relationships")
+		if _, err := client.WriteRelationships(context.Background(), request); err != nil {
+			return err
+		}
+
+		log.Info().
+			Int("batch_no", i+1).
+			Int("write_count", len(updates[start:end])).
+			Int("total_written", len(updates[:end])).
+			Msg("wrote relationships")
 	}
 
 	return nil
