@@ -9,16 +9,10 @@ import (
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
-	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
-	"github.com/authzed/spicedb/pkg/schemadsl/generator"
-	"github.com/authzed/spicedb/pkg/schemadsl/input"
 	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/jzelinskie/cobrautil"
-	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/authzed/zed/internal/decode"
 	"github.com/authzed/zed/internal/storage"
@@ -84,54 +78,6 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Read the existing schema (if any) to get the prefix.
-	prefix := cobrautil.MustGetString(cmd, "schema-definition-prefix")
-	if prefix == "" {
-		request := &v1.ReadSchemaRequest{}
-		log.Trace().Interface("request", request).Msg("requesting schema read")
-
-		resp, err := client.ReadSchema(context.Background(), request)
-		if err != nil {
-			// If the schema was not found, then just use the empty prefix.
-			errStatus, ok := status.FromError(err)
-			if !ok || errStatus.Code() != codes.NotFound {
-				return err
-			}
-
-			log.Debug().Msg("no schema defined")
-		} else {
-			empty := ""
-			found, err := compiler.Compile([]compiler.InputSchema{
-				{Source: input.Source("schema"), SchemaString: resp.SchemaText},
-			}, &empty)
-			if err != nil {
-				return err
-			}
-
-			foundPrefixes := make([]string, 0, len(found))
-			for _, def := range found {
-				if strings.Contains(def.Name, "/") {
-					parts := strings.Split(def.Name, "/")
-					foundPrefixes = append(foundPrefixes, parts[0])
-				} else {
-					foundPrefixes = append(foundPrefixes, "")
-				}
-			}
-
-			prefixes := stringz.Dedup(foundPrefixes)
-			if len(prefixes) == 0 {
-				return fmt.Errorf("found no schema definition prefixes")
-			}
-
-			if len(prefixes) > 1 {
-				return fmt.Errorf("found multiple schema definition prefixes: %v", prefixes)
-			}
-
-			prefix = prefixes[0]
-			log.Debug().Str("prefix", prefix).Msg("found schema definition prefix")
-		}
-	}
-
 	u, err := url.Parse(args[0])
 	if err != nil {
 		return err
@@ -143,6 +89,11 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	var p decode.SchemaRelationships
 	if _, err := decoder(&p); err != nil {
+		return err
+	}
+
+	prefix, err := determinePrefixForSchema(cobrautil.MustGetString(cmd, "schema-definition-prefix"), client, nil)
+	if err != nil {
 		return err
 	}
 
@@ -165,20 +116,10 @@ func importSchema(client *authzed.Client, schema string, definitionPrefix string
 	log.Info().Msg("importing schema")
 
 	// Recompile the schema with the specified prefix.
-	nsDefs, err := compiler.Compile([]compiler.InputSchema{
-		{Source: input.Source("schema"), SchemaString: schema},
-	}, &definitionPrefix)
+	schemaText, err := rewriteSchema(schema, definitionPrefix)
 	if err != nil {
 		return err
 	}
-
-	objectDefs := make([]string, 0, len(nsDefs))
-	for _, nsDef := range nsDefs {
-		objectDef, _ := generator.GenerateSource(nsDef)
-		objectDefs = append(objectDefs, objectDef)
-	}
-
-	schemaText := strings.Join(objectDefs, "\n\n")
 
 	// Write the recompiled and regenerated schema.
 	request := &v1.WriteSchemaRequest{Schema: schemaText}
