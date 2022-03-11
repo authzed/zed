@@ -40,7 +40,7 @@ jobs:
           username: "${{ secrets.QUAY_USERNAME }}"
           password: "${{ secrets.QUAY_ROBOT_TOKEN }}"
       - name: "Install linux cross-compilers"
-        run: "sudo apt-get install -y gcc-aarch64-linux-gnu gcc-mingw-w64-x86-64"
+        run: "sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu gcc-mingw-w64-x86-64"
       - uses: "actions/setup-go@v2"
         with:
           go-version: "^1.17"
