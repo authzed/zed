@@ -200,19 +200,19 @@ func buildReadRequest(cmd *cobra.Command, args []string) (*v1.ReadRelationshipsR
 		}
 	}
 
-	subjectFilter := cobrautil.MustGetString(cmd, "subject-filter")
-	switch {
-	case len(args) > 1:
+	if len(args) > 1 {
 		readFilter.OptionalRelation = args[1]
+	}
 
-	case len(args) == 3:
+	subjectFilter := cobrautil.MustGetString(cmd, "subject-filter")
+	if len(args) == 3 {
 		if subjectFilter != "" {
 			return nil, errors.New("cannot specify subject filter both positionally and via --subject-filter")
 		}
 		subjectFilter = args[2]
-		fallthrough
+	}
 
-	case subjectFilter != "":
+	if subjectFilter != "" {
 		if strings.Contains(subjectFilter, ":") {
 			subjectNS, subjectID, subjectRel, err := parseSubject(subjectFilter)
 			if err != nil {
