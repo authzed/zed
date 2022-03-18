@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -16,7 +15,6 @@ import (
 
 	zgrpcutil "github.com/authzed/zed/internal/grpcutil"
 	"github.com/authzed/zed/internal/storage"
-	"github.com/authzed/zed/internal/version"
 )
 
 func atLeastAsFresh(zedtoken string) *v1.Consistency {
@@ -80,11 +78,9 @@ func main() {
 	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "display zed version information",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(version.UsageVersion(cobrautil.MustGetBool(cmd, "include-deps")))
-		},
+		RunE:  cobrautil.VersionRunFunc("zed"),
 	}
-	versionCmd.Flags().Bool("include-deps", false, "include dependencies' versions")
+	cobrautil.RegisterVersionFlags(versionCmd.Flags())
 	rootCmd.AddCommand(versionCmd)
 
 	// Register root-level aliases

@@ -3,11 +3,12 @@ package storage
 import (
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/jzelinskie/stringz"
-	"tailscale.com/atomicfile"
 )
 
 const configFileName = "config.json"
@@ -124,5 +125,41 @@ func (s JSONConfigStore) Put(cfg Config) error {
 		return err
 	}
 
-	return atomicfile.WriteFile(filepath.Join(s.ConfigPath, configFileName), cfgBytes, 0o774)
+	return atomicWriteFile(filepath.Join(s.ConfigPath, configFileName), cfgBytes, 0o774)
+}
+
+// atomicWriteFile writes data to filename+some suffix, then renames it into
+// filename.
+//
+// Copyright (c) 2019 Tailscale Inc & AUTHORS All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be found
+// at the following URL:
+// https://github.com/tailscale/tailscale/blob/main/LICENSE
+func atomicWriteFile(filename string, data []byte, perm os.FileMode) (err error) {
+	f, err := ioutil.TempFile(filepath.Dir(filename), filepath.Base(filename)+".tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := f.Name()
+	defer func() {
+		if err != nil {
+			f.Close()
+			os.Remove(tmpName)
+		}
+	}()
+	if _, err := f.Write(data); err != nil {
+		return err
+	}
+	if runtime.GOOS != "windows" {
+		if err := f.Chmod(perm); err != nil {
+			return err
+		}
+	}
+	if err := f.Sync(); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, filename)
 }

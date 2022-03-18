@@ -12,9 +12,11 @@ require (
 	github.com/authzed/spicedb v1.4.1-0.20220214225827-aea171d69d33
 	github.com/charmbracelet/lipgloss v0.4.0
 	github.com/cockroachdb/cockroach v20.1.17+incompatible
+	github.com/creack/pty v1.1.17 // indirect
 	github.com/hokaccha/go-prettyjson v0.0.0-20210113012101-fb4e108d2519 // indirect
-	github.com/jzelinskie/cobrautil v0.0.8-0.20220111193536-0ffd41c0b812
+	github.com/jzelinskie/cobrautil v0.0.9
 	github.com/jzelinskie/stringz v0.0.1
+	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/open-policy-agent/opa v0.36.1
@@ -22,8 +24,9 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
+	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
-	tailscale.com v1.20.2
 )

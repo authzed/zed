@@ -14,7 +14,7 @@ builds:
     gcflags: &gcflags ["all=-trimpath={{ .Env.GITHUB_WORKSPACE }}"]
     ldflags: &ldflags
       - "-s -w"
-      - "-X {{ .ModulePath }}/internal/version.Version={{ .Version }}"
+      - "-X github.com/jzelinskie/cobrautil.Version={{ .Version }}"
   - id: "linux-arm64"
     goos: ["linux"]
     goarch: ["arm64"]
