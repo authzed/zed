@@ -12,7 +12,7 @@ builds:
     gcflags: &gcflags ["all=-trimpath={{ .Env.GITHUB_WORKSPACE }}"]
     ldflags: &ldflags
       - "-s -w"
-      - "-X {{ .ModulePath }}/internal/version.Version={{ .Version }}"
+      - "-X github.com/jzelinskie/cobrautil.Version={{ .Version }}"
   - id: "linux-amd64-musl"
     goos: ["linux"]
     goarch: ["amd64"]
@@ -142,7 +142,7 @@ brews:
       system "#{bin}/zed version"
     install: |
       if !File.exists? "zed"
-        system "go build --ldflags \"-s -w -X github.com/authzed/zed/internal/version.Version=$(git describe --always --abbrev=7 --dirty)\" ./cmd/zed"
+        system "go build --ldflags \"-s -w -X github.com/jzelinskie/cobrautil.Version=$(git describe --always --abbrev=7 --dirty)\" ./cmd/zed"
       end
       bin.install "zed"
       (bash_completion/"zed").write Utils.safe_popen_read("#{bin}/zed", "completion", "bash")
