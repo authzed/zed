@@ -1,0 +1,38 @@
+---
+name: "Build & Test"
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - "!dependabot/*"
+      - "*"
+  pull_request:
+    branches:
+      - "*"
+jobs:
+  build:
+    name: "Build Binary"
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v3"
+      - uses: "actions/setup-go@v3"
+        with:
+          go-version: "^1.17"
+      - uses: "authzed/actions/go-build@main"
+
+  image-build:
+    name: "Build Container Image"
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v3"
+      - uses: "authzed/actions/docker-build@main"
+
+  unit:
+    name: "Run Unit Tests"
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v3"
+      - uses: "actions/setup-go@v3"
+        with:
+          go-version: "^1.17"
+      - uses: "authzed/action-spicedb@v1"
+      - uses: "authzed/actions/go-test@main"
