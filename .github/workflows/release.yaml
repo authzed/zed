@@ -35,6 +35,10 @@ jobs:
         with:
           fetch-depth: 0
       - uses: "authzed/actions/docker-login@main"
+        with:
+          quayio_token: "${{ secrets.QUAYIO_PASSWORD }}"
+          github_token: "${{ secrets.GITHUB_TOKEN }}"
+          dockerhub_token: "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}"
       - name: "Install linux cross-compilers"
         run: "sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu gcc-mingw-w64-x86-64"
       - uses: "actions/setup-go@v3"
