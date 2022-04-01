@@ -19,7 +19,7 @@ require (
 	github.com/open-policy-agent/opa v0.36.1
 	github.com/rs/zerolog v1.26.1
 	github.com/spf13/cobra v1.3.0
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1
