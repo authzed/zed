@@ -12,7 +12,7 @@ require (
 	github.com/authzed/spicedb v1.4.1-0.20220214225827-aea171d69d33
 	github.com/charmbracelet/lipgloss v0.4.0
 	github.com/cockroachdb/cockroach v20.1.17+incompatible
-	github.com/jzelinskie/cobrautil v0.0.9
+	github.com/jzelinskie/cobrautil v0.0.10
 	github.com/jzelinskie/stringz v0.0.1
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/olekukonko/tablewriter v0.0.5
