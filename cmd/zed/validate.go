@@ -12,10 +12,11 @@ import (
 	"github.com/spf13/cobra"
 
 	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
+	"github.com/authzed/spicedb/pkg/commonerrors"
 	"github.com/authzed/spicedb/pkg/development"
+	core "github.com/authzed/spicedb/pkg/proto/core/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/authzed/spicedb/pkg/validationfile"
-	"github.com/authzed/spicedb/pkg/validationfile/blocks"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/authzed/zed/internal/decode"
@@ -77,7 +78,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	var parsed validationfile.ValidationFile
 	validateContents, err := decoder(&parsed)
 	if err != nil {
-		var errWithSource blocks.ErrorWithSource
+		var errWithSource commonerrors.ErrorWithSource
 		if errors.As(err, &errWithSource) {
 			ouputErrorWithSource(validateContents, errWithSource)
 		}
@@ -89,7 +90,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	tuples := make([]*v0.RelationTuple, 0, len(parsed.Relationships.Relationships))
 	for _, rel := range parsed.Relationships.Relationships {
-		tuples = append(tuples, tuple.MustFromRelationship(rel))
+		tuples = append(tuples, core.ToV0RelationTuple(tuple.MustFromRelationship(rel)))
 	}
 	devCtx, devErrs, err := development.NewDevContext(ctx, &v0.RequestContext{
 		Schema:        parsed.Schema.Schema,
@@ -129,14 +130,14 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func ouputErrorWithSource(validateContents []byte, errWithSource blocks.ErrorWithSource) {
+func ouputErrorWithSource(validateContents []byte, errWithSource commonerrors.ErrorWithSource) {
 	lines := strings.Split(string(validateContents), "\n")
 
 	fmt.Printf("%s%s\n", errorPrefix, errorMessageStyle.Render(errWithSource.Error()))
 	errorLineNumber := int(errWithSource.LineNumber) - 1 // errWithSource.LineNumber is 1-indexed
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
-			renderLine(lines, i, errWithSource.Source, errorLineNumber)
+			renderLine(lines, i, errWithSource.SourceCodeString, errorLineNumber)
 		} else {
 			renderLine(lines, i, "", errorLineNumber)
 		}
