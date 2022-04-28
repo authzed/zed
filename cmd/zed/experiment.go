@@ -66,7 +66,7 @@ func NewImportPostgresCmd(ctx context.Context, streams streams.IO) *cobra.Comman
 			if err != nil {
 				return err
 			}
-			client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
+			client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
 			if err != nil {
 				return err
 			}
@@ -98,7 +98,7 @@ func opaPreRunCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
 	if err != nil {
 		return err
 	}

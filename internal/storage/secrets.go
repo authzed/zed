@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/99designs/keyring"
+	"github.com/jzelinskie/stringz"
 	"golang.org/x/term"
 )
 
@@ -19,6 +20,20 @@ type Token struct {
 	Name     string
 	Endpoint string
 	APIToken string
+	Insecure *bool
+}
+
+func (t Token) IsInsecure() bool {
+	return t.Insecure != nil && *t.Insecure
+}
+
+func (t Token) Redacted() string {
+	prefix, _ := t.SplitAPIToken()
+	if prefix == "" {
+		return "<redacted>"
+	}
+
+	return stringz.Join("_", prefix, "<redacted>")
 }
 
 func (t Token) SplitAPIToken() (prefix, secret string) {

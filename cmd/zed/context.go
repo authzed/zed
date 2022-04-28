@@ -76,8 +76,12 @@ func contextListCmdFunc(cmd *cobra.Command, args []string) error {
 		}
 		secret := token.APIToken
 		if !cobrautil.MustGetBool(cmd, "reveal-tokens") {
-			prefix, _ := token.SplitAPIToken()
-			secret = stringz.Join("_", prefix, "<redacted>")
+			secret = token.Redacted()
+		}
+
+		insecureStr := ""
+		if token.IsInsecure() {
+			insecureStr = "   ✓    "
 		}
 
 		rows = append(rows, []string{
@@ -85,10 +89,11 @@ func contextListCmdFunc(cmd *cobra.Command, args []string) error {
 			token.Name,
 			token.Endpoint,
 			secret,
+			insecureStr,
 		})
 	}
 
-	printers.PrintTable(os.Stdout, []string{"current", "name", "endpoint", "token"}, rows)
+	printers.PrintTable(os.Stdout, []string{"current", "name", "endpoint", "token", "insecure"}, rows)
 
 	return nil
 }
@@ -100,11 +105,13 @@ func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	insecure := cobrautil.MustGetBool(cmd, "insecure")
 	cfgStore, secretStore := defaultStorage()
 	err = storage.PutToken(storage.Token{
 		Name:     name,
 		Endpoint: stringz.DefaultEmpty(endpoint, "grpc.authzed.com:443"),
 		APIToken: apiToken,
+		Insecure: &insecure,
 	}, secretStore)
 	if err != nil {
 		return err

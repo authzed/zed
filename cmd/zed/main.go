@@ -36,7 +36,7 @@ func defaultStorage() (storage.ConfigStore, storage.SecretStore) {
 	return storage.JSONConfigStore{ConfigPath: home}, storage.KeychainSecretStore{ConfigPath: home}
 }
 
-func dialOptsFromFlags(cmd *cobra.Command, token string) []grpc.DialOption {
+func dialOptsFromFlags(cmd *cobra.Command, token storage.Token) []grpc.DialOption {
 	opts := []grpc.DialOption{
 		grpc.WithUnaryInterceptor(zgrpcutil.LogDispatchTrailers),
 	}
@@ -45,11 +45,11 @@ func dialOptsFromFlags(cmd *cobra.Command, token string) []grpc.DialOption {
 		opts = append(opts, grpc.WithUnaryInterceptor(zgrpcutil.CheckServerVersion))
 	}
 
-	if cobrautil.MustGetBool(cmd, "insecure") {
+	if cobrautil.MustGetBool(cmd, "insecure") || (token.IsInsecure()) {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		opts = append(opts, grpcutil.WithInsecureBearerToken(token))
+		opts = append(opts, grpcutil.WithInsecureBearerToken(token.APIToken))
 	} else {
-		opts = append(opts, grpcutil.WithBearerToken(token))
+		opts = append(opts, grpcutil.WithBearerToken(token.APIToken))
 		opts = append(opts, grpcutil.WithSystemCerts(cobrautil.MustGetBool(cmd, "no-verify-ca")))
 	}
 

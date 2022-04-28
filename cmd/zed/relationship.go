@@ -109,7 +109,7 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
 	if err != nil {
 		return err
 	}
@@ -262,7 +262,7 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
 	if err != nil {
 		return err
 	}
@@ -327,7 +327,7 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 		}
 		log.Trace().Interface("token", token).Send()
 
-		client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
+		client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
 		if err != nil {
 			return err
 		}
