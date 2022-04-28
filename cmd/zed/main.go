@@ -41,6 +41,10 @@ func dialOptsFromFlags(cmd *cobra.Command, token string) []grpc.DialOption {
 		grpc.WithUnaryInterceptor(zgrpcutil.LogDispatchTrailers),
 	}
 
+	if !cobrautil.MustGetBool(cmd, "skip-version-check") {
+		opts = append(opts, grpc.WithUnaryInterceptor(zgrpcutil.CheckServerVersion))
+	}
+
 	if cobrautil.MustGetBool(cmd, "insecure") {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		opts = append(opts, grpcutil.WithInsecureBearerToken(token))
@@ -71,6 +75,7 @@ func main() {
 	rootCmd.PersistentFlags().String("permissions-system", "", "permissions system to query")
 	rootCmd.PersistentFlags().String("token", "", "token used to authenticate to authzed")
 	rootCmd.PersistentFlags().Bool("insecure", false, "connect over a plaintext connection")
+	rootCmd.PersistentFlags().Bool("skip-version-check", false, "if true, no version check is performed against the server")
 	rootCmd.PersistentFlags().Bool("no-verify-ca", false, "do not attempt to verify the server's certificate chain and host name")
 	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
 	_ = rootCmd.PersistentFlags().MarkHidden("debug") // This cannot return its error.
