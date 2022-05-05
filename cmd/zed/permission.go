@@ -99,7 +99,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
 	if err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func lookupCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token.APIToken)...)
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
 	if err != nil {
 		return err
 	}

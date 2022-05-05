@@ -53,6 +53,7 @@ func DefaultToken(overrideEndpoint, overrideAPIToken string, cs ConfigStore, ss 
 		Name:     token.Name,
 		Endpoint: stringz.DefaultEmpty(overrideEndpoint, token.Endpoint),
 		APIToken: stringz.DefaultEmpty(overrideAPIToken, token.APIToken),
+		Insecure: token.Insecure,
 	}, nil
 }
 
