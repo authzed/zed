@@ -15,11 +15,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/authzed/zed/internal/decode"
+	"github.com/authzed/zed/internal/grpcutil"
 	"github.com/authzed/zed/internal/storage"
 )
 
 func registerImportCmd(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(importCmd)
+	importCmd.Flags().Int("batch-size", 1000, "import batch size")
+	importCmd.Flags().Int("workers", 1, "number of concurrent batching workers")
 	importCmd.Flags().Bool("schema", true, "import schema")
 	importCmd.Flags().Bool("relationships", true, "import relationships")
 	importCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before importing")
@@ -47,7 +50,7 @@ var importCmd = &cobra.Command{
 	From a local file (no prefix):
 		zed import authzed-x7izWU8_2Gw3.yaml
 
-	Only schema: 
+	Only schema:
 		zed import --relationships=false file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
 
 	Only relationships:
@@ -104,7 +107,9 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	if cobrautil.MustGetBool(cmd, "relationships") {
-		if err := importRelationships(client, p.Relationships, prefix); err != nil {
+		batchSize := cobrautil.MustGetInt(cmd, "batch-size")
+		workers := cobrautil.MustGetInt(cmd, "workers")
+		if err := importRelationships(client, p.Relationships, prefix, batchSize, workers); err != nil {
 			return err
 		}
 	}
@@ -132,7 +137,7 @@ func importSchema(client *authzed.Client, schema string, definitionPrefix string
 	return nil
 }
 
-func importRelationships(client *authzed.Client, relationships string, definitionPrefix string) error {
+func importRelationships(client *authzed.Client, relationships string, definitionPrefix string, batchSize int, workers int) error {
 	relationshipUpdates := make([]*v1.RelationshipUpdate, 0)
 	scanner := bufio.NewScanner(strings.NewReader(relationships))
 	for scanner.Scan() {
@@ -164,13 +169,24 @@ func importRelationships(client *authzed.Client, relationships string, definitio
 		return err
 	}
 
-	request := &v1.WriteRelationshipsRequest{Updates: relationshipUpdates}
-	log.Trace().Interface("request", request).Msg("writing relationships")
-	log.Info().Int("count", len(relationshipUpdates)).Msg("importing relationships")
+	log.Info().
+		Int("batch_size", batchSize).
+		Int("workers", workers).
+		Int("count", len(relationshipUpdates)).
+		Msg("importing relationships")
 
-	if _, err := client.WriteRelationships(context.Background(), request); err != nil {
-		return err
-	}
+	err := grpcutil.ConcurrentBatch(context.Background(), len(relationshipUpdates), batchSize, workers, func(ctx context.Context, no int, start int, end int) error {
+		request := &v1.WriteRelationshipsRequest{Updates: relationshipUpdates[start:end]}
+		_, err := client.WriteRelationships(ctx, request)
+		if err != nil {
+			return err
+		}
 
-	return nil
+		log.Info().
+			Int("batch_no", no).
+			Int("count", len(relationshipUpdates[start:end])).
+			Msg("imported relationships")
+		return nil
+	})
+	return err
 }
