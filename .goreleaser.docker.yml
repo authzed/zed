@@ -30,18 +30,22 @@ builds:
     ldflags: *ldflags
 
 dockers:
+  # AMD64
   - image_templates:
-      - &amd_image "quay.io/authzed/zed:{{ .Version }}-amd64"
-    ids: ["linux-amd64"]
+      - &amd_image_quay "quay.io/authzed/zed:v{{ .Version }}-amd64"
+      - &amd_image_gh "ghcr.io/authzed/zed:v{{ .Version }}-amd64"
+      - &amd_image_dh "authzed/zed:v{{ .Version }}-amd64"
     dockerfile: &dockerfile "Dockerfile.release"
     goos: "linux"
     goarch: "amd64"
     use: "buildx"
     build_flag_templates:
       - "--platform=linux/amd64"
+  # ARM64
   - image_templates:
-      - &arm_image "quay.io/authzed/zed:{{ .Version }}-arm64"
-    ids: ["linux-arm64"]
+      - &arm_image_quay "quay.io/authzed/zed:v{{ .Version }}-arm64"
+      - &arm_image_gh "ghcr.io/authzed/zed:v{{ .Version }}-arm64"
+      - &arm_image_dh "authzed/zed:v{{ .Version }}-arm64"
     dockerfile: *dockerfile
     goos: "linux"
     goarch: "arm64"
@@ -50,14 +54,21 @@ dockers:
       - "--platform=linux/arm64"
 
 docker_manifests:
-  - name_template: "quay.io/authzed/zed:{{ .Version }}"
-    image_templates:
-      - *amd_image
-      - *arm_image
+  # Quay
+  - name_template: "quay.io/authzed/zed:v{{ .Version }}"
+    image_templates: [*amd_image_quay, *arm_image_quay]
   - name_template: "quay.io/authzed/zed:latest"
-    image_templates:
-      - *amd_image
-      - *arm_image
+    image_templates: [*amd_image_quay, *arm_image_quay]
+  # GitHub Registry
+  - name_template: "ghcr.io/authzed/zed:v{{ .Version }}"
+    image_templates: [*amd_image_gh, *arm_image_gh]
+  - name_template: "ghcr.io/authzed/zed:latest"
+    image_templates: [*amd_image_gh, *arm_image_gh]
+  # Docker Hub
+  - name_template: "authzed/zed:v{{ .Version }}"
+    image_templates: [*amd_image_dh, *arm_image_dh]
+  - name_template: "authzed/zed:latest"
+    image_templates: [*amd_image_dh, *arm_image_dh]
 
 release:
   disable: true
