@@ -37,12 +37,18 @@ func defaultStorage() (storage.ConfigStore, storage.SecretStore) {
 }
 
 func dialOptsFromFlags(cmd *cobra.Command, token storage.Token) []grpc.DialOption {
-	opts := []grpc.DialOption{
-		grpc.WithUnaryInterceptor(zgrpcutil.LogDispatchTrailers),
+	grpc.WithChainUnaryInterceptor()
+
+	interceptors := []grpc.UnaryClientInterceptor{
+		zgrpcutil.LogDispatchTrailers,
 	}
 
 	if !cobrautil.MustGetBool(cmd, "skip-version-check") {
-		opts = append(opts, grpc.WithUnaryInterceptor(zgrpcutil.CheckServerVersion))
+		interceptors = append(interceptors, zgrpcutil.CheckServerVersion)
+	}
+
+	opts := []grpc.DialOption{
+		grpc.WithChainUnaryInterceptor(interceptors...),
 	}
 
 	if cobrautil.MustGetBool(cmd, "insecure") || (token.IsInsecure()) {
