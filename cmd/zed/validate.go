@@ -11,10 +11,10 @@ import (
 	"github.com/jzelinskie/cobrautil"
 	"github.com/spf13/cobra"
 
-	v0 "github.com/authzed/authzed-go/proto/authzed/api/v0"
 	"github.com/authzed/spicedb/pkg/commonerrors"
 	"github.com/authzed/spicedb/pkg/development"
 	core "github.com/authzed/spicedb/pkg/proto/core/v1"
+	devinterface "github.com/authzed/spicedb/pkg/proto/developer/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/charmbracelet/lipgloss"
@@ -88,11 +88,11 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 
 	// Create the development context.
 	ctx := context.Background()
-	tuples := make([]*v0.RelationTuple, 0, len(parsed.Relationships.Relationships))
+	tuples := make([]*core.RelationTuple, 0, len(parsed.Relationships.Relationships))
 	for _, rel := range parsed.Relationships.Relationships {
-		tuples = append(tuples, core.ToV0RelationTuple(tuple.MustFromRelationship(rel)))
+		tuples = append(tuples, tuple.MustFromRelationship(rel))
 	}
-	devCtx, devErrs, err := development.NewDevContext(ctx, &v0.RequestContext{
+	devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
 		Schema:        parsed.Schema.Schema,
 		Relationships: tuples,
 	})
@@ -159,7 +159,7 @@ func outputDeveloperErrors(validateContents []byte, devErrors *development.Devel
 	os.Exit(1)
 }
 
-func outputDeveloperError(devError *v0.DeveloperError, lines []string) {
+func outputDeveloperError(devError *devinterface.DeveloperError, lines []string) {
 	fmt.Printf("%s %s\n", errorPrefix, errorMessageStyle.Render(devError.Message))
 	errorLineNumber := int(devError.Line) - 1 // devError.Line is 1-indexed
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {

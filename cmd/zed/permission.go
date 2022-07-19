@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/authzed/authzed-go/pkg/requestmeta"
+	"github.com/authzed/authzed-go/pkg/responsemeta"
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
@@ -13,6 +15,9 @@ import (
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/authzed/zed/internal/printers"
 	"github.com/authzed/zed/internal/storage"
@@ -24,6 +29,8 @@ func registerPermissionCmd(rootCmd *cobra.Command) {
 	permissionCmd.AddCommand(checkCmd)
 	checkCmd.Flags().Bool("json", false, "output as JSON")
 	checkCmd.Flags().String("revision", "", "optional revision at which to check")
+	checkCmd.Flags().Bool("explain", false, "requests debug information from SpiceDB and prints out a trace of the requests")
+	checkCmd.Flags().Bool("schema", false, "requests debug information from SpiceDB and prints out the schema used")
 
 	permissionCmd.AddCommand(expandCmd)
 	expandCmd.Flags().Bool("json", false, "output as JSON")
@@ -124,8 +131,20 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("request", request).Send()
 
-	resp, err := client.CheckPermission(context.Background(), request)
+	ctx := context.Background()
+	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") {
+		log.Info().Msg("debugging requested on check")
+		ctx = requestmeta.AddRequestHeaders(ctx, requestmeta.RequestDebugInformation)
+	}
+
+	var trailerMD metadata.MD
+	resp, err := client.CheckPermission(ctx, request, grpc.Trailer(&trailerMD))
 	if err != nil {
+		derr := displayDebugInformationIfRequested(cmd, trailerMD, true)
+		if derr != nil {
+			return derr
+		}
+
 		return err
 	}
 
@@ -140,7 +159,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println(resp.Permissionship == v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION)
-	return nil
+	return displayDebugInformationIfRequested(cmd, trailerMD, false)
 }
 
 func expandCmdFunc(cmd *cobra.Command, args []string) error {
@@ -270,4 +289,42 @@ func lookupCmdFunc(cmd *cobra.Command, args []string) error {
 			fmt.Println(resp.ResourceObjectId)
 		}
 	}
+}
+
+func displayDebugInformationIfRequested(cmd *cobra.Command, trailerMD metadata.MD, hasError bool) error {
+	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") {
+		found, err := responsemeta.GetResponseTrailerMetadataOrNil(trailerMD, responsemeta.DebugInformation)
+		if err != nil {
+			return err
+		}
+
+		if found == nil {
+			log.Warn().Msg("No debuging information returned for the check")
+			return nil
+		}
+
+		debugInfo := &v1.DebugInformation{}
+		err = protojson.Unmarshal([]byte(*found), debugInfo)
+		if err != nil {
+			return err
+		}
+
+		if debugInfo.Check == nil {
+			log.Warn().Msg("No trace found for the check")
+			return nil
+		}
+
+		if cobrautil.MustGetBool(cmd, "explain") {
+			tp := treeprinter.New()
+			printers.DisplayCheckTrace(debugInfo.Check, tp, hasError)
+			fmt.Println()
+			fmt.Println(tp.String())
+		}
+
+		if cobrautil.MustGetBool(cmd, "schema") {
+			fmt.Println()
+			fmt.Println(debugInfo.SchemaUsed)
+		}
+	}
+	return nil
 }

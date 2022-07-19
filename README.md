@@ -17,12 +17,12 @@ zed features include:
 
 See [CONTRIBUTING.md] for instructions on how to contribute and perform common tasks like building the project and running tests.
 
-[SpiceDB]: https://github.com/authzed/spicedb
-[Authzed]: https://authzed.com
+[spicedb]: https://github.com/authzed/spicedb
+[authzed]: https://authzed.com
 [v1]: https://buf.build/authzed/api/docs/main/authzed.api.v1
-[API]: https://docs.authzed.com/reference/api
-[OPA]: https://openpolicyagent.org
-[CONTRIBUTING.md]: CONTRIBUTING.md
+[api]: https://docs.authzed.com/reference/api
+[opa]: https://openpolicyagent.org
+[contributing.md]: CONTRIBUTING.md
 
 ## Getting Started
 
@@ -30,14 +30,14 @@ See [CONTRIBUTING.md] for instructions on how to contribute and perform common t
 
 We highly recommend following the **[Protecting Your First App]** guide to learn the latest best practice to integrate an application with Authzed.
 
-[Protecting Your First App]: https://docs.authzed.com/guides/first-app
+[protecting your first app]: https://docs.authzed.com/guides/first-app
 
 ### Installation
 
 zed is currently packaged by [Homebrew] for both macOS and Linux.
 Individual releases are also available on the [releases page].
 
-[Homebrew]: https://brew.sh
+[homebrew]: https://brew.sh
 [releases page]: https://github.com/authzed/zed/releases
 
 ```sh
@@ -73,6 +73,14 @@ zed schema read
 zed permission check document:firstdoc writer user:emilia
 zed relationship create document:firstdoc reader user:beatrice
 zed relationship delete document:firstdoc reader user:beatrice
+```
+
+### Debugging
+
+The `--explain` flag can be used on `permission check` to see a trace:
+
+```sh
+zed permission check document:firstdoc writer user:emilia --explain
 ```
 
 ### Open Policy Agent (OPA)
