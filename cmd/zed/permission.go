@@ -6,13 +6,21 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/authzed/spicedb/pkg/tuple"
+
+	"github.com/authzed/authzed-go/pkg/requestmeta"
+	"github.com/authzed/authzed-go/pkg/responsemeta"
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
+	"github.com/gookit/color"
 	"github.com/jzelinskie/cobrautil"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/authzed/zed/internal/printers"
 	"github.com/authzed/zed/internal/storage"
@@ -24,6 +32,8 @@ func registerPermissionCmd(rootCmd *cobra.Command) {
 	permissionCmd.AddCommand(checkCmd)
 	checkCmd.Flags().Bool("json", false, "output as JSON")
 	checkCmd.Flags().String("revision", "", "optional revision at which to check")
+	checkCmd.Flags().Bool("trace", false, "requests the debug information of the check from SpiceDB and prints out a trace of the requests")
+	checkCmd.Flags().Bool("schema-used", false, "requests the debug information of the check from SpiceDB and prints out the schema used")
 
 	permissionCmd.AddCommand(expandCmd)
 	expandCmd.Flags().Bool("json", false, "output as JSON")
@@ -124,8 +134,20 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("request", request).Send()
 
-	resp, err := client.CheckPermission(context.Background(), request)
+	ctx := context.Background()
+	if cobrautil.MustGetBool(cmd, "trace") || cobrautil.MustGetBool(cmd, "schema-used") {
+		log.Info().Msg("debugging requested on check")
+		ctx = requestmeta.AddRequestHeaders(ctx, requestmeta.RequestDebugInformation)
+	}
+
+	var trailerMD metadata.MD
+	resp, err := client.CheckPermission(ctx, request, grpc.Trailer(&trailerMD))
 	if err != nil {
+		derr := displayDebugInformationIfRequested(cmd, trailerMD, true)
+		if derr != nil {
+			return derr
+		}
+
 		return err
 	}
 
@@ -140,7 +162,144 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println(resp.Permissionship == v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION)
+	return displayDebugInformationIfRequested(cmd, trailerMD, false)
+}
+
+func displayDebugInformationIfRequested(cmd *cobra.Command, trailerMD metadata.MD, hasError bool) error {
+	if cobrautil.MustGetBool(cmd, "trace") || cobrautil.MustGetBool(cmd, "schema-used") {
+		found, err := responsemeta.GetResponseTrailerMetadataOrNil(trailerMD, responsemeta.DebugInformation)
+		if err != nil {
+			return err
+		}
+
+		if found == nil {
+			log.Warn().Msg("No debuging information returned for the check")
+			return nil
+		}
+
+		debugInfo := &v1.DebugInformation{}
+		err = protojson.Unmarshal([]byte(*found), debugInfo)
+		if err != nil {
+			return err
+		}
+
+		if debugInfo.Check == nil {
+			log.Warn().Msg("No trace found for the check")
+			return nil
+		}
+
+		if cobrautil.MustGetBool(cmd, "trace") {
+			tp := treeprinter.New()
+			displayCheckTrace(debugInfo.Check, tp, hasError, map[string]struct{}{})
+			fmt.Println()
+			fmt.Println(tp.String())
+		}
+
+		if cobrautil.MustGetBool(cmd, "schema-used") {
+			fmt.Println()
+			fmt.Println(debugInfo.SchemaUsed)
+		}
+	}
 	return nil
+}
+
+func cycleKey(checkTrace *v1.CheckDebugTrace) string {
+	return fmt.Sprintf("%s#%s", tuple.StringObjectRef(checkTrace.Resource), checkTrace.Permission)
+}
+
+func isPartOfCycle(checkTrace *v1.CheckDebugTrace, encountered map[string]struct{}) bool {
+	if checkTrace.GetSubProblems() == nil {
+		return false
+	}
+
+	encounteredCopy := make(map[string]struct{}, len(encountered))
+	for k, v := range encountered {
+		encounteredCopy[k] = v
+	}
+
+	key := cycleKey(checkTrace)
+	if _, ok := encounteredCopy[key]; ok {
+		return true
+	}
+
+	encounteredCopy[key] = struct{}{}
+
+	for _, subProblem := range checkTrace.GetSubProblems().Traces {
+		if isPartOfCycle(subProblem, encounteredCopy) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp treeprinter.Node, hasError bool, encountered map[string]struct{}) {
+	red := color.FgRed.Render
+	green := color.FgGreen.Render
+	cyan := color.FgCyan.Render
+	white := color.FgWhite.Render
+	faint := color.FgGray.Render
+
+	orange := color.C256(166).Sprint
+	purple := color.C256(99).Sprint
+	lightgreen := color.C256(35).Sprint
+
+	hasPermission := green("✓")
+	resourceColor := white
+	permissionColor := color.FgWhite.Render
+
+	if checkTrace.PermissionType == v1.CheckDebugTrace_PERMISSION_TYPE_PERMISSION {
+		permissionColor = lightgreen
+	} else if checkTrace.PermissionType == v1.CheckDebugTrace_PERMISSION_TYPE_RELATION {
+		permissionColor = orange
+	}
+
+	if checkTrace.Result != v1.CheckDebugTrace_PERMISSIONSHIP_HAS_PERMISSION {
+		hasPermission = red("⨉")
+		resourceColor = faint
+		permissionColor = faint
+	}
+
+	additional := ""
+	if checkTrace.GetWasCachedResult() {
+		additional = cyan(" (cached)")
+	} else if hasError && isPartOfCycle(checkTrace, map[string]struct{}{}) {
+		hasPermission = orange("!")
+		resourceColor = white
+	}
+
+	isEndOfCycle := false
+	if hasError {
+		key := cycleKey(checkTrace)
+		_, isEndOfCycle = encountered[key]
+		if isEndOfCycle {
+			additional = color.C256(166).Sprint(" (cycle)")
+		}
+		encountered[key] = struct{}{}
+	}
+
+	tp = tp.Child(
+		fmt.Sprintf(
+			"%s %s:%s %s%s",
+			hasPermission,
+			resourceColor(checkTrace.Resource.ObjectType),
+			resourceColor(checkTrace.Resource.ObjectId),
+			permissionColor(checkTrace.Permission),
+			additional,
+		),
+	)
+
+	if isEndOfCycle {
+		return
+	}
+
+	if checkTrace.GetSubProblems() != nil {
+		for _, subProblem := range checkTrace.GetSubProblems().Traces {
+			displayCheckTrace(subProblem, tp, hasError, encountered)
+		}
+	} else if checkTrace.Result == v1.CheckDebugTrace_PERMISSIONSHIP_HAS_PERMISSION {
+		tp.Child(purple(fmt.Sprintf("%s:%s %s", checkTrace.Subject.Object.ObjectType, checkTrace.Subject.Object.ObjectId, checkTrace.Subject.OptionalRelation)))
+	}
 }
 
 func expandCmdFunc(cmd *cobra.Command, args []string) error {
