@@ -272,6 +272,10 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 
 // rewriteSchema rewrites the given existing schema to include the specified prefix on all definitions.
 func rewriteSchema(existingSchemaText string, definitionPrefix string) (string, error) {
+	if definitionPrefix == "" {
+		return existingSchemaText, nil
+	}
+
 	nsDefs, err := compiler.Compile([]compiler.InputSchema{
 		{Source: input.Source("schema"), SchemaString: existingSchemaText},
 	}, &definitionPrefix)
@@ -353,15 +357,11 @@ func determinePrefixForSchema(specifiedPrefix string, client *authzed.Client, ex
 	}
 
 	prefixes := stringz.Dedup(foundPrefixes)
-	if len(prefixes) == 0 {
-		return "", fmt.Errorf("found no schema definition prefixes")
+	if len(prefixes) == 1 {
+		prefix := prefixes[0]
+		log.Debug().Str("prefix", prefix).Msg("found schema definition prefix")
+		return prefix, nil
 	}
 
-	if len(prefixes) > 1 {
-		return "", fmt.Errorf("found multiple schema definition prefixes: %v", prefixes)
-	}
-
-	prefix := prefixes[0]
-	log.Debug().Str("prefix", prefix).Msg("found schema definition prefix")
-	return prefix, nil
+	return "", nil
 }
