@@ -89,9 +89,13 @@ func main() {
 	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "display zed version information",
-		RunE:  cobrautil.VersionRunFunc("zed"),
+		RunE: cobrautil.CommandStack(
+			LogCmdFunc,
+			versionCmdFunc,
+		),
 	}
 	cobrautil.RegisterVersionFlags(versionCmd.Flags())
+	versionCmd.Flags().Bool("include-remote-version", true, "whether to display the version of Authzed or SpiceDB for the current context")
 	rootCmd.AddCommand(versionCmd)
 
 	// Register root-level aliases
