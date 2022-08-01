@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/99designs/keyring v1.2.1
-	github.com/AlecAivazis/survey/v2 v2.3.2
+	github.com/AlecAivazis/survey/v2 v2.3.5
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
 	github.com/authzed/authzed-go v0.6.1-0.20220721164311-7b705b328aed
 	github.com/authzed/connector-postgresql v0.2.1-0.20211110161636-5a22597732ae
@@ -36,7 +36,6 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/creack/pty v1.1.17 // indirect
 	github.com/dalzilio/rudd v1.1.1-0.20220422201445-0a0cd32c7df9 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
