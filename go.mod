@@ -9,7 +9,7 @@ require (
 	github.com/authzed/authzed-go v0.6.1-0.20220721164311-7b705b328aed
 	github.com/authzed/connector-postgresql v0.2.1-0.20211110161636-5a22597732ae
 	github.com/authzed/grpcutil v0.0.0-20220104222419-f813f77722e5
-	github.com/authzed/spicedb v1.9.0
+	github.com/authzed/spicedb v1.10.0
 	github.com/charmbracelet/lipgloss v0.4.0
 	github.com/cockroachdb/cockroach v20.1.17+incompatible
 	github.com/gookit/color v1.5.1
@@ -81,6 +81,7 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/keybase/go-keychain v0.0.0-20190712205309-48d3d31d256d // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
+	github.com/kr/pretty v0.3.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
@@ -103,6 +104,7 @@ require (
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/rogpeppe/go-internal v1.8.1 // indirect
 	github.com/scylladb/go-set v1.0.2 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
