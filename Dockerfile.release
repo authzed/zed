@@ -1,4 +1,6 @@
 # vim: syntax=dockerfile
-FROM gcr.io/distroless/base
+ARG BASE=distroless.dev/static
+FROM $BASE
+
 COPY zed /usr/local/bin/zed
 ENTRYPOINT ["zed"]
