@@ -8,6 +8,6 @@ COPY . /go/src/zed
 RUN go mod download
 RUN go install ./cmd/zed
 
-FROM gcr.io/distroless/base
+FROM distroless.dev/static
 COPY --from=build /go/bin/* /usr/local/bin/
 ENTRYPOINT ["zed"]
