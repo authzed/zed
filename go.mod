@@ -12,7 +12,7 @@ require (
 	github.com/authzed/spicedb v1.12.0
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/cockroachdb/cockroach v20.1.17+incompatible
-	github.com/gookit/color v1.5.1
+	github.com/gookit/color v1.5.2
 	github.com/jzelinskie/cobrautil v0.0.12
 	github.com/jzelinskie/stringz v0.0.1
 	github.com/mitchellh/go-homedir v1.1.0
