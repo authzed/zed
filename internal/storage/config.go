@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -137,7 +136,7 @@ func (s JSONConfigStore) Put(cfg Config) error {
 // at the following URL:
 // https://github.com/tailscale/tailscale/blob/main/LICENSE
 func atomicWriteFile(filename string, data []byte, perm os.FileMode) (err error) {
-	f, err := ioutil.TempFile(filepath.Dir(filename), filepath.Base(filename)+".tmp")
+	f, err := os.CreateTemp(filepath.Dir(filename), filepath.Base(filename)+".tmp")
 	if err != nil {
 		return err
 	}

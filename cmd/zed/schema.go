@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
@@ -142,7 +142,7 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 		}
 		log.Trace().Str("schema", string(schemaBytes)).Str("file", args[0]).Msg("read schema from file")
 	case 0:
-		schemaBytes, err = ioutil.ReadAll(os.Stdin)
+		schemaBytes, err = io.ReadAll(os.Stdin)
 		if err != nil {
 			return fmt.Errorf("failed to read schema file: %w", err)
 		}
