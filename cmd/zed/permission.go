@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/authzed/authzed-go/pkg/requestmeta"
 	"github.com/authzed/authzed-go/pkg/responsemeta"
@@ -39,6 +40,14 @@ func registerPermissionCmd(rootCmd *cobra.Command) {
 	permissionCmd.AddCommand(lookupCmd)
 	lookupCmd.Flags().Bool("json", false, "output as JSON")
 	lookupCmd.Flags().String("revision", "", "optional revision at which to check")
+
+	permissionCmd.AddCommand(lookupResourcesCmd)
+	lookupResourcesCmd.Flags().Bool("json", false, "output as JSON")
+	lookupResourcesCmd.Flags().String("revision", "", "optional revision at which to check")
+
+	permissionCmd.AddCommand(lookupSubjectsCmd)
+	lookupSubjectsCmd.Flags().Bool("json", false, "output as JSON")
+	lookupSubjectsCmd.Flags().String("revision", "", "optional revision at which to check")
 }
 
 var permissionCmd = &cobra.Command{
@@ -60,11 +69,26 @@ var expandCmd = &cobra.Command{
 	RunE:  cobrautil.CommandStack(LogCmdFunc, expandCmdFunc),
 }
 
-var lookupCmd = &cobra.Command{
-	Use:   "lookup <type> <permission> <subject:id>",
-	Short: "lookup the Resources of a given type for which the Subject has Permission",
+var lookupResourcesCmd = &cobra.Command{
+	Use:   "lookup-resources <type> <permission> <subject:id>",
+	Short: "looks up the Resources of a given type for which the Subject has Permission",
 	Args:  cobra.ExactArgs(3),
-	RunE:  cobrautil.CommandStack(LogCmdFunc, lookupCmdFunc),
+	RunE:  cobrautil.CommandStack(LogCmdFunc, lookupResourcesCmdFunc),
+}
+
+var lookupCmd = &cobra.Command{
+	Use:    "lookup <type> <permission> <subject:id>",
+	Short:  "lookup the Resources of a given type for which the Subject has Permission",
+	Args:   cobra.ExactArgs(3),
+	RunE:   cobrautil.CommandStack(LogCmdFunc, lookupResourcesCmdFunc),
+	Hidden: true,
+}
+
+var lookupSubjectsCmd = &cobra.Command{
+	Use:   "lookup-subjects <resource:id> <permission> <subject_type#optional_subject_relation>",
+	Short: "lookup the Subjects of a given type for which the Subject has Permission on the Resource",
+	Args:  cobra.ExactArgs(3),
+	RunE:  cobrautil.CommandStack(LogCmdFunc, lookupSubjectsCmdFunc),
 }
 
 func parseSubject(s string) (namespace, id, relation string, err error) {
@@ -77,6 +101,11 @@ func parseSubject(s string) (namespace, id, relation string, err error) {
 		relation = ""
 		err = nil
 	}
+	return
+}
+
+func parseType(s string) (namespace, relation string) {
+	namespace, relation, _ = strings.Cut(s, "#")
 	return
 }
 
@@ -223,7 +252,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func lookupCmdFunc(cmd *cobra.Command, args []string) error {
+func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 	objectNS := args[0]
 	relation := args[1]
 	subjectNS, subjectID, subjectRel, err := parseSubject(args[2])
@@ -287,6 +316,80 @@ func lookupCmdFunc(cmd *cobra.Command, args []string) error {
 				fmt.Println(string(prettyProto))
 			}
 			fmt.Println(resp.ResourceObjectId)
+		}
+	}
+}
+
+func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
+	var objectNS, objectID string
+	err := stringz.SplitExact(args[0], ":", &objectNS, &objectID)
+	if err != nil {
+		return err
+	}
+
+	permission := args[1]
+
+	subjectType, subjectRelation := parseType(args[2])
+
+	configStore, secretStore := defaultStorage()
+	token, err := storage.DefaultToken(
+		cobrautil.MustGetString(cmd, "endpoint"),
+		cobrautil.MustGetString(cmd, "token"),
+		configStore,
+		secretStore,
+	)
+	if err != nil {
+		return err
+	}
+	log.Trace().Interface("token", token).Send()
+
+	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
+	if err != nil {
+		return err
+	}
+
+	request := &v1.LookupSubjectsRequest{
+		Resource: &v1.ObjectReference{
+			ObjectType: objectNS,
+			ObjectId:   objectID,
+		},
+		Permission:              permission,
+		SubjectObjectType:       subjectType,
+		OptionalSubjectRelation: subjectRelation,
+	}
+
+	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
+		request.Consistency = atLeastAsFresh(zedtoken)
+	}
+	log.Trace().Interface("request", request).Send()
+
+	respStream, err := client.LookupSubjects(context.Background(), request)
+	if err != nil {
+		return err
+	}
+
+	for {
+		resp, err := respStream.Recv()
+		switch {
+		case errors.Is(err, io.EOF):
+			return nil
+		case err != nil:
+			return err
+		default:
+			if cobrautil.MustGetBool(cmd, "json") {
+				prettyProto, err := prettyProto(resp)
+				if err != nil {
+					return err
+				}
+
+				fmt.Println(string(prettyProto))
+			}
+
+			if len(resp.ExcludedSubjectIds) > 0 {
+				fmt.Printf("%s:* - {%s}\n", subjectType, strings.Join(resp.ExcludedSubjectIds, ", "))
+			} else {
+				fmt.Printf("%s:%s\n", subjectType, resp.SubjectObjectId)
+			}
 		}
 	}
 }
