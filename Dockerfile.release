@@ -1,5 +1,5 @@
 # vim: syntax=dockerfile
-ARG BASE=distroless.dev/static
+ARG BASE=distroless.dev/alpine-base
 FROM $BASE
 
 COPY zed /usr/local/bin/zed
