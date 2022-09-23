@@ -54,7 +54,7 @@ dockers:
     use: "buildx"
     build_flag_templates:
       - "--platform=linux/amd64"
-      - "--build-arg=BASE=distroless.dev/busybox"
+      - "--build-arg=BASE=distroless.dev/alpine-base"
   # ARM64
   - image_templates:
       - &arm_image_quay "quay.io/authzed/zed:v{{ .Version }}-arm64"
@@ -79,7 +79,7 @@ dockers:
     use: "buildx"
     build_flag_templates:
       - "--platform=linux/arm64"
-      - "--build-arg=BASE=distroless.dev/busybox"
+      - "--build-arg=BASE=distroless.dev/alpine-base"
 
 docker_manifests:
   # Quay
