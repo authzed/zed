@@ -163,4 +163,4 @@ release:
   footer: |
     ## Docker Images
 
-    This release is available at `quay.io/authzed/zed:{{ .Version }}`
+    This release is available at `quay.io/authzed/zed:v{{ .Version }}`
