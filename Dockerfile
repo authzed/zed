@@ -1,13 +1,9 @@
-FROM golang:1.19.1-alpine3.16 AS build
+FROM golang:1.19-alpine3.16 AS zed-builder
+WORKDIR /go/src/app
+RUN apk update && apk add --no-cache git
+COPY . .
+RUN go build -v ./cmd/zed/
 
-RUN apk update
-RUN apk add git
-
-WORKDIR /go/src/zed
-COPY . /go/src/zed
-RUN go mod download
-RUN go install ./cmd/zed
-
-FROM distroless.dev/alpine-base
-COPY --from=build /go/bin/* /usr/local/bin/
+FROM cgr.dev/chainguard/musl-dynamic:latest
+COPY --from=zed-builder /go/src/app/zed /usr/local/bin/zed
 ENTRYPOINT ["zed"]

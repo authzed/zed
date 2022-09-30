@@ -1,5 +1,6 @@
 # vim: syntax=dockerfile
-ARG BASE=distroless.dev/alpine-base
+ARG BASE=cgr.dev/chainguard/musl-dynamic:latest
+
 FROM $BASE
 
 COPY zed /usr/local/bin/zed
