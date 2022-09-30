@@ -15,8 +15,10 @@ import (
 
 // Compile-time assertion that LogDispatchTrailers and CheckServerVersion implement the
 // grpc.UnaryClientInterceptor interface.
-var _ grpc.UnaryClientInterceptor = grpc.UnaryClientInterceptor(LogDispatchTrailers)
-var _ grpc.UnaryClientInterceptor = grpc.UnaryClientInterceptor(CheckServerVersion)
+var (
+	_ grpc.UnaryClientInterceptor = grpc.UnaryClientInterceptor(LogDispatchTrailers)
+	_ grpc.UnaryClientInterceptor = grpc.UnaryClientInterceptor(CheckServerVersion)
+)
 
 // CheckServerVersion implements a gRPC unary interceptor that requests the server version
 // from SpiceDB and, if found, compares it to the current released version.
