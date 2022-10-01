@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/99designs/keyring v1.2.1
-	github.com/AlecAivazis/survey/v2 v2.3.5
+	github.com/AlecAivazis/survey/v2 v2.3.6
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
 	github.com/authzed/authzed-go v0.7.0
 	github.com/authzed/connector-postgresql v0.2.1-0.20211110161636-5a22597732ae
