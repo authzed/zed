@@ -10,7 +10,7 @@ require (
 	github.com/authzed/connector-postgresql v0.2.1-0.20211110161636-5a22597732ae
 	github.com/authzed/grpcutil v0.0.0-20220104222419-f813f77722e5
 	github.com/authzed/spicedb v1.12.0
-	github.com/charmbracelet/lipgloss v0.5.0
+	github.com/charmbracelet/lipgloss v0.6.0
 	github.com/cockroachdb/cockroach v20.1.17+incompatible
 	github.com/gookit/color v1.5.2
 	github.com/jzelinskie/cobrautil v0.0.12
