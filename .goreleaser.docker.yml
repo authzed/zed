@@ -54,7 +54,7 @@ dockers:
     use: "buildx"
     build_flag_templates:
       - "--platform=linux/amd64"
-      - "--build-arg=BASE=cgr.dev/chainguard/musl-dynamic:latest"
+      - "--build-arg=BASE=cgr.dev/chainguard/alpine-base:latest"
   # ARM64
   - image_templates:
       - &arm_image_quay "quay.io/authzed/zed:v{{ .Version }}-arm64"
@@ -79,7 +79,7 @@ dockers:
     use: "buildx"
     build_flag_templates:
       - "--platform=linux/arm64"
-      - "--build-arg=BASE=cgr.dev/chainguard/musl-dynamic:latest"
+      - "--build-arg=BASE=cgr.dev/chainguard/alpine-base:latest"
 
 docker_manifests:
   # Quay
