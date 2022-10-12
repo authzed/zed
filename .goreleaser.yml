@@ -157,10 +157,10 @@ snapshot:
 
 changelog:
   use: "github-native"
+  sort: "asc"
 
 release:
   prerelease: "auto"
   footer: |
     ## Docker Images
-
-    This release is available at `quay.io/authzed/zed:v{{ .Version }}`
+    This release is available at `authzed/zed:v{{ .Version }}`, `quay.io/authzed/zed:v{{ .Version }}`, `ghcr.io/authzed/zed:v{{ .Version }}`

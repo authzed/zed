@@ -3,9 +3,7 @@ builds:
   - id: "linux-amd64"
     goos: ["linux"]
     goarch: ["amd64"]
-    env:
-      - "CC=gcc"
-      - "CGO_ENABLED=1"
+    env: ["CC=gcc", "CGO_ENABLED=0"]
     main: &main "./cmd/zed"
     binary: &binary "zed"
     mod_timestamp: &mod_timestamp "{{ .CommitTimestamp }}"
@@ -18,9 +16,7 @@ builds:
   - id: "linux-arm64"
     goos: ["linux"]
     goarch: ["arm64"]
-    env:
-      - "CC=aarch64-linux-gnu-gcc"
-      - "CGO_ENABLED=1"
+    env: ["CC=aarch64-linux-gnu-gcc", "CGO_ENABLED=0"]
     main: *main
     binary: *binary
     mod_timestamp: *mod_timestamp
