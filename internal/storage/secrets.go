@@ -21,6 +21,7 @@ type Token struct {
 	Endpoint string
 	APIToken string
 	Insecure *bool
+	CAfile   []byte
 }
 
 func (t Token) IsInsecure() bool {
