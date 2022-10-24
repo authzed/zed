@@ -51,16 +51,16 @@ func dialOptsFromFlags(cmd *cobra.Command, token storage.Token) []grpc.DialOptio
 		grpc.WithChainUnaryInterceptor(interceptors...),
 	}
 
-	if cobrautil.MustGetBool(cmd, "insecure") && cobrautil.MustGetString(cmd, "cacert") != "" {
+	if cobrautil.MustGetBool(cmd, "insecure") && cobrautil.MustGetString(cmd, "cafile") != "" {
 		panic("cafile flag cannot be combined with insecure")
 	}
 
 	if cobrautil.MustGetBool(cmd, "insecure") || (token.IsInsecure()) {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		opts = append(opts, grpcutil.WithInsecureBearerToken(token.APIToken))
-	} else if cobrautil.MustGetString(cmd, "cacert") != "" {
+	} else if cobrautil.MustGetString(cmd, "cafile") != "" {
 		opts = append(opts, grpcutil.WithBearerToken(token.APIToken))
-		opts = append(opts, grpcutil.WithCustomCerts(cobrautil.MustGetString(cmd, "cacert"), cobrautil.MustGetBool(cmd, "no-verify-ca")))
+		opts = append(opts, grpcutil.WithCustomCerts(cobrautil.MustGetString(cmd, "cafile"), cobrautil.MustGetBool(cmd, "no-verify-ca")))
 	} else {
 		opts = append(opts, grpcutil.WithBearerToken(token.APIToken))
 		opts = append(opts, grpcutil.WithSystemCerts(cobrautil.MustGetBool(cmd, "no-verify-ca")))
@@ -90,7 +90,7 @@ func main() {
 	rootCmd.PersistentFlags().Bool("insecure", false, "connect over a plaintext connection")
 	rootCmd.PersistentFlags().Bool("skip-version-check", false, "if true, no version check is performed against the server")
 	rootCmd.PersistentFlags().Bool("no-verify-ca", false, "do not attempt to verify the server's certificate chain and host name")
-	rootCmd.PersistentFlags().String("cacert", "", "Use the contents of file as a CA Trust Bundle (PEM-formatted DER)")
+	rootCmd.PersistentFlags().String("cafile", "", "Use the contents of file as a CA Trust Bundle (PEM-formatted DER)")
 	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
 	_ = rootCmd.PersistentFlags().MarkHidden("debug") // This cannot return its error.
 
