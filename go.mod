@@ -19,7 +19,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/open-policy-agent/opa v0.44.0
 	github.com/rs/zerolog v1.28.0
-	github.com/spf13/cobra v1.5.0
+	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.0
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
@@ -86,7 +86,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hokaccha/go-prettyjson v0.0.0-20210113012101-fb4e108d2519 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.13.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
