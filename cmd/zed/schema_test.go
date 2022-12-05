@@ -85,9 +85,16 @@ func TestRewriteSchema(t *testing.T) {
 		},
 		{
 			"empty prefix schema with specified",
-			"definition user {}",
+			`definition user {}
+			
+			caveat some_caveat(someCondition int) { someCondition == 42 }
+			`,
 			"test",
-			"definition test/user {}",
+			`definition test/user {}
+
+caveat test/some_caveat(someCondition int) {
+	someCondition == 42
+}`,
 		},
 		{
 			"prefixed schema with specified",

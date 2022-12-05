@@ -19,6 +19,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/authzed/zed/internal/printers"
 	"github.com/authzed/zed/internal/storage"
@@ -32,6 +33,7 @@ func registerPermissionCmd(rootCmd *cobra.Command) {
 	checkCmd.Flags().String("revision", "", "optional revision at which to check")
 	checkCmd.Flags().Bool("explain", false, "requests debug information from SpiceDB and prints out a trace of the requests")
 	checkCmd.Flags().Bool("schema", false, "requests debug information from SpiceDB and prints out the schema used")
+	checkCmd.Flags().String("caveat-context", "", "the caveat context to send along with the check, in JSON form")
 
 	permissionCmd.AddCommand(expandCmd)
 	expandCmd.Flags().Bool("json", false, "output as JSON")
@@ -40,14 +42,17 @@ func registerPermissionCmd(rootCmd *cobra.Command) {
 	permissionCmd.AddCommand(lookupCmd)
 	lookupCmd.Flags().Bool("json", false, "output as JSON")
 	lookupCmd.Flags().String("revision", "", "optional revision at which to check")
+	lookupCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
 
 	permissionCmd.AddCommand(lookupResourcesCmd)
 	lookupResourcesCmd.Flags().Bool("json", false, "output as JSON")
 	lookupResourcesCmd.Flags().String("revision", "", "optional revision at which to check")
+	lookupResourcesCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
 
 	permissionCmd.AddCommand(lookupSubjectsCmd)
 	lookupSubjectsCmd.Flags().Bool("json", false, "output as JSON")
 	lookupSubjectsCmd.Flags().String("revision", "", "optional revision at which to check")
+	lookupSubjectsCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
 }
 
 var permissionCmd = &cobra.Command{
@@ -109,6 +114,15 @@ func parseType(s string) (namespace, relation string) {
 	return
 }
 
+func getCaveatContext(cmd *cobra.Command) (*structpb.Struct, error) {
+	contextString := cobrautil.MustGetString(cmd, "caveat-context")
+	if len(contextString) == 0 {
+		return nil, nil
+	}
+
+	return parseCaveatContext(contextString)
+}
+
 func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	var objectNS, objectID string
 	err := stringz.SplitExact(args[0], ":", &objectNS, &objectID)
@@ -119,6 +133,11 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	relation := args[1]
 
 	subjectNS, subjectID, subjectRel, err := parseSubject(args[2])
+	if err != nil {
+		return err
+	}
+
+	caveatContext, err := getCaveatContext(cmd)
 	if err != nil {
 		return err
 	}
@@ -153,6 +172,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 			},
 			OptionalRelation: subjectRel,
 		},
+		Context: caveatContext,
 	}
 
 	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
@@ -187,7 +207,21 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Println(resp.Permissionship == v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION)
+	switch resp.Permissionship {
+	case v1.CheckPermissionResponse_PERMISSIONSHIP_CONDITIONAL_PERMISSION:
+		log.Warn().Strs("fields", resp.PartialCaveatInfo.MissingRequiredContext).Msg("missing fields in caveat context")
+		fmt.Println("caveated")
+
+	case v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION:
+		fmt.Println("true")
+
+	case v1.CheckPermissionResponse_PERMISSIONSHIP_NO_PERMISSION:
+		fmt.Println("false")
+
+	default:
+		return fmt.Errorf("unknown permission response: %v", resp.Permissionship)
+	}
+
 	return displayDebugInformationIfRequested(cmd, trailerMD, false)
 }
 
@@ -260,6 +294,11 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	caveatContext, err := getCaveatContext(cmd)
+	if err != nil {
+		return err
+	}
+
 	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
 		cobrautil.MustGetString(cmd, "endpoint"),
@@ -287,6 +326,7 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 			},
 			OptionalRelation: subjectRel,
 		},
+		Context: caveatContext,
 	}
 
 	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
@@ -315,7 +355,8 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 
 				fmt.Println(string(prettyProto))
 			}
-			fmt.Println(resp.ResourceObjectId)
+
+			fmt.Println(prettyLookupPermissionship(resp.ResourceObjectId, resp.Permissionship, resp.PartialCaveatInfo))
 		}
 	}
 }
@@ -330,6 +371,11 @@ func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
 	permission := args[1]
 
 	subjectType, subjectRelation := parseType(args[2])
+
+	caveatContext, err := getCaveatContext(cmd)
+	if err != nil {
+		return err
+	}
 
 	configStore, secretStore := defaultStorage()
 	token, err := storage.DefaultToken(
@@ -356,6 +402,7 @@ func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
 		Permission:              permission,
 		SubjectObjectType:       subjectType,
 		OptionalSubjectRelation: subjectRelation,
+		Context:                 caveatContext,
 	}
 
 	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
@@ -384,14 +431,40 @@ func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
 
 				fmt.Println(string(prettyProto))
 			}
-
-			if len(resp.ExcludedSubjectIds) > 0 {
-				fmt.Printf("%s:* - {%s}\n", subjectType, strings.Join(resp.ExcludedSubjectIds, ", "))
-			} else {
-				fmt.Printf("%s:%s\n", subjectType, resp.SubjectObjectId)
-			}
+			fmt.Printf("%s:%s%s\n",
+				subjectType,
+				prettyLookupPermissionship(resp.Subject.SubjectObjectId, resp.Subject.Permissionship, resp.Subject.PartialCaveatInfo),
+				excludedSubjectsString(resp.ExcludedSubjects),
+			)
 		}
 	}
+}
+
+func excludedSubjectsString(excluded []*v1.ResolvedSubject) string {
+	if len(excluded) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, " - {\n")
+	for _, subj := range excluded {
+		fmt.Fprintf(&b, "\t%s\n", prettyLookupPermissionship(
+			subj.SubjectObjectId,
+			subj.Permissionship,
+			subj.PartialCaveatInfo,
+		))
+	}
+	fmt.Fprintf(&b, "}")
+	return b.String()
+}
+
+func prettyLookupPermissionship(objectID string, p v1.LookupPermissionship, info *v1.PartialCaveatInfo) string {
+	var b strings.Builder
+	fmt.Fprint(&b, objectID)
+	if p == v1.LookupPermissionship_LOOKUP_PERMISSIONSHIP_CONDITIONAL_PERMISSION {
+		fmt.Fprintf(&b, " (caveated, missing context: %s)", strings.Join(info.MissingRequiredContext, ", "))
+	}
+	return b.String()
 }
 
 func displayDebugInformationIfRequested(cmd *cobra.Command, trailerMD metadata.MD, hasError bool) error {
