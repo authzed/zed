@@ -276,20 +276,15 @@ func rewriteSchema(existingSchemaText string, definitionPrefix string) (string, 
 		return existingSchemaText, nil
 	}
 
-	nsDefs, err := compiler.Compile([]compiler.InputSchema{
-		{Source: input.Source("schema"), SchemaString: existingSchemaText},
+	compiled, err := compiler.Compile(compiler.InputSchema{
+		Source: input.Source("schema"), SchemaString: existingSchemaText,
 	}, &definitionPrefix)
 	if err != nil {
 		return "", err
 	}
 
-	objectDefs := make([]string, 0, len(nsDefs))
-	for _, nsDef := range nsDefs {
-		objectDef, _ := generator.GenerateSource(nsDef)
-		objectDefs = append(objectDefs, objectDef)
-	}
-
-	return strings.Join(objectDefs, "\n\n"), nil
+	generated, _ := generator.GenerateSchema(compiled.OrderedDefinitions)
+	return generated, nil
 }
 
 // readSchema calls read schema for the client and returns the schema found.
@@ -339,17 +334,17 @@ func determinePrefixForSchema(specifiedPrefix string, client *authzed.Client, ex
 
 	// Otherwise, compile the schema and grab the prefixes of the namespaces defined.
 	empty := ""
-	found, err := compiler.Compile([]compiler.InputSchema{
-		{Source: input.Source("schema"), SchemaString: schemaText},
+	found, err := compiler.Compile(compiler.InputSchema{
+		Source: input.Source("schema"), SchemaString: schemaText,
 	}, &empty)
 	if err != nil {
 		return "", err
 	}
 
-	foundPrefixes := make([]string, 0, len(found))
-	for _, def := range found {
-		if strings.Contains(def.Name, "/") {
-			parts := strings.Split(def.Name, "/")
+	foundPrefixes := make([]string, 0, len(found.OrderedDefinitions))
+	for _, def := range found.OrderedDefinitions {
+		if strings.Contains(def.GetName(), "/") {
+			parts := strings.Split(def.GetName(), "/")
 			foundPrefixes = append(foundPrefixes, parts[0])
 		} else {
 			foundPrefixes = append(foundPrefixes, "")

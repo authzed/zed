@@ -25,9 +25,11 @@ func registerRelationshipCmd(rootCmd *cobra.Command) {
 
 	relationshipCmd.AddCommand(createCmd)
 	createCmd.Flags().Bool("json", false, "output as JSON")
+	createCmd.Flags().String("caveat", "", `the caveat for the relationship, with format: 'caveat_name:{"some":"context"}'`)
 
 	relationshipCmd.AddCommand(touchCmd)
 	touchCmd.Flags().Bool("json", false, "output as JSON")
+	touchCmd.Flags().String("caveat", "", `the caveat for the relationship, with format: 'caveat_name:{"some":"context"}'`)
 
 	relationshipCmd.AddCommand(deleteCmd)
 	deleteCmd.Flags().Bool("json", false, "output as JSON")
@@ -315,6 +317,28 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 			return err
 		}
 
+		var contextualizedCaveat *v1.ContextualizedCaveat
+
+		caveatString := cobrautil.MustGetString(cmd, "caveat")
+		if caveatString != "" {
+			parts := strings.Split(caveatString, ":")
+			if len(parts) == 0 {
+				return fmt.Errorf("invalid --caveat argument. Must be in format `caveat_name:context`, but found `%s`", caveatString)
+			}
+
+			contextualizedCaveat = &v1.ContextualizedCaveat{
+				CaveatName: parts[0],
+			}
+
+			if len(parts) == 2 {
+				context, err := parseCaveatContext(parts[1])
+				if err != nil {
+					return err
+				}
+				contextualizedCaveat.Context = context
+			}
+		}
+
 		configStore, secretStore := defaultStorage()
 		token, err := storage.DefaultToken(
 			cobrautil.MustGetString(cmd, "endpoint"),
@@ -349,6 +373,7 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 							},
 							OptionalRelation: subjectRel,
 						},
+						OptionalCaveat: contextualizedCaveat,
 					},
 				},
 			},

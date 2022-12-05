@@ -11,10 +11,10 @@ import (
 	"github.com/jzelinskie/cobrautil"
 	"github.com/spf13/cobra"
 
-	"github.com/authzed/spicedb/pkg/commonerrors"
 	"github.com/authzed/spicedb/pkg/development"
 	core "github.com/authzed/spicedb/pkg/proto/core/v1"
 	devinterface "github.com/authzed/spicedb/pkg/proto/developer/v1"
+	"github.com/authzed/spicedb/pkg/spiceerrors"
 	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/charmbracelet/lipgloss"
@@ -78,7 +78,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	var parsed validationfile.ValidationFile
 	validateContents, err := decoder(&parsed)
 	if err != nil {
-		var errWithSource commonerrors.ErrorWithSource
+		var errWithSource spiceerrors.ErrorWithSource
 		if errors.As(err, &errWithSource) {
 			ouputErrorWithSource(validateContents, errWithSource)
 		}
@@ -100,7 +100,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if devErrs != nil {
-		outputDeveloperErrors(validateContents, devErrs)
+		outputDeveloperErrors(validateContents, devErrs.InputErrors)
 	}
 
 	// Run assertions.
@@ -130,7 +130,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func ouputErrorWithSource(validateContents []byte, errWithSource commonerrors.ErrorWithSource) {
+func ouputErrorWithSource(validateContents []byte, errWithSource spiceerrors.ErrorWithSource) {
 	lines := strings.Split(string(validateContents), "\n")
 
 	fmt.Printf("%s%s\n", errorPrefix, errorMessageStyle.Render(errWithSource.Error()))
@@ -145,15 +145,11 @@ func ouputErrorWithSource(validateContents []byte, errWithSource commonerrors.Er
 	os.Exit(1)
 }
 
-func outputDeveloperErrors(validateContents []byte, devErrors *development.DeveloperErrors) {
+func outputDeveloperErrors(validateContents []byte, devErrors []*devinterface.DeveloperError) {
 	lines := strings.Split(string(validateContents), "\n")
 
-	for _, inputErr := range devErrors.InputErrors {
-		outputDeveloperError(inputErr, lines)
-	}
-
-	for _, validationErr := range devErrors.ValidationErrors {
-		outputDeveloperError(validationErr, lines)
+	for _, devErr := range devErrors {
+		outputDeveloperError(devErr, lines)
 	}
 
 	os.Exit(1)
