@@ -17,11 +17,11 @@ import (
 var ErrTokenNotFound = errors.New("token does not exist")
 
 type Token struct {
-	Name     string
-	Endpoint string
-	APIToken string
-	Insecure *bool
-	CAfile   []byte
+	Name        string
+	Endpoint    string
+	APIToken    string
+	Insecure    *bool
+	Certificate []byte
 }
 
 func (t Token) IsInsecure() bool {

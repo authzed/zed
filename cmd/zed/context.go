@@ -98,14 +98,13 @@ func contextListCmdFunc(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// Reads the CAFile if it exists, returning byte form.
-func getCABytes(cmd *cobra.Command) (cabytes []byte) {
-	var err error
+// Reads the trusted certificate if it exists, returning byte form.
+func getCertificate(cmd *cobra.Command) (certificate []byte, err error) {
 	cafile := cobrautil.MustGetString(cmd, "cafile")
 	if cafile != "" {
-		cabytes, err = os.ReadFile(cafile)
+		certificate, err = os.ReadFile(cafile)
 		if err != nil {
-			panic("Failed to read from CA Certificate File")
+			return nil, fmt.Errorf("Failed to read from CA Certificate File, %w")
 		}
 	}
 	return
@@ -121,12 +120,16 @@ func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 	insecure := cobrautil.MustGetBool(cmd, "insecure")
 	cfgStore, secretStore := defaultStorage()
 
+	certificate, err := getCertificate(cmd)
+	if err != nil {
+		return err
+	}
 	err = storage.PutToken(storage.Token{
-		Name:     name,
-		Endpoint: stringz.DefaultEmpty(endpoint, "grpc.authzed.com:443"),
-		APIToken: apiToken,
-		Insecure: &insecure,
-		CAfile:   getCABytes(cmd),
+		Name:        name,
+		Endpoint:    stringz.DefaultEmpty(endpoint, "grpc.authzed.com:443"),
+		APIToken:    apiToken,
+		Insecure:    &insecure,
+		Certificate: certificate,
 	}, secretStore)
 	if err != nil {
 		return err
