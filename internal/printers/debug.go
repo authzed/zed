@@ -1,7 +1,9 @@
 package printers
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/authzed/spicedb/pkg/tuple"
 
@@ -21,10 +23,12 @@ func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp treeprinter.Node, hasE
 	cyan := color.FgCyan.Render
 	white := color.FgWhite.Render
 	faint := color.FgGray.Render
+	magenta := color.FgMagenta.Render
 
 	orange := color.C256(166).Sprint
 	purple := color.C256(99).Sprint
 	lightgreen := color.C256(35).Sprint
+	caveatColor := color.C256(198).Sprint
 
 	hasPermission := green("✓")
 	resourceColor := white
@@ -36,7 +40,19 @@ func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp treeprinter.Node, hasE
 		permissionColor = orange
 	}
 
-	if checkTrace.Result != v1.CheckDebugTrace_PERMISSIONSHIP_HAS_PERMISSION {
+	if checkTrace.Result == v1.CheckDebugTrace_PERMISSIONSHIP_CONDITIONAL_PERMISSION {
+		switch checkTrace.CaveatEvaluationInfo.Result {
+		case v1.CaveatEvalInfo_RESULT_FALSE:
+			hasPermission = red("⨉")
+			resourceColor = faint
+			permissionColor = faint
+
+		case v1.CaveatEvalInfo_RESULT_MISSING_SOME_CONTEXT:
+			hasPermission = magenta("?")
+			resourceColor = faint
+			permissionColor = faint
+		}
+	} else if checkTrace.Result != v1.CheckDebugTrace_PERMISSIONSHIP_HAS_PERMISSION {
 		hasPermission = red("⨉")
 		resourceColor = faint
 		permissionColor = faint
@@ -73,6 +89,42 @@ func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp treeprinter.Node, hasE
 
 	if isEndOfCycle {
 		return
+	}
+
+	if checkTrace.GetCaveatEvaluationInfo() != nil {
+		indicator := ""
+		exprColor := color.FgWhite.Render
+		switch checkTrace.CaveatEvaluationInfo.Result {
+		case v1.CaveatEvalInfo_RESULT_FALSE:
+			indicator = red("⨉")
+			exprColor = faint
+
+		case v1.CaveatEvalInfo_RESULT_TRUE:
+			indicator = green("✓")
+
+		case v1.CaveatEvalInfo_RESULT_MISSING_SOME_CONTEXT:
+			indicator = magenta("?")
+		}
+
+		white := color.HEXStyle("fff")
+		white.SetOpts(color.Opts{color.OpItalic})
+
+		contextMap := checkTrace.CaveatEvaluationInfo.Context.AsMap()
+		caveatName := checkTrace.CaveatEvaluationInfo.CaveatName
+
+		c := tp.Child(fmt.Sprintf("%s %s %s", indicator, exprColor(checkTrace.CaveatEvaluationInfo.Expression), caveatColor(caveatName)))
+		if len(contextMap) > 0 {
+			contextJSON, _ := json.MarshalIndent(contextMap, "", "  ")
+			c.Child(string(contextJSON))
+		} else {
+			if checkTrace.CaveatEvaluationInfo.Result != v1.CaveatEvalInfo_RESULT_MISSING_SOME_CONTEXT {
+				c.Child(faint("(no matching context found)"))
+			}
+		}
+
+		if checkTrace.CaveatEvaluationInfo.Result == v1.CaveatEvalInfo_RESULT_MISSING_SOME_CONTEXT {
+			c.Child(fmt.Sprintf("missing context: %s", strings.Join(checkTrace.CaveatEvaluationInfo.PartialCaveatInfo.MissingRequiredContext, ", ")))
+		}
 	}
 
 	if checkTrace.GetSubProblems() != nil {

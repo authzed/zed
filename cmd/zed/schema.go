@@ -283,8 +283,8 @@ func rewriteSchema(existingSchemaText string, definitionPrefix string) (string, 
 		return "", err
 	}
 
-	generated, _ := generator.GenerateSchema(compiled.OrderedDefinitions)
-	return generated, nil
+	generated, _, err := generator.GenerateSchema(compiled.OrderedDefinitions)
+	return generated, err
 }
 
 // readSchema calls read schema for the client and returns the schema found.
