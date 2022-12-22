@@ -1,13 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
-	"github.com/jzelinskie/cobrautil"
+	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
 
+	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/console"
 	"github.com/authzed/zed/internal/printers"
 	"github.com/authzed/zed/internal/storage"
 )
@@ -32,32 +33,32 @@ var contextListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "list all contexts",
 	Args:  cobra.ExactArgs(0),
-	RunE:  cobrautil.CommandStack(LogCmdFunc, contextListCmdFunc),
+	RunE:  contextListCmdFunc,
 }
 
 var contextSetCmd = &cobra.Command{
 	Use:   "set <name> <endpoint> <api-token>",
 	Short: "create or overwrite a context",
 	Args:  cobra.ExactArgs(3),
-	RunE:  cobrautil.CommandStack(LogCmdFunc, contextSetCmdFunc),
+	RunE:  contextSetCmdFunc,
 }
 
 var contextRemoveCmd = &cobra.Command{
 	Use:   "remove <system>",
 	Short: "remove a context",
 	Args:  cobra.ExactArgs(1),
-	RunE:  cobrautil.CommandStack(LogCmdFunc, contextRemoveCmdFunc),
+	RunE:  contextRemoveCmdFunc,
 }
 
 var contextUseCmd = &cobra.Command{
 	Use:   "use <system>",
 	Short: "set a context as the current context",
 	Args:  cobra.MaximumNArgs(1),
-	RunE:  cobrautil.CommandStack(LogCmdFunc, contextUseCmdFunc),
+	RunE:  contextUseCmdFunc,
 }
 
 func contextListCmdFunc(cmd *cobra.Command, args []string) error {
-	cfgStore, secretStore := defaultStorage()
+	cfgStore, secretStore := client.DefaultStorage()
 	secrets, err := secretStore.Get()
 	if err != nil {
 		return err
@@ -106,7 +107,7 @@ func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	insecure := cobrautil.MustGetBool(cmd, "insecure")
-	cfgStore, secretStore := defaultStorage()
+	cfgStore, secretStore := client.DefaultStorage()
 	err = storage.PutToken(storage.Token{
 		Name:     name,
 		Endpoint: stringz.DefaultEmpty(endpoint, "grpc.authzed.com:443"),
@@ -122,7 +123,7 @@ func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 
 func contextRemoveCmdFunc(cmd *cobra.Command, args []string) error {
 	// If the token is what's currently being used, remove it from the config.
-	cfgStore, secretStore := defaultStorage()
+	cfgStore, secretStore := client.DefaultStorage()
 	cfg, err := cfgStore.Get()
 	if err != nil {
 		return err
@@ -141,14 +142,14 @@ func contextRemoveCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func contextUseCmdFunc(cmd *cobra.Command, args []string) error {
-	cfgStore, secretStore := defaultStorage()
+	cfgStore, secretStore := client.DefaultStorage()
 	switch len(args) {
 	case 0:
 		cfg, err := cfgStore.Get()
 		if err != nil {
 			return err
 		}
-		fmt.Println(cfg.CurrentToken)
+		console.Println(cfg.CurrentToken)
 	case 1:
 		return storage.SetCurrentToken(args[0], cfgStore, secretStore)
 	default:

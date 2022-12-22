@@ -8,15 +8,14 @@ import (
 	"strings"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/authzed-go/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
-	"github.com/jzelinskie/cobrautil"
+	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/decode"
 	"github.com/authzed/zed/internal/grpcutil"
-	"github.com/authzed/zed/internal/storage"
 )
 
 func registerImportCmd(rootCmd *cobra.Command) {
@@ -60,27 +59,14 @@ var importCmd = &cobra.Command{
 		zed import --schema-definition-prefix=mypermsystem file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
 `,
 	Args: cobra.ExactArgs(1),
-	RunE: cobrautil.CommandStack(LogCmdFunc, importCmdFunc),
+	RunE: importCmdFunc,
 }
 
 func importCmdFunc(cmd *cobra.Command, args []string) error {
-	configStore, secretStore := defaultStorage()
-	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "endpoint"),
-		cobrautil.MustGetString(cmd, "token"),
-		configStore,
-		secretStore,
-	)
+	client, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
-	log.Trace().Interface("token", token).Send()
-
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
-	if err != nil {
-		return err
-	}
-
 	u, err := url.Parse(args[0])
 	if err != nil {
 		return err
@@ -117,7 +103,7 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-func importSchema(client *authzed.Client, schema string, definitionPrefix string) error {
+func importSchema(client client.Client, schema string, definitionPrefix string) error {
 	log.Info().Msg("importing schema")
 
 	// Recompile the schema with the specified prefix.
@@ -137,7 +123,7 @@ func importSchema(client *authzed.Client, schema string, definitionPrefix string
 	return nil
 }
 
-func importRelationships(client *authzed.Client, relationships string, definitionPrefix string, batchSize int, workers int) error {
+func importRelationships(client client.Client, relationships string, definitionPrefix string, batchSize int, workers int) error {
 	relationshipUpdates := make([]*v1.RelationshipUpdate, 0)
 	scanner := bufio.NewScanner(strings.NewReader(relationships))
 	for scanner.Scan() {

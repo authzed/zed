@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jzelinskie/cobrautil"
 	"github.com/spf13/cobra"
 
 	"github.com/authzed/spicedb/pkg/development"
@@ -19,6 +18,7 @@ import (
 	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/authzed/zed/internal/console"
 	"github.com/authzed/zed/internal/decode"
 )
 
@@ -59,7 +59,7 @@ var validateCmd = &cobra.Command{
 	From a devtools instance:
 		zed validate https://localhost:8443/download`,
 	Args: cobra.ExactArgs(1),
-	RunE: cobrautil.CommandStack(LogCmdFunc, validateCmdFunc),
+	RunE: validateCmdFunc,
 }
 
 func validateCmdFunc(cmd *cobra.Command, args []string) error {
@@ -122,7 +122,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Print(success)
-	fmt.Printf(" - %d relationships loaded, %d assertions run, %d expected relations validated\n",
+	console.Printf(" - %d relationships loaded, %d assertions run, %d expected relations validated\n",
 		len(tuples),
 		len(parsed.Assertions.AssertTrue)+len(parsed.Assertions.AssertFalse),
 		len(parsed.ExpectedRelations.ValidationMap),
@@ -133,7 +133,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 func ouputErrorWithSource(validateContents []byte, errWithSource spiceerrors.ErrorWithSource) {
 	lines := strings.Split(string(validateContents), "\n")
 
-	fmt.Printf("%s%s\n", errorPrefix, errorMessageStyle.Render(errWithSource.Error()))
+	console.Printf("%s%s\n", errorPrefix, errorMessageStyle.Render(errWithSource.Error()))
 	errorLineNumber := int(errWithSource.LineNumber) - 1 // errWithSource.LineNumber is 1-indexed
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
@@ -156,7 +156,7 @@ func outputDeveloperErrors(validateContents []byte, devErrors []*devinterface.De
 }
 
 func outputDeveloperError(devError *devinterface.DeveloperError, lines []string) {
-	fmt.Printf("%s %s\n", errorPrefix, errorMessageStyle.Render(devError.Message))
+	console.Printf("%s %s\n", errorPrefix, errorMessageStyle.Render(devError.Message))
 	errorLineNumber := int(devError.Line) - 1 // devError.Line is 1-indexed
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
@@ -166,7 +166,7 @@ func outputDeveloperError(devError *devinterface.DeveloperError, lines []string)
 		}
 	}
 
-	fmt.Printf("\n\n")
+	console.Printf("\n\n")
 }
 
 func renderLine(lines []string, index int, highlight string, highlightLineIndex int) {
@@ -188,15 +188,15 @@ func renderLine(lines []string, index int, highlight string, highlightLineIndex 
 	}
 
 	if highlightIndex < 0 || len(highlight) == 0 {
-		fmt.Printf(" %s | %s\n", lineNumberStyle.Render(lineNumberStr), lineContentsStyle.Render(lineContents))
+		console.Printf(" %s | %s\n", lineNumberStyle.Render(lineNumberStr), lineContentsStyle.Render(lineContents))
 	} else {
-		fmt.Printf(" %s | %s%s%s\n",
+		console.Printf(" %s | %s%s%s\n",
 			lineNumberStyle.Render(lineNumberStr),
 			lineContentsStyle.Render(lineContents[0:highlightIndex]),
 			highlightedSourceStyle.Render(highlight),
 			lineContentsStyle.Render(lineContents[highlightIndex+len(highlight):]),
 		)
-		fmt.Printf(" %s | %s%s%s\n",
+		console.Printf(" %s | %s%s%s\n",
 			lineNumberStyle.Render(spacer),
 			strings.Repeat(" ", highlightIndex),
 			highlightedSourceStyle.Render("^"),
