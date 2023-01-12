@@ -129,7 +129,7 @@ func openKeyring(configPath string) (keyring.Keyring, error) {
 				return password, nil
 			}
 
-			fmt.Fprintf(os.Stderr, "%s: ", prompt)
+			fmt.Fprintf(os.Stderr, "Entering your password a lot? Try setting the environment variable `ZED_KEYRING_PASSWORD`\n%s: ", prompt)
 			b, err := term.ReadPassword(int(os.Stdin.Fd()))
 			if err != nil {
 				return "", err
