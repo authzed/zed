@@ -7,7 +7,6 @@ import (
 
 	"github.com/authzed/authzed-go/pkg/responsemeta"
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/authzed-go/v1"
 	"github.com/gookit/color"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/rs/zerolog/log"
@@ -58,7 +57,7 @@ func versionCmdFunc(cmd *cobra.Command, args []string) error {
 		}
 		log.Trace().Interface("token", token).Send()
 
-		client, err := authzed.NewClient(token.Endpoint, client.DialOptsFromFlags(cmd, token)...)
+		client, err := client.NewClient(cmd)
 		if err != nil {
 			return err
 		}

@@ -23,6 +23,14 @@ type Token struct {
 	Endpoint string
 	APIToken string
 	Insecure *bool
+	CACert   []byte
+}
+
+func (t Token) Certificate() (cert []byte, ok bool) {
+	if t.CACert != nil && len(t.CACert) > 0 {
+		return t.CACert, true
+	}
+	return nil, false
 }
 
 func (t Token) IsInsecure() bool {
