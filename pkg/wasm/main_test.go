@@ -17,8 +17,6 @@ import (
 )
 
 func TestZedCommand(t *testing.T) {
-	rootCmd := buildRootCmd()
-
 	requestCtx := &devinterface.RequestContext{
 		Schema: `definition user {}
 		
@@ -32,7 +30,7 @@ func TestZedCommand(t *testing.T) {
 	encodedContext, err := m.MarshalToString(requestCtx)
 	require.NoError(t, err)
 
-	result := runZedCommand(rootCmd, encodedContext, []string{"permission", "check", "document:firstdoc", "view", "user:tom"})
+	result := runZedCommand(encodedContext, []string{"permission", "check", "document:firstdoc", "view", "user:tom"})
 	require.Contains(t, result.Output, "false")
 
 	updatedContext := &devinterface.RequestContext{}
