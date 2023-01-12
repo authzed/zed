@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/jzelinskie/cobrautil/v2"
@@ -80,9 +81,13 @@ func contextListCmdFunc(cmd *cobra.Command, args []string) error {
 			secret = token.Redacted()
 		}
 
-		insecureStr := ""
+		certStr := ""
 		if token.IsInsecure() {
-			insecureStr = "   ✓    "
+			certStr = "insecure"
+		} else if _, ok := token.Certificate(); ok {
+			certStr = "custom"
+		} else {
+			certStr = "system"
 		}
 
 		rows = append(rows, []string{
@@ -90,11 +95,11 @@ func contextListCmdFunc(cmd *cobra.Command, args []string) error {
 			token.Name,
 			token.Endpoint,
 			secret,
-			insecureStr,
+			certStr,
 		})
 	}
 
-	printers.PrintTable(os.Stdout, []string{"current", "name", "endpoint", "token", "insecure"}, rows)
+	printers.PrintTable(os.Stdout, []string{"current", "name", "endpoint", "token", "tls cert"}, rows)
 
 	return nil
 }
@@ -106,6 +111,15 @@ func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	certPath := cobrautil.MustGetStringExpanded(cmd, "certificate-path")
+	var certBytes []byte
+	if certPath != "" {
+		certBytes, err = os.ReadFile(certPath)
+		if err != nil {
+			return fmt.Errorf("failed to read ceritficate: %w", err)
+		}
+	}
+
 	insecure := cobrautil.MustGetBool(cmd, "insecure")
 	cfgStore, secretStore := client.DefaultStorage()
 	err = storage.PutToken(storage.Token{
@@ -113,6 +127,7 @@ func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 		Endpoint: stringz.DefaultEmpty(endpoint, "grpc.authzed.com:443"),
 		APIToken: apiToken,
 		Insecure: &insecure,
+		CACert:   certBytes,
 	}, secretStore)
 	if err != nil {
 		return err

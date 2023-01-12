@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -40,7 +41,12 @@ func newGRPCClient(cmd *cobra.Command) (Client, error) {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, DialOptsFromFlags(cmd, token)...)
+	dialOpts, err := DialOptsFromFlags(cmd, token)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := authzed.NewClient(token.Endpoint, dialOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -60,8 +66,20 @@ func DefaultStorage() (storage.ConfigStore, storage.SecretStore) {
 	return storage.JSONConfigStore{ConfigPath: home}, storage.KeychainSecretStore{ConfigPath: home}
 }
 
+func certOption(cmd *cobra.Command, token storage.Token) (opt grpc.DialOption, err error) {
+	verification := grpcutil.VerifyCA
+	if cobrautil.MustGetBool(cmd, "no-verify-ca") {
+		verification = grpcutil.SkipVerifyCA
+	}
+
+	if certBytes, ok := token.Certificate(); ok {
+		return grpcutil.WithCustomCertBytes(verification, certBytes)
+	}
+	return grpcutil.WithSystemCerts(verification)
+}
+
 // DialOptsFromFlags returns the dial options from the CLI-specified flags.
-func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) []grpc.DialOption {
+func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOption, error) {
 	grpc.WithChainUnaryInterceptor()
 
 	interceptors := []grpc.UnaryClientInterceptor{
@@ -72,17 +90,19 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) []grpc.DialOptio
 		interceptors = append(interceptors, zgrpcutil.CheckServerVersion)
 	}
 
-	opts := []grpc.DialOption{
-		grpc.WithChainUnaryInterceptor(interceptors...),
-	}
+	opts := []grpc.DialOption{grpc.WithChainUnaryInterceptor(interceptors...)}
 
 	if cobrautil.MustGetBool(cmd, "insecure") || (token.IsInsecure()) {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		opts = append(opts, grpcutil.WithInsecureBearerToken(token.APIToken))
 	} else {
 		opts = append(opts, grpcutil.WithBearerToken(token.APIToken))
-		opts = append(opts, grpcutil.WithSystemCerts(cobrautil.MustGetBool(cmd, "no-verify-ca")))
+		certOpt, err := certOption(cmd, token)
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure TLS cert: %w", err)
+		}
+		opts = append(opts, certOpt)
 	}
 
-	return opts
+	return opts, nil
 }

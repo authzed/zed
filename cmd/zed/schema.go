@@ -49,6 +49,7 @@ var schemaCopyCmd = &cobra.Command{
 	RunE:  schemaCopyCmdFunc,
 }
 
+// TODO(jschorr): support this in the client package
 func clientForContext(cmd *cobra.Command, contextName string, secretStore storage.SecretStore) (*authzed.Client, error) {
 	token, err := storage.GetToken(contextName, secretStore)
 	if err != nil {
@@ -56,7 +57,11 @@ func clientForContext(cmd *cobra.Command, contextName string, secretStore storag
 	}
 	log.Trace().Interface("token", token).Send()
 
-	return authzed.NewClient(token.Endpoint, client.DialOptsFromFlags(cmd, token)...)
+	dialOpts, err := client.DialOptsFromFlags(cmd, token)
+	if err != nil {
+		return nil, err
+	}
+	return authzed.NewClient(token.Endpoint, dialOpts...)
 }
 
 func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
