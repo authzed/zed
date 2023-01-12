@@ -11,6 +11,8 @@ import (
 	"github.com/99designs/keyring"
 	"github.com/jzelinskie/stringz"
 	"golang.org/x/term"
+
+	"github.com/authzed/zed/internal/console"
 )
 
 // ErrTokenNotFound is returned if there is no Token in a ConfigStore.
@@ -124,7 +126,7 @@ func openKeyring(configPath string) (keyring.Keyring, error) {
 			if err != nil {
 				return "", err
 			}
-			fmt.Println()
+			console.Println()
 			return string(b), nil
 		},
 	})

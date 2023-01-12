@@ -1,26 +1,23 @@
-package main
+package commands
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/authzed-go/v1"
-	"github.com/jzelinskie/cobrautil"
+	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/authzed/zed/internal/storage"
+	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/console"
 )
 
-func registerRelationshipCmd(rootCmd *cobra.Command) {
+func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	rootCmd.AddCommand(relationshipCmd)
 
 	relationshipCmd.AddCommand(createCmd)
@@ -43,6 +40,8 @@ func registerRelationshipCmd(rootCmd *cobra.Command) {
 	bulkDeleteCmd.Flags().Bool("force", false, "force deletion immediately without confirmation")
 	bulkDeleteCmd.Flags().String("subject-filter", "", "optional subject filter")
 	bulkDeleteCmd.Flags().Bool("estimate-count", true, "estimate the count of relationships to be deleted")
+
+	return relationshipCmd
 }
 
 var relationshipCmd = &cobra.Command{
@@ -54,44 +53,35 @@ var createCmd = &cobra.Command{
 	Use:   "create <resource:id> <relation> <subject:id>",
 	Short: "create a Relationship for a Subject",
 	Args:  cobra.ExactArgs(3),
-	RunE: cobrautil.CommandStack(
-		LogCmdFunc,
-		writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE),
-	),
+	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE),
 }
 
 var touchCmd = &cobra.Command{
 	Use:   "touch <resource:id> <relation> <subject:id>",
 	Short: "idempotently update a Relationship for a Subject",
 	Args:  cobra.ExactArgs(3),
-	RunE: cobrautil.CommandStack(
-		LogCmdFunc,
-		writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH),
-	),
+	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH),
 }
 
 var deleteCmd = &cobra.Command{
 	Use:   "delete <resource:id> <relation> <subject:id>",
 	Short: "delete a Relationship",
 	Args:  cobra.ExactArgs(3),
-	RunE: cobrautil.CommandStack(
-		LogCmdFunc,
-		writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE),
-	),
+	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE),
 }
 
 var readCmd = &cobra.Command{
 	Use:   "read <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
 	Short: "reads Relationships",
 	Args:  cobra.RangeArgs(1, 3),
-	RunE:  cobrautil.CommandStack(LogCmdFunc, readRelationships),
+	RunE:  readRelationships,
 }
 
 var bulkDeleteCmd = &cobra.Command{
 	Use:   "bulk-delete <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
 	Short: "bulk delete Relationships",
 	Args:  cobra.RangeArgs(1, 3),
-	RunE:  cobrautil.CommandStack(LogCmdFunc, bulkDeleteRelationships),
+	RunE:  bulkDeleteRelationships,
 }
 
 var fullyConsistent = &v1.Consistency{
@@ -99,19 +89,7 @@ var fullyConsistent = &v1.Consistency{
 }
 
 func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
-	configStore, secretStore := defaultStorage()
-	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "endpoint"),
-		cobrautil.MustGetString(cmd, "token"),
-		configStore,
-		secretStore,
-	)
-	if err != nil {
-		return err
-	}
-	log.Trace().Interface("token", token).Send()
-
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
+	client, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
@@ -155,28 +133,9 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 	}
 
 	if !cobrautil.MustGetBool(cmd, "force") {
-		message := fmt.Sprintf("Will delete %d relationships. Continue?", counter)
-		if counter > 1000 {
-			message = "Will delete 1000+ relationships. Continue?"
-		}
-		if counter < 0 {
-			message = "Will delete all matching relationships. Continue?"
-		}
-
-		response := false
-		err := survey.AskOne(&survey.Confirm{
-			Message: message,
-		}, &response)
+		err := performBulkDeletionConfirmation(counter)
 		if err != nil {
-			if errors.Is(err, terminal.InterruptErr) {
-				os.Exit(0)
-			}
-
 			return err
-		}
-
-		if !response {
-			os.Exit(1)
 		}
 	}
 
@@ -188,7 +147,7 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Println(resp.DeletedAt.GetToken())
+	console.Println(resp.DeletedAt.GetToken())
 	return nil
 }
 
@@ -216,7 +175,7 @@ func buildReadRequest(cmd *cobra.Command, args []string) (*v1.ReadRelationshipsR
 
 	if subjectFilter != "" {
 		if strings.Contains(subjectFilter, ":") {
-			subjectNS, subjectID, subjectRel, err := parseSubject(subjectFilter)
+			subjectNS, subjectID, subjectRel, err := ParseSubject(subjectFilter)
 			if err != nil {
 				return nil, err
 			}
@@ -247,28 +206,15 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 	}
 
 	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
-		request.Consistency = atLeastAsFresh(zedtoken)
+		request.Consistency = AtLeastAsFresh(zedtoken)
 	} else {
 		request.Consistency = fullyConsistent
 	}
 
-	configStore, secretStore := defaultStorage()
-	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "endpoint"),
-		cobrautil.MustGetString(cmd, "token"),
-		configStore,
-		secretStore,
-	)
+	client, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
-	log.Trace().Interface("token", token).Send()
-
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
-	if err != nil {
-		return err
-	}
-
 	log.Trace().Interface("request", request).Msg("reading relationships")
 	resp, err := client.ReadRelationships(context.Background(), request)
 	if err != nil {
@@ -286,17 +232,17 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 		}
 
 		if cobrautil.MustGetBool(cmd, "json") {
-			prettyProto, err := prettyProto(msg)
+			prettyProto, err := PrettyProto(msg)
 			if err != nil {
 				return err
 			}
 
-			fmt.Println(string(prettyProto))
+			console.Println(string(prettyProto))
 		} else {
 			if msg.Relationship.Subject.OptionalRelation != "" {
-				fmt.Printf("%s:%s %s %s:%s#%s\n", msg.Relationship.Resource.ObjectType, msg.Relationship.Resource.ObjectId, msg.Relationship.Relation, msg.Relationship.Subject.Object.ObjectType, msg.Relationship.Subject.Object.ObjectId, msg.Relationship.Subject.OptionalRelation)
+				console.Printf("%s:%s %s %s:%s#%s\n", msg.Relationship.Resource.ObjectType, msg.Relationship.Resource.ObjectId, msg.Relationship.Relation, msg.Relationship.Subject.Object.ObjectType, msg.Relationship.Subject.Object.ObjectId, msg.Relationship.Subject.OptionalRelation)
 			} else {
-				fmt.Printf("%s:%s %s %s:%s\n", msg.Relationship.Resource.ObjectType, msg.Relationship.Resource.ObjectId, msg.Relationship.Relation, msg.Relationship.Subject.Object.ObjectType, msg.Relationship.Subject.Object.ObjectId)
+				console.Printf("%s:%s %s %s:%s\n", msg.Relationship.Resource.ObjectType, msg.Relationship.Resource.ObjectId, msg.Relationship.Relation, msg.Relationship.Subject.Object.ObjectType, msg.Relationship.Subject.Object.ObjectId)
 			}
 		}
 	}
@@ -312,46 +258,35 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 
 		relation := args[1]
 
-		subjectNS, subjectID, subjectRel, err := parseSubject(args[2])
+		subjectNS, subjectID, subjectRel, err := ParseSubject(args[2])
 		if err != nil {
 			return err
 		}
 
 		var contextualizedCaveat *v1.ContextualizedCaveat
-
-		caveatString := cobrautil.MustGetString(cmd, "caveat")
-		if caveatString != "" {
-			parts := strings.Split(caveatString, ":")
-			if len(parts) == 0 {
-				return fmt.Errorf("invalid --caveat argument. Must be in format `caveat_name:context`, but found `%s`", caveatString)
-			}
-
-			contextualizedCaveat = &v1.ContextualizedCaveat{
-				CaveatName: parts[0],
-			}
-
-			if len(parts) == 2 {
-				context, err := parseCaveatContext(parts[1])
-				if err != nil {
-					return err
+		if operation != v1.RelationshipUpdate_OPERATION_DELETE {
+			caveatString := cobrautil.MustGetString(cmd, "caveat")
+			if caveatString != "" {
+				parts := strings.Split(caveatString, ":")
+				if len(parts) == 0 {
+					return fmt.Errorf("invalid --caveat argument. Must be in format `caveat_name:context`, but found `%s`", caveatString)
 				}
-				contextualizedCaveat.Context = context
+
+				contextualizedCaveat = &v1.ContextualizedCaveat{
+					CaveatName: parts[0],
+				}
+
+				if len(parts) == 2 {
+					context, err := ParseCaveatContext(parts[1])
+					if err != nil {
+						return err
+					}
+					contextualizedCaveat.Context = context
+				}
 			}
 		}
 
-		configStore, secretStore := defaultStorage()
-		token, err := storage.DefaultToken(
-			cobrautil.MustGetString(cmd, "endpoint"),
-			cobrautil.MustGetString(cmd, "token"),
-			configStore,
-			secretStore,
-		)
-		if err != nil {
-			return err
-		}
-		log.Trace().Interface("token", token).Send()
-
-		client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
+		client, err := client.NewClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -387,16 +322,16 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 		}
 
 		if cobrautil.MustGetBool(cmd, "json") {
-			prettyProto, err := prettyProto(resp)
+			prettyProto, err := PrettyProto(resp)
 			if err != nil {
 				return err
 			}
 
-			fmt.Println(string(prettyProto))
+			console.Println(string(prettyProto))
 			return nil
 		}
 
-		fmt.Println(resp.WrittenAt.GetToken())
+		console.Println(resp.WrittenAt.GetToken())
 		return nil
 	}
 }

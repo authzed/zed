@@ -9,13 +9,15 @@ import (
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/gookit/color"
-	"github.com/jzelinskie/cobrautil"
+	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/console"
 	"github.com/authzed/zed/internal/storage"
 )
 
@@ -26,7 +28,7 @@ func versionCmdFunc(cmd *cobra.Command, args []string) error {
 
 	includeRemoteVersion := cobrautil.MustGetBool(cmd, "include-remote-version")
 	hasContext := false
-	configStore, secretStore := defaultStorage()
+	configStore, secretStore := client.DefaultStorage()
 	if includeRemoteVersion {
 		_, err := storage.DefaultToken(
 			cobrautil.MustGetString(cmd, "endpoint"),
@@ -42,10 +44,7 @@ func versionCmdFunc(cmd *cobra.Command, args []string) error {
 		fmt.Print(green("client: "))
 	}
 
-	_, err := fmt.Println(cobrautil.UsageVersion("zed", cobrautil.MustGetBool(cmd, "include-deps")))
-	if err != nil {
-		return err
-	}
+	console.Println(cobrautil.UsageVersion("zed", cobrautil.MustGetBool(cmd, "include-deps")))
 
 	if hasContext && includeRemoteVersion {
 		token, err := storage.DefaultToken(
@@ -59,7 +58,7 @@ func versionCmdFunc(cmd *cobra.Command, args []string) error {
 		}
 		log.Trace().Interface("token", token).Send()
 
-		client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
+		client, err := authzed.NewClient(token.Endpoint, client.DialOptsFromFlags(cmd, token)...)
 		if err != nil {
 			return err
 		}
@@ -74,9 +73,9 @@ func versionCmdFunc(cmd *cobra.Command, args []string) error {
 		blue := color.FgLightBlue.Render
 		fmt.Print(blue("service: "))
 		if len(version) == 1 {
-			fmt.Println(version[0])
+			console.Println(version[0])
 		} else {
-			fmt.Println("(unknown)")
+			console.Println("(unknown)")
 		}
 	}
 

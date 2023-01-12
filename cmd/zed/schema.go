@@ -2,112 +2,112 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/TylerBrock/colorjson"
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/authzed/spicedb/pkg/schemadsl/input"
-	"github.com/jzelinskie/cobrautil"
+	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 
+	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/commands"
+	"github.com/authzed/zed/internal/console"
 	"github.com/authzed/zed/internal/storage"
 )
 
-func registerSchemaCmd(rootCmd *cobra.Command) {
-	rootCmd.AddCommand(schemaCmd)
-
-	schemaCmd.AddCommand(schemaReadCmd)
-	schemaReadCmd.Flags().Bool("json", false, "output as JSON")
+func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
+	schemaCmd.AddCommand(schemaCopyCmd)
+	schemaCopyCmd.Flags().Bool("json", false, "output as JSON")
+	schemaCopyCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before writing")
 
 	schemaCmd.AddCommand(schemaWriteCmd)
 	schemaWriteCmd.Flags().Bool("json", false, "output as JSON")
 	schemaWriteCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before writing")
-
-	schemaCmd.AddCommand(schemaCopyCmd)
-	schemaCopyCmd.Flags().Bool("json", false, "output as JSON")
-	schemaCopyCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before writing")
 }
 
-var (
-	schemaCmd = &cobra.Command{
-		Use:   "schema <subcommand>",
-		Short: "read and write to a Schema for a Permissions System",
-	}
+var schemaWriteCmd = &cobra.Command{
+	Use:   "write <file?>",
+	Args:  cobra.MaximumNArgs(1),
+	Short: "write a Schema file (or stdin) to the current Permissions System",
+	RunE:  schemaWriteCmdFunc,
+}
 
-	schemaReadCmd = &cobra.Command{
-		Use:   "read",
-		Args:  cobra.ExactArgs(0),
-		Short: "read the Schema of current Permissions System",
-		RunE:  cobrautil.CommandStack(LogCmdFunc, schemaReadCmdFunc),
-	}
+var schemaCopyCmd = &cobra.Command{
+	Use:   "copy <src context> <dest context>",
+	Args:  cobra.ExactArgs(2),
+	Short: "copy a Schema from one context into another",
+	RunE:  schemaCopyCmdFunc,
+}
 
-	schemaWriteCmd = &cobra.Command{
-		Use:   "write <file?>",
-		Args:  cobra.MaximumNArgs(1),
-		Short: "write a Schema file (or stdin) to the current Permissions System",
-		RunE:  cobrautil.CommandStack(LogCmdFunc, schemaWriteCmdFunc),
-	}
-
-	schemaCopyCmd = &cobra.Command{
-		Use:   "copy <src context> <dest context>",
-		Args:  cobra.ExactArgs(2),
-		Short: "copy a Schema from one context into another",
-		RunE:  cobrautil.CommandStack(LogCmdFunc, schemaCopyCmdFunc),
-	}
-)
-
-func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
-	configStore, secretStore := defaultStorage()
-	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "endpoint"),
-		cobrautil.MustGetString(cmd, "token"),
-		configStore,
-		secretStore,
-	)
+func clientForContext(cmd *cobra.Command, contextName string, secretStore storage.SecretStore) (*authzed.Client, error) {
+	token, err := storage.GetToken(contextName, secretStore)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	log.Trace().Interface("token", token).Send()
 
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
+	return authzed.NewClient(token.Endpoint, client.DialOptsFromFlags(cmd, token)...)
+}
+
+func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
+	_, secretStore := client.DefaultStorage()
+	srcClient, err := clientForContext(cmd, args[0], secretStore)
+	if err != nil {
+		return err
+	}
+	destClient, err := clientForContext(cmd, args[1], secretStore)
 	if err != nil {
 		return err
 	}
 
-	request := &v1.ReadSchemaRequest{}
-	log.Trace().Interface("request", request).Msg("requesting schema read")
+	readRequest := &v1.ReadSchemaRequest{}
+	log.Trace().Interface("request", readRequest).Msg("requesting schema read")
 
-	resp, err := client.ReadSchema(context.Background(), request)
+	readResp, err := srcClient.ReadSchema(context.Background(), readRequest)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read schema")
+	}
+	log.Trace().Interface("response", readResp).Msg("read schema")
+
+	prefix, err := determinePrefixForSchema(cobrautil.MustGetString(cmd, "schema-definition-prefix"), nil, &readResp.SchemaText)
 	if err != nil {
 		return err
 	}
+
+	schemaText, err := rewriteSchema(readResp.SchemaText, prefix)
+	if err != nil {
+		return err
+	}
+
+	writeRequest := &v1.WriteSchemaRequest{Schema: schemaText}
+	log.Trace().Interface("request", writeRequest).Msg("writing schema")
+
+	resp, err := destClient.WriteSchema(context.Background(), writeRequest)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write schema")
+	}
+	log.Trace().Interface("response", resp).Msg("wrote schema")
 
 	if cobrautil.MustGetBool(cmd, "json") {
-		prettyProto, err := prettyProto(resp)
+		prettyProto, err := commands.PrettyProto(resp)
 		if err != nil {
-			return err
+			log.Fatal().Err(err).Msg("failed to convert schema to JSON")
 		}
 
-		fmt.Println(string(prettyProto))
+		console.Println(string(prettyProto))
 		return nil
 	}
 
-	fmt.Println(stringz.Join("\n\n", resp.SchemaText))
 	return nil
 }
 
@@ -116,23 +116,10 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("must provide file path or contents via stdin")
 	}
 
-	configStore, secretStore := defaultStorage()
-	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "endpoint"),
-		cobrautil.MustGetString(cmd, "token"),
-		configStore,
-		secretStore,
-	)
+	client, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
-	log.Trace().Interface("token", token).Send()
-
-	client, err := authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
-	if err != nil {
-		return err
-	}
-
 	var schemaBytes []byte
 	switch len(args) {
 	case 1:
@@ -175,95 +162,12 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 	log.Trace().Interface("response", resp).Msg("wrote schema")
 
 	if cobrautil.MustGetBool(cmd, "json") {
-		prettyProto, err := prettyProto(resp)
+		prettyProto, err := commands.PrettyProto(resp)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to convert schema to JSON")
 		}
 
-		fmt.Println(string(prettyProto))
-		return nil
-	}
-
-	return nil
-}
-
-func prettyProto(m proto.Message) ([]byte, error) {
-	encoded, err := protojson.Marshal(m)
-	if err != nil {
-		return nil, err
-	}
-	var obj interface{}
-	err = json.Unmarshal(encoded, &obj)
-	if err != nil {
-		panic("protojson decode failed: " + err.Error())
-	}
-
-	f := colorjson.NewFormatter()
-	f.Indent = 2
-	pretty, err := f.Marshal(obj)
-	if err != nil {
-		panic("colorjson encode failed: " + err.Error())
-	}
-
-	return pretty, nil
-}
-
-func clientForContext(cmd *cobra.Command, contextName string, secretStore storage.SecretStore) (*authzed.Client, error) {
-	token, err := storage.GetToken(contextName, secretStore)
-	if err != nil {
-		return nil, err
-	}
-	log.Trace().Interface("token", token).Send()
-
-	return authzed.NewClient(token.Endpoint, dialOptsFromFlags(cmd, token)...)
-}
-
-func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
-	_, secretStore := defaultStorage()
-	srcClient, err := clientForContext(cmd, args[0], secretStore)
-	if err != nil {
-		return err
-	}
-	destClient, err := clientForContext(cmd, args[1], secretStore)
-	if err != nil {
-		return err
-	}
-
-	readRequest := &v1.ReadSchemaRequest{}
-	log.Trace().Interface("request", readRequest).Msg("requesting schema read")
-
-	readResp, err := srcClient.ReadSchema(context.Background(), readRequest)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to read schema")
-	}
-	log.Trace().Interface("response", readResp).Msg("read schema")
-
-	prefix, err := determinePrefixForSchema(cobrautil.MustGetString(cmd, "schema-definition-prefix"), nil, &readResp.SchemaText)
-	if err != nil {
-		return err
-	}
-
-	schemaText, err := rewriteSchema(readResp.SchemaText, prefix)
-	if err != nil {
-		return err
-	}
-
-	writeRequest := &v1.WriteSchemaRequest{Schema: schemaText}
-	log.Trace().Interface("request", writeRequest).Msg("writing schema")
-
-	resp, err := destClient.WriteSchema(context.Background(), writeRequest)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to write schema")
-	}
-	log.Trace().Interface("response", resp).Msg("wrote schema")
-
-	if cobrautil.MustGetBool(cmd, "json") {
-		prettyProto, err := prettyProto(resp)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to convert schema to JSON")
-		}
-
-		fmt.Println(string(prettyProto))
+		console.Println(string(prettyProto))
 		return nil
 	}
 
@@ -287,31 +191,12 @@ func rewriteSchema(existingSchemaText string, definitionPrefix string) (string, 
 	return generated, err
 }
 
-// readSchema calls read schema for the client and returns the schema found.
-func readSchema(client *authzed.Client) (string, error) {
-	request := &v1.ReadSchemaRequest{}
-	log.Trace().Interface("request", request).Msg("requesting schema read")
-
-	resp, err := client.ReadSchema(context.Background(), request)
-	if err != nil {
-		errStatus, ok := status.FromError(err)
-		if !ok || errStatus.Code() != codes.NotFound {
-			return "", err
-		}
-
-		log.Debug().Msg("no schema defined")
-		return "", nil
-	}
-
-	return resp.SchemaText, nil
-}
-
 // determinePrefixForSchema determines the prefix to be applied to a schema that will be written.
 //
 // If specifiedPrefix is non-empty, it is returned immediately.
 // If existingSchema is non-nil, it is parsed for the prefix.
 // Otherwise, the client is used to retrieve the existing schema (if any), and the prefix is retrieved from there.
-func determinePrefixForSchema(specifiedPrefix string, client *authzed.Client, existingSchema *string) (string, error) {
+func determinePrefixForSchema(specifiedPrefix string, client client.Client, existingSchema *string) (string, error) {
 	if specifiedPrefix != "" {
 		return specifiedPrefix, nil
 	}
@@ -320,7 +205,7 @@ func determinePrefixForSchema(specifiedPrefix string, client *authzed.Client, ex
 	if existingSchema != nil {
 		schemaText = *existingSchema
 	} else {
-		readSchemaText, err := readSchema(client)
+		readSchemaText, err := commands.ReadSchema(client)
 		if err != nil {
 			return "", nil
 		}
