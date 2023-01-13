@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/TylerBrock/colorjson"
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
@@ -44,16 +43,6 @@ func GetCaveatContext(cmd *cobra.Command) (*structpb.Struct, error) {
 	}
 
 	return ParseCaveatContext(contextString)
-}
-
-// AtLeastAsFresh returns a consistency block set to AtLeastAsFresh as the
-// specified zedtoken.
-func AtLeastAsFresh(zedtoken string) *v1.Consistency {
-	return &v1.Consistency{
-		Requirement: &v1.Consistency_AtLeastAsFresh{
-			AtLeastAsFresh: &v1.ZedToken{Token: zedtoken},
-		},
-	}
 }
 
 // ParseCaveatContext parses the given context JSON string into caveat context,
