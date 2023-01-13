@@ -15,6 +15,7 @@ import (
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -24,34 +25,81 @@ import (
 	"github.com/authzed/zed/internal/printers"
 )
 
+var ErrMultipleConsistencies = errors.New("provided multiple consistency flags")
+
+func registerConsistencyFlags(flags *pflag.FlagSet) {
+	flags.String("consistency-at-exactly", "", "evaluate at the provided zedtoken")
+	flags.String("consistency-at-least", "", "evaluate at least as consistent as the provided zedtoken")
+	flags.Bool("consistency-min-latency", false, "evaluate at the zedtoken preferred by the database")
+	flags.Bool("consistency-full", false, "evaluate at the newest zedtoken in the database")
+}
+
+func consistencyFromCmd(cmd *cobra.Command) (c *v1.Consistency, err error) {
+	if cobrautil.MustGetBool(cmd, "consistency-full") {
+		c = &v1.Consistency{Requirement: &v1.Consistency_FullyConsistent{FullyConsistent: true}}
+	}
+	if atLeast := cobrautil.MustGetStringExpanded(cmd, "consistency-at-least"); atLeast != "" {
+		if c != nil {
+			return nil, ErrMultipleConsistencies
+		}
+		c = &v1.Consistency{Requirement: &v1.Consistency_AtLeastAsFresh{AtLeastAsFresh: &v1.ZedToken{Token: atLeast}}}
+	}
+
+	// Deprecated (hidden) flag.
+	if revision := cobrautil.MustGetStringExpanded(cmd, "revision"); revision != "" {
+		if c != nil {
+			return nil, ErrMultipleConsistencies
+		}
+		c = &v1.Consistency{Requirement: &v1.Consistency_AtLeastAsFresh{AtLeastAsFresh: &v1.ZedToken{Token: revision}}}
+	}
+
+	if exact := cobrautil.MustGetStringExpanded(cmd, "consistency-at-exactly"); exact != "" {
+		if c != nil {
+			return nil, ErrMultipleConsistencies
+		}
+		c = &v1.Consistency{Requirement: &v1.Consistency_AtExactSnapshot{AtExactSnapshot: &v1.ZedToken{Token: exact}}}
+	}
+
+	if c == nil {
+		c = &v1.Consistency{Requirement: &v1.Consistency_MinimizeLatency{MinimizeLatency: true}}
+	}
+	return
+}
+
 func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	rootCmd.AddCommand(permissionCmd)
 
 	permissionCmd.AddCommand(checkCmd)
 	checkCmd.Flags().Bool("json", false, "output as JSON")
 	checkCmd.Flags().String("revision", "", "optional revision at which to check")
+	_ = checkCmd.Flags().MarkHidden("revision")
 	checkCmd.Flags().Bool("explain", false, "requests debug information from SpiceDB and prints out a trace of the requests")
 	checkCmd.Flags().Bool("schema", false, "requests debug information from SpiceDB and prints out the schema used")
 	checkCmd.Flags().String("caveat-context", "", "the caveat context to send along with the check, in JSON form")
+	registerConsistencyFlags(checkCmd.Flags())
 
 	permissionCmd.AddCommand(expandCmd)
 	expandCmd.Flags().Bool("json", false, "output as JSON")
 	expandCmd.Flags().String("revision", "", "optional revision at which to check")
+	registerConsistencyFlags(expandCmd.Flags())
 
 	permissionCmd.AddCommand(lookupCmd)
 	lookupCmd.Flags().Bool("json", false, "output as JSON")
 	lookupCmd.Flags().String("revision", "", "optional revision at which to check")
 	lookupCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
+	registerConsistencyFlags(lookupCmd.Flags())
 
 	permissionCmd.AddCommand(lookupResourcesCmd)
 	lookupResourcesCmd.Flags().Bool("json", false, "output as JSON")
 	lookupResourcesCmd.Flags().String("revision", "", "optional revision at which to check")
 	lookupResourcesCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
+	registerConsistencyFlags(lookupResourcesCmd.Flags())
 
 	permissionCmd.AddCommand(lookupSubjectsCmd)
 	lookupSubjectsCmd.Flags().Bool("json", false, "output as JSON")
 	lookupSubjectsCmd.Flags().String("revision", "", "optional revision at which to check")
 	lookupSubjectsCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
+	registerConsistencyFlags(lookupSubjectsCmd.Flags())
 
 	return permissionCmd
 }
@@ -116,10 +164,16 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	consistency, err := consistencyFromCmd(cmd)
+	if err != nil {
+		return err
+	}
+
 	client, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
+
 	request := &v1.CheckPermissionRequest{
 		Resource: &v1.ObjectReference{
 			ObjectType: objectNS,
@@ -133,11 +187,8 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 			},
 			OptionalRelation: subjectRel,
 		},
-		Context: caveatContext,
-	}
-
-	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
-		request.Consistency = AtLeastAsFresh(zedtoken)
+		Context:     caveatContext,
+		Consistency: consistency,
 	}
 	log.Trace().Interface("request", request).Send()
 
@@ -195,20 +246,23 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	consistency, err := consistencyFromCmd(cmd)
+	if err != nil {
+		return err
+	}
+
 	client, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
+
 	request := &v1.ExpandPermissionTreeRequest{
 		Resource: &v1.ObjectReference{
 			ObjectType: objectNS,
 			ObjectId:   objectID,
 		},
-		Permission: relation,
-	}
-
-	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
-		request.Consistency = AtLeastAsFresh(zedtoken)
+		Permission:  relation,
+		Consistency: consistency,
 	}
 	log.Trace().Interface("request", request).Send()
 
@@ -247,6 +301,11 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	consistency, err := consistencyFromCmd(cmd)
+	if err != nil {
+		return err
+	}
+
 	client, err := client.NewClient(cmd)
 	if err != nil {
 		return err
@@ -261,11 +320,8 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 			},
 			OptionalRelation: subjectRel,
 		},
-		Context: caveatContext,
-	}
-
-	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
-		request.Consistency = AtLeastAsFresh(zedtoken)
+		Context:     caveatContext,
+		Consistency: consistency,
 	}
 	log.Trace().Interface("request", request).Send()
 
@@ -312,6 +368,11 @@ func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	consistency, err := consistencyFromCmd(cmd)
+	if err != nil {
+		return err
+	}
+
 	client, err := client.NewClient(cmd)
 	if err != nil {
 		return err
@@ -325,10 +386,7 @@ func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
 		SubjectObjectType:       subjectType,
 		OptionalSubjectRelation: subjectRelation,
 		Context:                 caveatContext,
-	}
-
-	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
-		request.Consistency = AtLeastAsFresh(zedtoken)
+		Consistency:             consistency,
 	}
 	log.Trace().Interface("request", request).Send()
 

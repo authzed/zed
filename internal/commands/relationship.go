@@ -34,7 +34,9 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	relationshipCmd.AddCommand(readCmd)
 	readCmd.Flags().Bool("json", false, "output as JSON")
 	readCmd.Flags().String("revision", "", "optional revision at which to check")
+	_ = readCmd.Flags().MarkHidden("revision")
 	readCmd.Flags().String("subject-filter", "", "optional subject filter")
+	registerConsistencyFlags(readCmd.Flags())
 
 	relationshipCmd.AddCommand(bulkDeleteCmd)
 	bulkDeleteCmd.Flags().Bool("force", false, "force deletion immediately without confirmation")
@@ -84,10 +86,6 @@ var bulkDeleteCmd = &cobra.Command{
 	RunE:  bulkDeleteRelationships,
 }
 
-var fullyConsistent = &v1.Consistency{
-	Requirement: &v1.Consistency_FullyConsistent{FullyConsistent: true},
-}
-
 func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 	client, err := client.NewClient(cmd)
 	if err != nil {
@@ -101,13 +99,12 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 
 	counter := -1
 	if cobrautil.MustGetBool(cmd, "estimate-count") {
-		request.Consistency = fullyConsistent
-
-		log.Trace().Interface("request", request).Send()
+		request.Consistency = &v1.Consistency{Requirement: &v1.Consistency_FullyConsistent{FullyConsistent: true}}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		log.Trace().Interface("request", request).Send()
 		resp, err := client.ReadRelationships(ctx, request)
 		if err != nil {
 			return err
@@ -205,16 +202,16 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if zedtoken := cobrautil.MustGetString(cmd, "revision"); zedtoken != "" {
-		request.Consistency = AtLeastAsFresh(zedtoken)
-	} else {
-		request.Consistency = fullyConsistent
+	request.Consistency, err = consistencyFromCmd(cmd)
+	if err != nil {
+		return err
 	}
 
 	client, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
+
 	log.Trace().Interface("request", request).Msg("reading relationships")
 	resp, err := client.ReadRelationships(context.Background(), request)
 	if err != nil {
