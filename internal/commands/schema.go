@@ -27,7 +27,7 @@ func RegisterSchemaCmd(rootCmd *cobra.Command) *cobra.Command {
 var (
 	schemaCmd = &cobra.Command{
 		Use:   "schema <subcommand>",
-		Short: "read and write to a Schema for a Permissions System",
+		Short: "manages Schema for a Permissions System",
 	}
 
 	schemaReadCmd = &cobra.Command{

@@ -19,7 +19,6 @@ import (
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gookit/color"
-	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -46,7 +45,6 @@ func main() {
 		return wasmClient{}, nil
 	}
 
-	rootCmd := buildRootCmd()
 	c := make(chan struct{}, 0)
 	js.Global().Set("runZedCommand", js.FuncOf(func(this js.Value, args []js.Value) any {
 		if len(args) != 2 {
@@ -61,7 +59,7 @@ func main() {
 			stringParams = append(stringParams, params.Get(strconv.Itoa(i)).String())
 		}
 
-		result := runZedCommand(rootCmd, args[0].String(), stringParams)
+		result := runZedCommand(args[0].String(), stringParams)
 		marshaled, err := json.Marshal(result)
 		if err != nil {
 			return `{"error": "could not marshal result"}`
@@ -76,17 +74,9 @@ func main() {
 func buildRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "zed",
-		Short: "The Authzed CLI",
-		Long:  "A client for managing Authzed from your command line.",
+		Short: "SpiceDB client, by AuthZed",
+		Long:  "A command-line client for managing SpiceDB clusters, built by AuthZed",
 	}
-
-	versionCmd := &cobra.Command{
-		Use:   "version",
-		Short: "display zed version information",
-		RunE:  versionCmdFunc,
-	}
-	cobrautil.RegisterVersionFlags(versionCmd.Flags())
-	rootCmd.AddCommand(versionCmd)
 
 	// Register shared commands.
 	commands.RegisterPermissionCmd(rootCmd)
@@ -95,13 +85,9 @@ func buildRootCmd() *cobra.Command {
 	return rootCmd
 }
 
-func versionCmdFunc(cmd *cobra.Command, args []string) error {
-	console.Println(cobrautil.UsageVersion("zed", cobrautil.MustGetBool(cmd, "include-deps")))
-	return nil
-}
-
-func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringParams []string) zedCommandResult {
+func runZedCommand(requestContextJSON string, stringParams []string) zedCommandResult {
 	ctx := context.Background()
+	rootCmd := buildRootCmd()
 
 	// Decode the request context.
 	requestCtx := &devinterface.RequestContext{}
