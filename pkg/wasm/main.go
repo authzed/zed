@@ -22,6 +22,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/authzed/zed/internal/client"
@@ -37,6 +38,8 @@ type zedCommandResult struct {
 }
 
 func main() {
+	rootCmd := buildRootCmd()
+
 	// Force color output.
 	color.ForceColor()
 
@@ -59,7 +62,7 @@ func main() {
 			stringParams = append(stringParams, params.Get(strconv.Itoa(i)).String())
 		}
 
-		result := runZedCommand(args[0].String(), stringParams)
+		result := runZedCommand(rootCmd, args[0].String(), stringParams)
 		marshaled, err := json.Marshal(result)
 		if err != nil {
 			return `{"error": "could not marshal result"}`
@@ -82,12 +85,25 @@ func buildRootCmd() *cobra.Command {
 	commands.RegisterPermissionCmd(rootCmd)
 	commands.RegisterRelationshipCmd(rootCmd)
 	commands.RegisterSchemaCmd(rootCmd)
+
 	return rootCmd
 }
 
-func runZedCommand(requestContextJSON string, stringParams []string) zedCommandResult {
+// From: https://github.com/golang/debug/pull/8/files
+func resetSubCommandFlagValues(root *cobra.Command) {
+	for _, c := range root.Commands() {
+		c.Flags().VisitAll(func(f *pflag.Flag) {
+			if f.Changed {
+				f.Value.Set(f.DefValue)
+				f.Changed = false
+			}
+		})
+		resetSubCommandFlagValues(c)
+	}
+}
+
+func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringParams []string) zedCommandResult {
 	ctx := context.Background()
-	rootCmd := buildRootCmd()
 
 	// Decode the request context.
 	requestCtx := &devinterface.RequestContext{}
@@ -129,6 +145,7 @@ func runZedCommand(requestContextJSON string, stringParams []string) zedCommandR
 	log.Logger = zerolog.New(&buf).With().Bool("is-log", true).Timestamp().Logger()
 
 	// Set the input arguments.
+	resetSubCommandFlagValues(rootCmd) // See: https://github.com/spf13/cobra/issues/1488
 	rootCmd.SetArgs(stringParams)
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)

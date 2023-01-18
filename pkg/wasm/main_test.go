@@ -30,7 +30,14 @@ func TestZedCommand(t *testing.T) {
 	encodedContext, err := m.MarshalToString(requestCtx)
 	require.NoError(t, err)
 
-	result := runZedCommand(encodedContext, []string{"permission", "check", "document:firstdoc", "view", "user:tom"})
+	rootCmd := buildRootCmd()
+
+	// Run with --help
+	result := runZedCommand(rootCmd, encodedContext, []string{"permission", "check", "--help"})
+	require.Contains(t, result.Output, "Usage:")
+
+	// Run the actual command.
+	result = runZedCommand(rootCmd, encodedContext, []string{"permission", "check", "document:firstdoc", "view", "user:tom"})
 	require.Contains(t, result.Output, "false")
 
 	updatedContext := &devinterface.RequestContext{}
