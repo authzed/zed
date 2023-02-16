@@ -264,7 +264,7 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 		if operation != v1.RelationshipUpdate_OPERATION_DELETE {
 			caveatString := cobrautil.MustGetString(cmd, "caveat")
 			if caveatString != "" {
-				parts := strings.SplitN(caveatString, ":",2)
+				parts := strings.SplitN(caveatString, ":", 2)
 				if len(parts) == 0 {
 					return fmt.Errorf("invalid --caveat argument. Must be in format `caveat_name:context`, but found `%s`", caveatString)
 				}
