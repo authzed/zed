@@ -21,12 +21,20 @@ func TestRelationshipToString(t *testing.T) {
 			"res:123 rel resource:1234",
 		},
 		{
+			"res:123#rel@resource:1234#anotherrel",
+			"res:123 rel resource:1234#anotherrel",
+		},
+		{
 			"res:123#rel@resource:1234[caveat_name]",
 			"res:123 rel resource:1234[caveat_name]",
 		},
 		{
 			"res:123#rel@resource:1234[caveat_name:{\"num\":1234}]",
 			"res:123 rel resource:1234[caveat_name:{\"num\":1234}]",
+		},
+		{
+			"res:123#rel@resource:1234[caveat_name:{\"name\":\"##@@##@@\"}]",
+			"res:123 rel resource:1234[caveat_name:{\"name\":\"##@@##@@\"}]",
 		},
 	} {
 		t.Run(tt.rawRel, func(t *testing.T) {
