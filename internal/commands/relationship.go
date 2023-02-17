@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
@@ -236,13 +237,23 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 
 			console.Println(string(prettyProto))
 		} else {
-			if msg.Relationship.Subject.OptionalRelation != "" {
-				console.Printf("%s:%s %s %s:%s#%s\n", msg.Relationship.Resource.ObjectType, msg.Relationship.Resource.ObjectId, msg.Relationship.Relation, msg.Relationship.Subject.Object.ObjectType, msg.Relationship.Subject.Object.ObjectId, msg.Relationship.Subject.OptionalRelation)
-			} else {
-				console.Printf("%s:%s %s %s:%s\n", msg.Relationship.Resource.ObjectType, msg.Relationship.Resource.ObjectId, msg.Relationship.Relation, msg.Relationship.Subject.Object.ObjectType, msg.Relationship.Subject.Object.ObjectId)
+			relString, err := relationshipToString(msg.Relationship)
+			if err != nil {
+				return err
 			}
+			console.Println(relString)
 		}
 	}
+}
+
+func relationshipToString(rel *v1.Relationship) (string, error) {
+	relString, err := tuple.StringRelationship(rel)
+	if err != nil {
+		return "", err
+	}
+	relString = strings.Replace(relString, "@", " ", 1)
+	relString = strings.Replace(relString, "#", " ", 1)
+	return relString, nil
 }
 
 func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cmd *cobra.Command, args []string) error {
