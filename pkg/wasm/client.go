@@ -61,3 +61,8 @@ func (wc wasmClient) LookupSubjects(ctx context.Context, in *v1.LookupSubjectsRe
 	client := v1.NewPermissionsServiceClient(wc.conn)
 	return client.LookupSubjects(ctx, in, opts...)
 }
+
+func (wc wasmClient) Watch(ctx context.Context, in *v1.WatchRequest, opts ...grpc.CallOption) (v1.WatchService_WatchClient, error) {
+	client := v1.NewWatchServiceClient(wc.conn)
+	return client.Watch(ctx, in, opts...)
+}

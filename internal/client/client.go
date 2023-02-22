@@ -23,6 +23,7 @@ import (
 type Client interface {
 	v1.SchemaServiceClient
 	v1.PermissionsServiceClient
+	v1.WatchServiceClient
 }
 
 // NewClient defines an (overridable) means of creating a new client.
