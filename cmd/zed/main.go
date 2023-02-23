@@ -63,6 +63,7 @@ func main() {
 	// Register shared commands.
 	commands.RegisterPermissionCmd(rootCmd)
 	commands.RegisterRelationshipCmd(rootCmd)
+	commands.RegisterWatchCmd(rootCmd)
 
 	schemaCmd := commands.RegisterSchemaCmd(rootCmd)
 	registerAdditionalSchemaCmds(schemaCmd)
