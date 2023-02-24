@@ -17,7 +17,6 @@ import (
 	devinterface "github.com/authzed/spicedb/pkg/proto/developer/v1"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
-	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gookit/color"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -208,11 +207,10 @@ func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringPara
 		Relationships: relationships,
 	}
 
-	m := jsonpb.Marshaler{}
-	encodedUpdatedContext, err := m.MarshalToString(updatedRequestCtx)
+	encodedUpdatedContext, err := protojson.Marshal(updatedRequestCtx)
 	if err != nil {
 		return zedCommandResult{Error: err.Error()}
 	}
 
-	return zedCommandResult{UpdatedContext: encodedUpdatedContext, Output: buf.String()}
+	return zedCommandResult{UpdatedContext: string(encodedUpdatedContext), Output: buf.String()}
 }

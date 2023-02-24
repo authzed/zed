@@ -11,7 +11,6 @@ require (
 	github.com/authzed/spicedb v1.15.1-0.20221230180603-22b7de8eab7c
 	github.com/charmbracelet/lipgloss v0.6.0
 	github.com/cockroachdb/cockroach v20.1.17+incompatible
-	github.com/gogo/protobuf v1.3.2
 	github.com/gookit/color v1.5.2
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20221215210038-3f120e7f595f
 	github.com/jzelinskie/stringz v0.0.1
