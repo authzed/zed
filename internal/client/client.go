@@ -64,7 +64,8 @@ func DefaultStorage() (storage.ConfigStore, storage.SecretStore) {
 		homedir, _ := homedir.Dir()
 		home = filepath.Join(homedir, ".zed")
 	}
-	return storage.JSONConfigStore{ConfigPath: home}, storage.KeychainSecretStore{ConfigPath: home}
+	return &storage.JSONConfigStore{ConfigPath: home},
+		&storage.KeychainSecretStore{ConfigPath: home}
 }
 
 func certOption(cmd *cobra.Command, token storage.Token) (opt grpc.DialOption, err error) {
