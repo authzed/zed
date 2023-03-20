@@ -38,7 +38,7 @@ var (
 	}
 )
 
-func schemaReadCmdFunc(cmd *cobra.Command, args []string) error {
+func schemaReadCmdFunc(cmd *cobra.Command, _ []string) error {
 	client, err := client.NewClient(cmd)
 	if err != nil {
 		return err

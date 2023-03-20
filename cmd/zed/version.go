@@ -20,7 +20,7 @@ import (
 	"github.com/authzed/zed/internal/storage"
 )
 
-func versionCmdFunc(cmd *cobra.Command, args []string) error {
+func versionCmdFunc(cmd *cobra.Command, _ []string) error {
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
 		color.Disable()
 	}
