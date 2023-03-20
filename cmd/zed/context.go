@@ -58,7 +58,7 @@ var contextUseCmd = &cobra.Command{
 	RunE:  contextUseCmdFunc,
 }
 
-func contextListCmdFunc(cmd *cobra.Command, args []string) error {
+func contextListCmdFunc(cmd *cobra.Command, _ []string) error {
 	cfgStore, secretStore := client.DefaultStorage()
 	secrets, err := secretStore.Get()
 	if err != nil {
@@ -81,7 +81,7 @@ func contextListCmdFunc(cmd *cobra.Command, args []string) error {
 			secret = token.Redacted()
 		}
 
-		certStr := ""
+		var certStr string
 		if token.IsInsecure() {
 			certStr = "insecure"
 		} else if _, ok := token.Certificate(); ok {
@@ -136,7 +136,7 @@ func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 	return storage.SetCurrentToken(name, cfgStore, secretStore)
 }
 
-func contextRemoveCmdFunc(cmd *cobra.Command, args []string) error {
+func contextRemoveCmdFunc(_ *cobra.Command, args []string) error {
 	// If the token is what's currently being used, remove it from the config.
 	cfgStore, secretStore := client.DefaultStorage()
 	cfg, err := cfgStore.Get()
@@ -156,7 +156,7 @@ func contextRemoveCmdFunc(cmd *cobra.Command, args []string) error {
 	return storage.RemoveToken(args[0], secretStore)
 }
 
-func contextUseCmdFunc(cmd *cobra.Command, args []string) error {
+func contextUseCmdFunc(_ *cobra.Command, args []string) error {
 	cfgStore, secretStore := client.DefaultStorage()
 	switch len(args) {
 	case 0:

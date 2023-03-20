@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,34 +113,78 @@ func RemoveToken(name string, ss SecretStore) error {
 
 type KeychainSecretStore struct {
 	ConfigPath string
+	ring       keyring.Keyring
 }
 
-const keyringEntryName = "zed secrets"
+var _ SecretStore = (*KeychainSecretStore)(nil)
 
-var _ SecretStore = KeychainSecretStore{}
+const (
+	svcName                   = "zed"
+	keyringEntryName          = svcName + " secrets"
+	envRecommendation         = "Setting the environment variable `ZED_KEYRING_PASSWORD` to your password will skip prompts\n"
+	keyringDoesNotExistPrompt = "Keyring file does not already exist\nEnter a new passphrase: "
+	keyringPrompt             = "Enter passphrase to unlock zed keyring: "
+)
 
-func openKeyring(configPath string) (keyring.Keyring, error) {
-	return keyring.Open(keyring.Config{
+func fileExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	switch {
+	case err == nil:
+		return true, nil
+	case os.IsNotExist(err):
+		return false, nil
+	default:
+		return false, err
+	}
+}
+
+func (k *KeychainSecretStore) keyring() (keyring.Keyring, error) {
+	if k.ring != nil {
+		return k.ring, nil
+	}
+
+	keyringPath := filepath.Join(k.ConfigPath, "keyring.jwt")
+
+	ring, err := keyring.Open(keyring.Config{
 		ServiceName: "zed",
-		FileDir:     filepath.Join(configPath, "keyring.jwt"),
-		FilePasswordFunc: func(prompt string) (string, error) {
+		FileDir:     keyringPath,
+		FilePasswordFunc: func(_ string) (string, error) {
 			if password, ok := os.LookupEnv("ZED_KEYRING_PASSWORD"); ok {
 				return password, nil
 			}
 
-			fmt.Fprintf(os.Stderr, "Entering your password a lot? Try setting the environment variable `ZED_KEYRING_PASSWORD`\n%s: ", prompt)
+			prompt := keyringPrompt
+
+			// Check if this is the first run where the keyring is created.
+			keyringExists, err := fileExists(filepath.Join(keyringPath, keyringEntryName))
+			if err != nil {
+				return "", err
+			}
+			if !keyringExists {
+				// This is the first run and we're creating a password.
+				prompt = keyringDoesNotExistPrompt
+			}
+
+			console.Printf(envRecommendation + prompt)
 			b, err := term.ReadPassword(int(os.Stdin.Fd()))
 			if err != nil {
 				return "", err
 			}
-			console.Println()
+			console.Printf("\n") // Clear the line after a prompt
+
 			return string(b), nil
 		},
 	})
+	if err != nil {
+		return ring, err
+	}
+
+	k.ring = ring
+	return ring, err
 }
 
-func (k KeychainSecretStore) Get() (Secrets, error) {
-	ring, err := openKeyring(k.ConfigPath)
+func (k *KeychainSecretStore) Get() (Secrets, error) {
+	ring, err := k.keyring()
 	if err != nil {
 		return Secrets{}, err
 	}
@@ -159,8 +202,8 @@ func (k KeychainSecretStore) Get() (Secrets, error) {
 	return s, err
 }
 
-func (k KeychainSecretStore) Put(s Secrets) error {
-	ring, err := openKeyring(k.ConfigPath)
+func (k *KeychainSecretStore) Put(s Secrets) error {
+	ring, err := k.keyring()
 	if err != nil {
 		return err
 	}
