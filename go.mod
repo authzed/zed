@@ -10,7 +10,6 @@ require (
 	github.com/authzed/grpcutil v0.0.0-20230109193425-40ce0530e048
 	github.com/authzed/spicedb v1.15.1-0.20221230180603-22b7de8eab7c
 	github.com/charmbracelet/lipgloss v0.6.0
-	github.com/cockroachdb/cockroach v20.1.17+incompatible
 	github.com/gookit/color v1.5.2
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20221215210038-3f120e7f595f
 	github.com/jzelinskie/stringz v0.0.1
@@ -20,6 +19,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.1
+	github.com/xlab/treeprint v1.2.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/term v0.4.0
 	google.golang.org/grpc v1.52.3
