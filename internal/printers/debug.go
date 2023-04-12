@@ -5,19 +5,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/authzed/spicedb/pkg/tuple"
-
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
+	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/gookit/color"
 )
 
 // DisplayCheckTrace prints out the check trace found in the given debug message.
-func DisplayCheckTrace(checkTrace *v1.CheckDebugTrace, tp treeprinter.Node, hasError bool) {
+func DisplayCheckTrace(checkTrace *v1.CheckDebugTrace, tp *TreePrinter, hasError bool) {
 	displayCheckTrace(checkTrace, tp, hasError, map[string]struct{}{})
 }
 
-func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp treeprinter.Node, hasError bool, encountered map[string]struct{}) {
+func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp *TreePrinter, hasError bool, encountered map[string]struct{}) {
 	red := color.FgRed.Render
 	green := color.FgGreen.Render
 	cyan := color.FgCyan.Render

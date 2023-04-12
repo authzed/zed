@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/stringz"
 )
 
@@ -26,7 +25,7 @@ func prettySubject(subj *v1.SubjectReference) string {
 
 // TreeNodeTree walks an Authzed Tree Node and creates corresponding nodes
 // for a treeprinter.
-func TreeNodeTree(tp treeprinter.Node, treeNode *v1.PermissionRelationshipTree) {
+func TreeNodeTree(tp *TreePrinter, treeNode *v1.PermissionRelationshipTree) {
 	if treeNode.ExpandedObject != nil {
 		tp = tp.Child(fmt.Sprintf(
 			"%s:%s->%s",

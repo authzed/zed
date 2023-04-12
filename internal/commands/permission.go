@@ -10,7 +10,6 @@ import (
 	"github.com/authzed/authzed-go/pkg/requestmeta"
 	"github.com/authzed/authzed-go/pkg/responsemeta"
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/cockroachdb/cockroach/pkg/util/treeprinter"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
@@ -281,9 +280,9 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	tp := treeprinter.New()
+	tp := printers.NewTreePrinter()
 	printers.TreeNodeTree(tp, resp.TreeRoot)
-	console.Println(tp.String())
+	tp.Print()
 
 	return nil
 }
@@ -471,10 +470,9 @@ func displayDebugInformationIfRequested(cmd *cobra.Command, trailerMD metadata.M
 		}
 
 		if cobrautil.MustGetBool(cmd, "explain") {
-			tp := treeprinter.New()
+			tp := printers.NewTreePrinter()
 			printers.DisplayCheckTrace(debugInfo.Check, tp, hasError)
-			console.Println()
-			console.Println(tp.String())
+			tp.Print()
 		}
 
 		if cobrautil.MustGetBool(cmd, "schema") {

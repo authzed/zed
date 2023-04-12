@@ -37,6 +37,7 @@ func TestRelationshipToString(t *testing.T) {
 			"res:123 rel resource:1234[caveat_name:{\"name\":\"##@@##@@\"}]",
 		},
 	} {
+		tt := tt
 		t.Run(tt.rawRel, func(t *testing.T) {
 			rel := tuple.ParseRel(tt.rawRel)
 			out, err := relationshipToString(rel)
