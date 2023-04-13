@@ -8,6 +8,9 @@ on: # yamllint disable-line rule:truthy
   pull_request:
     branches:
       - "*"
+  merge_group:
+    types:
+      - "checks_requested"
 jobs:
   build:
     name: "Build Binary"
