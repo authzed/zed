@@ -11,6 +11,13 @@ This package provides zed's functionality via a WebAssembly interface, for use w
 GOOS=js GOARCH=wasm go build -o main.wasm
 ```
 
+## Testing
+
+```sh
+go install github.com/agnivade/wasmbrowsertest@latest
+GOOS=js GOARCH=wasm go test ./... -exec $(go env GOPATH)/bin/wasmbrowsertest
+```
+
 ## Integrating with the browser
 
 To see an example of invoking the WebAssembly based interface:
