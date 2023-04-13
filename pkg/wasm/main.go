@@ -164,13 +164,13 @@ func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringPara
 	reader := devCtx.Datastore.SnapshotReader(headRev)
 	relationships := []*core.RelationTuple{}
 
-	nsDefs, err := reader.ListNamespaces(ctx)
+	nsDefs, err := reader.ListAllNamespaces(ctx)
 	if err != nil {
 		return zedCommandResult{Error: err.Error()}
 	}
 
 	for _, nsDef := range nsDefs {
-		it, err := reader.QueryRelationships(ctx, datastore.RelationshipsFilter{ResourceType: nsDef.Name})
+		it, err := reader.QueryRelationships(ctx, datastore.RelationshipsFilter{ResourceType: nsDef.Definition.Name})
 		if err != nil {
 			return zedCommandResult{Error: err.Error()}
 		}
@@ -182,18 +182,18 @@ func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringPara
 		it.Close()
 	}
 
-	caveatDefs, err := reader.ListCaveats(ctx)
+	caveatDefs, err := reader.ListAllCaveats(ctx)
 	if err != nil {
 		return zedCommandResult{Error: err.Error()}
 	}
 
 	schemaDefinitions := make([]compiler.SchemaDefinition, 0, len(nsDefs)+len(caveatDefs))
 	for _, caveatDef := range caveatDefs {
-		schemaDefinitions = append(schemaDefinitions, caveatDef)
+		schemaDefinitions = append(schemaDefinitions, caveatDef.Definition)
 	}
 
 	for _, nsDef := range nsDefs {
-		schemaDefinitions = append(schemaDefinitions, nsDef)
+		schemaDefinitions = append(schemaDefinitions, nsDef.Definition)
 	}
 
 	schemaText, _, err := generator.GenerateSchema(schemaDefinitions)
