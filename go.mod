@@ -10,7 +10,7 @@ require (
 	github.com/authzed/grpcutil v0.0.0-20230109193425-40ce0530e048
 	github.com/authzed/spicedb v1.19.0
 	github.com/charmbracelet/lipgloss v0.6.0
-	github.com/gookit/color v1.5.2
+	github.com/gookit/color v1.5.3
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20221215210038-3f120e7f595f
 	github.com/jzelinskie/stringz v0.0.1
 	github.com/mitchellh/go-homedir v1.1.0
