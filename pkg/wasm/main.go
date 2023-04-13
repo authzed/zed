@@ -117,7 +117,7 @@ func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringPara
 		return zedCommandResult{Error: err.Error()}
 	}
 	if devErrs != nil {
-		return zedCommandResult{Error: "invalid schema or relationships"}
+		return zedCommandResult{Error: "invalid schema or relationships: " + devErrs.String()}
 	}
 
 	// Run the V1 API against the dev context.

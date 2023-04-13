@@ -28,7 +28,7 @@ func TestZedCommand(t *testing.T) {
 		}
 
 		definition document {
-			relation viewer: user
+			relation viewer: user | user with somecaveat
 			permission view = viewer
 		}`,
 
@@ -45,7 +45,7 @@ func TestZedCommand(t *testing.T) {
 
 	// Run with --help
 	result := runZedCommand(rootCmd, string(encodedContext), []string{"permission", "check", "--help"})
-	require.Contains(t, result.Output, "Usage:")
+	require.Contains(t, result.Output, "Usage:", "failed to run 'permission check --help' command: %v", result)
 
 	// Run the actual command.
 	result = runZedCommand(rootCmd, string(encodedContext), []string{"permission", "check", "document:first", "view", "user:fred"})
