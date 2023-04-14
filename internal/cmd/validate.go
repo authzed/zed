@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -62,7 +61,7 @@ var validateCmd = &cobra.Command{
 	RunE: validateCmdFunc,
 }
 
-func validateCmdFunc(_ *cobra.Command, args []string) error {
+func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	// Parse the URL of the validation document to import.
 	u, err := url.Parse(args[0])
 	if err != nil {
@@ -87,7 +86,7 @@ func validateCmdFunc(_ *cobra.Command, args []string) error {
 	}
 
 	// Create the development context.
-	ctx := context.Background()
+	ctx := cmd.Context()
 	tuples := make([]*core.RelationTuple, 0, len(parsed.Relationships.Relationships))
 	for _, rel := range parsed.Relationships.Relationships {
 		tuples = append(tuples, tuple.MustFromRelationship(rel))

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -66,7 +65,7 @@ func versionCmdFunc(cmd *cobra.Command, _ []string) error {
 		// the client being unable to connect, etc. We just treat all such cases as an unknown
 		// version.
 		var headerMD metadata.MD
-		_, _ = client.ReadSchema(context.Background(), &v1.ReadSchemaRequest{}, grpc.Header(&headerMD))
+		_, _ = client.ReadSchema(cmd.Context(), &v1.ReadSchemaRequest{}, grpc.Header(&headerMD))
 		version := headerMD.Get(string(responsemeta.ServerVersion))
 
 		blue := color.FgLightBlue.Render

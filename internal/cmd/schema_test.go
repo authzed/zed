@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -58,7 +59,7 @@ func TestDeterminePrefixForSchema(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			found, err := determinePrefixForSchema(test.specifiedPrefix, nil, &test.existingSchema)
+			found, err := determinePrefixForSchema(context.Background(), test.specifiedPrefix, nil, &test.existingSchema)
 			require.NoError(t, err)
 			require.Equal(t, test.expectedPrefix, found)
 		})

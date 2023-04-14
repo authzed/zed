@@ -102,7 +102,7 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 	if cobrautil.MustGetBool(cmd, "estimate-count") {
 		request.Consistency = &v1.Consistency{Requirement: &v1.Consistency_FullyConsistent{FullyConsistent: true}}
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
 		log.Trace().Interface("request", request).Send()
@@ -140,7 +140,7 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 	delRequest := &v1.DeleteRelationshipsRequest{RelationshipFilter: request.RelationshipFilter}
 	log.Trace().Interface("request", delRequest).Msg("deleting relationships")
 
-	resp, err := client.DeleteRelationships(context.Background(), delRequest)
+	resp, err := client.DeleteRelationships(cmd.Context(), delRequest)
 	if err != nil {
 		return err
 	}
@@ -214,12 +214,16 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Trace().Interface("request", request).Msg("reading relationships")
-	resp, err := client.ReadRelationships(context.Background(), request)
+	resp, err := client.ReadRelationships(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
 
 	for {
+		if err := cmd.Context().Err(); err != nil {
+			return err
+		}
+
 		msg, err := resp.Recv()
 		if errors.Is(err, io.EOF) {
 			return nil
@@ -324,7 +328,7 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 		}
 
 		log.Trace().Interface("request", request).Msg("writing relationships")
-		resp, err := client.WriteRelationships(context.Background(), request)
+		resp, err := client.WriteRelationships(cmd.Context(), request)
 		if err != nil {
 			return err
 		}

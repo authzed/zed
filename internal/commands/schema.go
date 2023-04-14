@@ -46,7 +46,7 @@ func schemaReadCmdFunc(cmd *cobra.Command, _ []string) error {
 	request := &v1.ReadSchemaRequest{}
 	log.Trace().Interface("request", request).Msg("requesting schema read")
 
-	resp, err := client.ReadSchema(context.Background(), request)
+	resp, err := client.ReadSchema(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -66,11 +66,11 @@ func schemaReadCmdFunc(cmd *cobra.Command, _ []string) error {
 }
 
 // ReadSchema calls read schema for the client and returns the schema found.
-func ReadSchema(client client.Client) (string, error) {
+func ReadSchema(ctx context.Context, client client.Client) (string, error) {
 	request := &v1.ReadSchemaRequest{}
 	log.Trace().Interface("request", request).Msg("requesting schema read")
 
-	resp, err := client.ReadSchema(context.Background(), request)
+	resp, err := client.ReadSchema(ctx, request)
 	if err != nil {
 		errStatus, ok := status.FromError(err)
 		if !ok || errStatus.Code() != codes.NotFound {
