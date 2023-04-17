@@ -78,13 +78,13 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 	readRequest := &v1.ReadSchemaRequest{}
 	log.Trace().Interface("request", readRequest).Msg("requesting schema read")
 
-	readResp, err := srcClient.ReadSchema(context.Background(), readRequest)
+	readResp, err := srcClient.ReadSchema(cmd.Context(), readRequest)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read schema")
 	}
 	log.Trace().Interface("response", readResp).Msg("read schema")
 
-	prefix, err := determinePrefixForSchema(cobrautil.MustGetString(cmd, "schema-definition-prefix"), nil, &readResp.SchemaText)
+	prefix, err := determinePrefixForSchema(cmd.Context(), cobrautil.MustGetString(cmd, "schema-definition-prefix"), nil, &readResp.SchemaText)
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 	writeRequest := &v1.WriteSchemaRequest{Schema: schemaText}
 	log.Trace().Interface("request", writeRequest).Msg("writing schema")
 
-	resp, err := destClient.WriteSchema(context.Background(), writeRequest)
+	resp, err := destClient.WriteSchema(cmd.Context(), writeRequest)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write schema")
 	}
@@ -147,7 +147,7 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 		return errors.New("attempted to write empty schema")
 	}
 
-	prefix, err := determinePrefixForSchema(cobrautil.MustGetString(cmd, "schema-definition-prefix"), client, nil)
+	prefix, err := determinePrefixForSchema(cmd.Context(), cobrautil.MustGetString(cmd, "schema-definition-prefix"), client, nil)
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 	request := &v1.WriteSchemaRequest{Schema: schemaText}
 	log.Trace().Interface("request", request).Msg("writing schema")
 
-	resp, err := client.WriteSchema(context.Background(), request)
+	resp, err := client.WriteSchema(cmd.Context(), request)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write schema")
 	}
@@ -201,7 +201,7 @@ func rewriteSchema(existingSchemaText string, definitionPrefix string) (string, 
 // If specifiedPrefix is non-empty, it is returned immediately.
 // If existingSchema is non-nil, it is parsed for the prefix.
 // Otherwise, the client is used to retrieve the existing schema (if any), and the prefix is retrieved from there.
-func determinePrefixForSchema(specifiedPrefix string, client client.Client, existingSchema *string) (string, error) {
+func determinePrefixForSchema(ctx context.Context, specifiedPrefix string, client client.Client, existingSchema *string) (string, error) {
 	if specifiedPrefix != "" {
 		return specifiedPrefix, nil
 	}
@@ -210,7 +210,7 @@ func determinePrefixForSchema(specifiedPrefix string, client client.Client, exis
 	if existingSchema != nil {
 		schemaText = *existingSchema
 	} else {
-		readSchemaText, err := commands.ReadSchema(client)
+		readSchemaText, err := commands.ReadSchema(ctx, client)
 		if err != nil {
 			return "", nil
 		}

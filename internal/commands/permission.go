@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -191,7 +190,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("request", request).Send()
 
-	ctx := context.Background()
+	ctx := cmd.Context()
 	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") {
 		log.Info().Msg("debugging requested on check")
 		ctx = requestmeta.AddRequestHeaders(ctx, requestmeta.RequestDebugInformation)
@@ -265,7 +264,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("request", request).Send()
 
-	resp, err := client.ExpandPermissionTree(context.Background(), request)
+	resp, err := client.ExpandPermissionTree(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -324,7 +323,7 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("request", request).Send()
 
-	respStream, err := client.LookupResources(context.Background(), request)
+	respStream, err := client.LookupResources(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -389,7 +388,7 @@ func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("request", request).Send()
 
-	respStream, err := client.LookupSubjects(context.Background(), request)
+	respStream, err := client.LookupSubjects(cmd.Context(), request)
 	if err != nil {
 		return err
 	}

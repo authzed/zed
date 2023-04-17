@@ -81,13 +81,13 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	prefix, err := determinePrefixForSchema(cobrautil.MustGetString(cmd, "schema-definition-prefix"), client, nil)
+	prefix, err := determinePrefixForSchema(cmd.Context(), cobrautil.MustGetString(cmd, "schema-definition-prefix"), client, nil)
 	if err != nil {
 		return err
 	}
 
 	if cobrautil.MustGetBool(cmd, "schema") {
-		if err := importSchema(client, p.Schema, prefix); err != nil {
+		if err := importSchema(cmd.Context(), client, p.Schema, prefix); err != nil {
 			return err
 		}
 	}
@@ -95,7 +95,7 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 	if cobrautil.MustGetBool(cmd, "relationships") {
 		batchSize := cobrautil.MustGetInt(cmd, "batch-size")
 		workers := cobrautil.MustGetInt(cmd, "workers")
-		if err := importRelationships(client, p.Relationships, prefix, batchSize, workers); err != nil {
+		if err := importRelationships(cmd.Context(), client, p.Relationships, prefix, batchSize, workers); err != nil {
 			return err
 		}
 	}
@@ -103,7 +103,7 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-func importSchema(client client.Client, schema string, definitionPrefix string) error {
+func importSchema(ctx context.Context, client client.Client, schema string, definitionPrefix string) error {
 	log.Info().Msg("importing schema")
 
 	// Recompile the schema with the specified prefix.
@@ -116,14 +116,14 @@ func importSchema(client client.Client, schema string, definitionPrefix string) 
 	request := &v1.WriteSchemaRequest{Schema: schemaText}
 	log.Trace().Interface("request", request).Str("schema", schemaText).Msg("writing schema")
 
-	if _, err := client.WriteSchema(context.Background(), request); err != nil {
+	if _, err := client.WriteSchema(ctx, request); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func importRelationships(client client.Client, relationships string, definitionPrefix string, batchSize int, workers int) error {
+func importRelationships(ctx context.Context, client client.Client, relationships string, definitionPrefix string, batchSize int, workers int) error {
 	relationshipUpdates := make([]*v1.RelationshipUpdate, 0)
 	scanner := bufio.NewScanner(strings.NewReader(relationships))
 	for scanner.Scan() {
@@ -161,7 +161,7 @@ func importRelationships(client client.Client, relationships string, definitionP
 		Int("count", len(relationshipUpdates)).
 		Msg("importing relationships")
 
-	err := grpcutil.ConcurrentBatch(context.Background(), len(relationshipUpdates), batchSize, workers, func(ctx context.Context, no int, start int, end int) error {
+	err := grpcutil.ConcurrentBatch(ctx, len(relationshipUpdates), batchSize, workers, func(ctx context.Context, no int, start int, end int) error {
 		request := &v1.WriteRelationshipsRequest{Updates: relationshipUpdates[start:end]}
 		_, err := client.WriteRelationships(ctx, request)
 		if err != nil {

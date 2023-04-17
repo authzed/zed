@@ -43,7 +43,7 @@ func CheckServerVersion(
 	} else if len(version) == 1 {
 		currentVersion := version[0]
 
-		rctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+		rctx, cancel := context.WithTimeout(ctx, time.Second*2)
 		defer cancel()
 
 		state, _, release, cerr := releases.CheckIsLatestVersion(rctx, func() (string, error) {

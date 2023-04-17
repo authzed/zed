@@ -102,7 +102,10 @@ func resetSubCommandFlagValues(root *cobra.Command) {
 }
 
 func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringParams []string) zedCommandResult {
-	ctx := context.Background()
+	ctx := rootCmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	// Decode the request context.
 	requestCtx := &devinterface.RequestContext{}
