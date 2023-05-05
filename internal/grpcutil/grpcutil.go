@@ -7,6 +7,7 @@ import (
 	"github.com/authzed/authzed-go/pkg/requestmeta"
 	"github.com/authzed/authzed-go/pkg/responsemeta"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/mod/semver"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -42,6 +43,12 @@ func CheckServerVersion(
 		log.Debug().Msg("error reading server version response header; it may be disabled on the server")
 	} else if len(version) == 1 {
 		currentVersion := version[0]
+
+		// If there is a build on the version, then do not compare.
+		if semver.Build(currentVersion) != "" {
+			log.Debug().Str("this-version", currentVersion).Msg("received build version of SpiceDB")
+			return nil
+		}
 
 		rctx, cancel := context.WithTimeout(ctx, time.Second*2)
 		defer cancel()
