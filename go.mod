@@ -6,9 +6,9 @@ require (
 	github.com/99designs/keyring v1.2.2
 	github.com/AlecAivazis/survey/v2 v2.3.6
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
-	github.com/authzed/authzed-go v0.7.1-0.20230407200536-38340f010afc
+	github.com/authzed/authzed-go v0.8.1-0.20230511215435-5ca552307f34
 	github.com/authzed/grpcutil v0.0.0-20230109193425-40ce0530e048
-	github.com/authzed/spicedb v1.20.0
+	github.com/authzed/spicedb v1.21.1-0.20230513151004-44d61eb264a6
 	github.com/charmbracelet/lipgloss v0.7.1
 	github.com/gookit/color v1.5.3
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20230403163312-3593f31d8fe1
@@ -20,9 +20,9 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.2
 	github.com/xlab/treeprint v1.2.0
-	golang.org/x/mod v0.9.0
-	golang.org/x/sync v0.1.0
-	golang.org/x/term v0.7.0
+	golang.org/x/mod v0.10.0
+	golang.org/x/sync v0.2.0
+	golang.org/x/term v0.8.0
 	google.golang.org/grpc v1.54.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -37,19 +37,21 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/creasty/defaults v1.7.0 // indirect
 	github.com/dalzilio/rudd v1.1.1-0.20220422201445-0a0cd32c7df9 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.5.0 // indirect
+	github.com/ecordell/optgen v0.0.9 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
-	github.com/envoyproxy/protoc-gen-validate v0.9.1 // indirect
+	github.com/envoyproxy/protoc-gen-validate v1.0.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/cel-go v0.12.5 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/go-github/v43 v43.0.0 // indirect
@@ -88,6 +90,7 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
+	github.com/samber/lo v1.38.1 // indirect
 	github.com/scylladb/go-set v1.0.2 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/spf13/afero v1.9.5 // indirect
@@ -101,10 +104,10 @@ require (
 	go.opentelemetry.io/otel/trace v1.11.1 // indirect
 	golang.org/x/crypto v0.7.0 // indirect
 	golang.org/x/exp v0.0.0-20220823124025-807a23277127 // indirect
-	golang.org/x/net v0.8.0 // indirect
-	golang.org/x/sys v0.7.0 // indirect
+	golang.org/x/net v0.10.0 // indirect
+	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
-	google.golang.org/genproto v0.0.0-20230223222841-637eb2293923 // indirect
+	google.golang.org/genproto v0.0.0-20230320184635-7606e756e683 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

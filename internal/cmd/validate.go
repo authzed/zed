@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/development"
 	core "github.com/authzed/spicedb/pkg/proto/core/v1"
 	devinterface "github.com/authzed/spicedb/pkg/proto/developer/v1"
@@ -89,7 +90,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	tuples := make([]*core.RelationTuple, 0, len(parsed.Relationships.Relationships))
 	for _, rel := range parsed.Relationships.Relationships {
-		tuples = append(tuples, tuple.MustFromRelationship(rel))
+		tuples = append(tuples, tuple.MustFromRelationship[*v1.ObjectReference, *v1.SubjectReference, *v1.ContextualizedCaveat](rel))
 	}
 	devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
 		Schema:        parsed.Schema.Schema,
