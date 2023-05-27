@@ -24,6 +24,7 @@ type Client interface {
 	v1.SchemaServiceClient
 	v1.PermissionsServiceClient
 	v1.WatchServiceClient
+	v1.ExperimentalServiceClient
 }
 
 // NewClient defines an (overridable) means of creating a new client.
@@ -47,7 +48,7 @@ func newGRPCClient(cmd *cobra.Command) (Client, error) {
 		return nil, err
 	}
 
-	client, err := authzed.NewClient(token.Endpoint, dialOpts...)
+	client, err := authzed.NewClientWithExperimentalAPIs(token.Endpoint, dialOpts...)
 	if err != nil {
 		return nil, err
 	}
