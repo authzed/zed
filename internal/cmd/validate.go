@@ -62,7 +62,7 @@ var validateCmd = &cobra.Command{
 	RunE: validateCmdFunc,
 }
 
-func validateCmdFunc(cmd *cobra.Command, args []string) error {
+func validateCmdFunc(_ *cobra.Command, args []string) error {
 	// Parse the URL of the validation document to import.
 	u, err := url.Parse(args[0])
 	if err != nil {
