@@ -62,6 +62,16 @@ func (wc wasmClient) LookupSubjects(ctx context.Context, in *v1.LookupSubjectsRe
 	return client.LookupSubjects(ctx, in, opts...)
 }
 
+func (wc wasmClient) BulkExportRelationships(ctx context.Context, in *v1.BulkExportRelationshipsRequest, opts ...grpc.CallOption) (v1.ExperimentalService_BulkExportRelationshipsClient, error) {
+	client := v1.NewExperimentalServiceClient(wc.conn)
+	return client.BulkExportRelationships(ctx, in, opts...)
+}
+
+func (wc wasmClient) BulkImportRelationships(ctx context.Context, opts ...grpc.CallOption) (v1.ExperimentalService_BulkImportRelationshipsClient, error) {
+	client := v1.NewExperimentalServiceClient(wc.conn)
+	return client.BulkImportRelationships(ctx, opts...)
+}
+
 func (wc wasmClient) Watch(ctx context.Context, in *v1.WatchRequest, opts ...grpc.CallOption) (v1.WatchService_WatchClient, error) {
 	client := v1.NewWatchServiceClient(wc.conn)
 	return client.Watch(ctx, in, opts...)
