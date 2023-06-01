@@ -1,7 +1,9 @@
 package backupformat
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/hamba/avro/v2"
 )
@@ -34,47 +36,19 @@ const (
 )
 
 func avroSchemaV1() (string, error) {
-	stringFieldNames := []string{
-		"object_type",
-		"object_id",
-		"relation",
-		"subject_object_type",
-		"subject_object_id",
-		"subject_relation",
-		"caveat_name",
-	}
-	relationshipFields := make([]*avro.Field, 0, len(stringFieldNames)+1)
-	for _, fieldName := range stringFieldNames {
-		field, err := avro.NewField(fieldName, avro.NewPrimitiveSchema(avro.String, nil))
-		if err != nil {
-			return "", fmt.Errorf("unable to create avro schema field: %w", err)
-		}
-		relationshipFields = append(relationshipFields, field)
-	}
-	caveatContextField, err := avro.NewField("caveat_context", avro.NewPrimitiveSchema(avro.Bytes, nil))
-	if err != nil {
-		return "", fmt.Errorf("unable to create avro schema field: %w", err)
-	}
-	relationshipFields = append(relationshipFields, caveatContextField)
-
-	relationshipSchema, err := avro.NewRecordSchema(
+	relationshipSchema, err := recordSchemaFromAvroStruct(
 		relationshipV1SchemaName,
 		spiceDBBackupNamespace,
-		relationshipFields,
+		RelationshipV1{},
 	)
 	if err != nil {
 		return "", fmt.Errorf("unable to create schema: %w", err)
 	}
 
-	schemaField, err := avro.NewField("schema_text", avro.NewPrimitiveSchema(avro.String, nil))
-	if err != nil {
-		return "", fmt.Errorf("unable to create avro schema field: %w", err)
-	}
-
-	schemaSchema, err := avro.NewRecordSchema(
+	schemaSchema, err := recordSchemaFromAvroStruct(
 		schemaV1SchemaName,
 		spiceDBBackupNamespace,
-		[]*avro.Field{schemaField},
+		SchemaV1{},
 	)
 	if err != nil {
 		return "", fmt.Errorf("unable to create avro SpiceDB schema schema: %w", err)
@@ -87,4 +61,39 @@ func avroSchemaV1() (string, error) {
 
 	serialized, err := unionSchema.MarshalJSON()
 	return string(serialized), err
+}
+
+func recordSchemaFromAvroStruct(name, namespace string, avroStruct any) (*avro.RecordSchema, error) {
+	v := reflect.TypeOf(avroStruct)
+	schemaFields := make([]*avro.Field, 0, v.NumField())
+	for i := 0; i < v.NumField(); i++ {
+		f := v.Field(i)
+		fieldName := f.Tag.Get("avro")
+		if fieldName == "" {
+			return nil, fmt.Errorf("field `%s` missing avro struct tag", f.Name)
+		}
+		fieldGoType := f.Type
+
+		var fieldType avro.Type
+		switch fieldGoType.Kind() {
+		case reflect.String:
+			fieldType = avro.String
+		case reflect.Slice:
+			if fieldGoType.Elem().Kind() != reflect.Uint8 {
+				return nil, errors.New("unable to build schema for slice, only byte slices are supported")
+			}
+			fieldType = avro.Bytes
+		default:
+			return nil, fmt.Errorf("unsupported struct kind: %s", fieldGoType)
+		}
+
+		schemaField, err := avro.NewField(fieldName, avro.NewPrimitiveSchema(fieldType, nil))
+		if err != nil {
+			return nil, fmt.Errorf("unable to create avro schema field: %w", err)
+		}
+
+		schemaFields = append(schemaFields, schemaField)
+	}
+
+	return avro.NewRecordSchema(name, namespace, schemaFields)
 }
