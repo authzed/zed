@@ -59,8 +59,11 @@ func backupCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	relationshipStream, err := client.BulkExportRelationships(ctx, &v1.BulkExportRelationshipsRequest{
-		// TODO use the snapshot from the schema read when it's available
-		Consistency: nil,
+		Consistency: &v1.Consistency{
+			Requirement: &v1.Consistency_AtExactSnapshot{
+				AtExactSnapshot: schemaResp.ReadAt,
+			},
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("error exporting relationships: %w", err)
