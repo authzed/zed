@@ -23,7 +23,7 @@ require (
 	golang.org/x/mod v0.10.0
 	golang.org/x/sync v0.2.0
 	golang.org/x/term v0.8.0
-	google.golang.org/grpc v1.54.0
+	google.golang.org/grpc v1.55.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/yaml.v3 v3.0.1
 )
