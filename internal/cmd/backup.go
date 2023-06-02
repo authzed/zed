@@ -9,7 +9,9 @@ import (
 	"time"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
+	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 
 	"github.com/authzed/zed/internal/backupformat"
@@ -53,7 +55,15 @@ func backupCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error reading schema: %w", err)
 	}
 
-	encoder, err := backupformat.NewEncoder(f, schemaResp.SchemaText)
+	var hasProgressbar bool
+	var relWriter io.Writer = f
+	if isatty.IsTerminal(os.Stderr.Fd()) {
+		bar := progressbar.DefaultBytes(-1, "backing up")
+		relWriter = io.MultiWriter(bar, f)
+		hasProgressbar = true
+	}
+
+	encoder, err := backupformat.NewEncoder(relWriter, schemaResp.SchemaText)
 	if err != nil {
 		return fmt.Errorf("error creating backup file encoder: %w", err)
 	}
@@ -87,8 +97,8 @@ func backupCmdFunc(cmd *cobra.Command, args []string) error {
 			}
 			stored++
 
-			if stored%100_000 == 0 {
-				log.Trace().Uint("relationships", stored).Msg("progress")
+			if stored%100_000 == 0 && !hasProgressbar {
+				log.Trace().Uint("relationships", stored).Msg("relationships stored")
 			}
 		}
 	}

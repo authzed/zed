@@ -3,12 +3,15 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/jzelinskie/cobrautil"
+	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
+	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 
 	"github.com/authzed/zed/internal/backupformat"
@@ -33,12 +36,25 @@ func restoreCmdFunc(cmd *cobra.Command, args []string) error {
 
 	log.Trace().Str("filename", filename).Send()
 
+	stats, err := os.Stat(filename)
+	if err != nil {
+		return fmt.Errorf("unable to stat restore file: %w", err)
+	}
+
 	f, err := os.Open(filename)
 	if err != nil {
 		return fmt.Errorf("unable to open restore file: %w", err)
 	}
 
-	decoder, err := backupformat.NewDecoder(f)
+	var hasProgressbar bool
+	var restoreReader io.Reader = f
+	if isatty.IsTerminal(os.Stderr.Fd()) {
+		bar := progressbar.DefaultBytes(stats.Size(), "restoring")
+		restoreReader = io.TeeReader(f, bar)
+		hasProgressbar = true
+	}
+
+	decoder, err := backupformat.NewDecoder(restoreReader)
 	if err != nil {
 		return fmt.Errorf("error creating restore file decoder: %w", err)
 	}
@@ -91,8 +107,9 @@ func restoreCmdFunc(cmd *cobra.Command, args []string) error {
 				if err != nil {
 					return fmt.Errorf("error finalizing write of %d batches: %w", batchesPerTransaction, err)
 				}
-				log.Debug().Uint64("relationships", written).Msg("relationships written")
-
+				if !hasProgressbar {
+					log.Debug().Uint64("relationships", written).Msg("relationships written")
+				}
 				written += resp.NumLoaded
 
 				relationshipWriter, err = client.BulkImportRelationships(ctx)
