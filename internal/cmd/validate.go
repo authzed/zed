@@ -157,7 +157,7 @@ func outputDeveloperErrors(validateContents []byte, devErrors []*devinterface.De
 
 func outputDeveloperError(devError *devinterface.DeveloperError, lines []string) {
 	console.Printf("%s %s\n", errorPrefix, errorMessageStyle.Render(devError.Message))
-	errorLineNumber := int(devError.Line) - 1 // devError.Line is 1-indexed
+	errorLineNumber := int(devError.Line) // devError.Line is 0-indexed
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
 			renderLine(lines, i, devError.Context, errorLineNumber)
