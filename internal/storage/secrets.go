@@ -18,11 +18,12 @@ import (
 var ErrTokenNotFound = errors.New("token does not exist")
 
 type Token struct {
-	Name     string
-	Endpoint string
-	APIToken string
-	Insecure *bool
-	CACert   []byte
+	Name       string
+	Endpoint   string
+	APIToken   string
+	Insecure   *bool
+	NoVerifyCA *bool
+	CACert     []byte
 }
 
 func (t Token) Certificate() (cert []byte, ok bool) {
@@ -34,6 +35,10 @@ func (t Token) Certificate() (cert []byte, ok bool) {
 
 func (t Token) IsInsecure() bool {
 	return t.Insecure != nil && *t.Insecure
+}
+
+func (t Token) HasNoVerifyCA() bool {
+	return t.NoVerifyCA != nil && *t.NoVerifyCA
 }
 
 func (t Token) Redacted() string {

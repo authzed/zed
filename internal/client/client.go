@@ -71,7 +71,7 @@ func DefaultStorage() (storage.ConfigStore, storage.SecretStore) {
 
 func certOption(cmd *cobra.Command, token storage.Token) (opt grpc.DialOption, err error) {
 	verification := grpcutil.VerifyCA
-	if cobrautil.MustGetBool(cmd, "no-verify-ca") {
+	if cobrautil.MustGetBool(cmd, "no-verify-ca") || token.HasNoVerifyCA() {
 		verification = grpcutil.SkipVerifyCA
 	}
 
