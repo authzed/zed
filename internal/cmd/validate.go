@@ -176,6 +176,7 @@ func renderLine(lines []string, index int, highlight string, highlightLineIndex 
 
 	lineNumberLength := len(fmt.Sprintf("%d", len(lines)))
 	lineContents := lines[index]
+	lineDelimiter := "|"
 	highlightIndex := strings.Index(lineContents, highlight)
 	lineNumberStr := fmt.Sprintf("%d", index+1)
 	spacer := strings.Repeat(" ", lineNumberLength)
@@ -185,19 +186,22 @@ func renderLine(lines []string, index int, highlight string, highlightLineIndex 
 	if index == highlightLineIndex {
 		lineNumberStyle = highlightedLineStyle
 		lineContentsStyle = highlightedCodeStyle
+		lineDelimiter = ">"
 	}
 
 	if highlightIndex < 0 || len(highlight) == 0 {
-		console.Printf(" %s | %s\n", lineNumberStyle.Render(lineNumberStr), lineContentsStyle.Render(lineContents))
+		console.Printf(" %s %s %s\n", lineNumberStyle.Render(lineNumberStr), lineDelimiter, lineContentsStyle.Render(lineContents))
 	} else {
-		console.Printf(" %s | %s%s%s\n",
+		console.Printf(" %s %s %s%s%s\n",
 			lineNumberStyle.Render(lineNumberStr),
+			lineDelimiter,
 			lineContentsStyle.Render(lineContents[0:highlightIndex]),
 			highlightedSourceStyle.Render(highlight),
 			lineContentsStyle.Render(lineContents[highlightIndex+len(highlight):]),
 		)
-		console.Printf(" %s | %s%s%s\n",
+		console.Printf(" %s %s %s%s%s\n",
 			lineNumberStyle.Render(spacer),
+			lineDelimiter,
 			strings.Repeat(" ", highlightIndex),
 			highlightedSourceStyle.Render("^"),
 			highlightedSourceStyle.Render(strings.Repeat("~", len(highlight)-1)),
