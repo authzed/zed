@@ -84,6 +84,8 @@ func contextListCmdFunc(cmd *cobra.Command, _ []string) error {
 		var certStr string
 		if token.IsInsecure() {
 			certStr = "insecure"
+		} else if token.HasNoVerifyCA() {
+			certStr = "no-verify-ca"
 		} else if _, ok := token.Certificate(); ok {
 			certStr = "custom"
 		} else {
@@ -121,13 +123,15 @@ func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	insecure := cobrautil.MustGetBool(cmd, "insecure")
+	noVerifyCA := cobrautil.MustGetBool(cmd, "no-verify-ca")
 	cfgStore, secretStore := client.DefaultStorage()
 	err = storage.PutToken(storage.Token{
-		Name:     name,
-		Endpoint: stringz.DefaultEmpty(endpoint, "grpc.authzed.com:443"),
-		APIToken: apiToken,
-		Insecure: &insecure,
-		CACert:   certBytes,
+		Name:       name,
+		Endpoint:   stringz.DefaultEmpty(endpoint, "grpc.authzed.com:443"),
+		APIToken:   apiToken,
+		Insecure:   &insecure,
+		NoVerifyCA: &noVerifyCA,
+		CACert:     certBytes,
 	}, secretStore)
 	if err != nil {
 		return err
