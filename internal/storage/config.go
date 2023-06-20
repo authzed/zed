@@ -43,7 +43,7 @@ func DefaultToken(overrideEndpoint, overrideAPIToken string, cs ConfigStore, ss 
 	token, err := CurrentToken(cs, ss)
 	if err != nil {
 		if errors.Is(err, ErrConfigNotFound) {
-			return Token{}, errors.New("must first save a token: see `zed context set --help`")
+			return Token{}, errors.New("no context found: see `zed context set --help` to setup a context or make sure to specifiy *all* context flags (--endpoint, --token and --insecure if necessary) to run without context")
 		}
 		return Token{}, err
 	}
