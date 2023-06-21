@@ -1,54 +1,81 @@
 # zed
 
-[![Container Image](https://img.shields.io/github/v/release/authzed/zed?color=%232496ED&label=container&logo=docker "Container Image")](https://quay.io/repository/authzed/zed?tab=tags)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
-[![Build Status](https://github.com/authzed/zed/workflows/Build%20&%20Test/badge.svg)](https://github.com/authzed/zed/actions)
-[![Mailing List](https://img.shields.io/badge/email-google%20groups-4285F4)](https://groups.google.com/g/authzed-oss)
-[![Discord Server](https://img.shields.io/discord/844600078504951838?color=7289da&logo=discord "Discord Server")](https://discord.gg/jTysUaxXzM)
-[![Twitter](https://img.shields.io/twitter/follow/authzed?color=%23179CF0&logo=twitter&style=flat-square)](https://twitter.com/authzed)
+[![Docs](https://img.shields.io/badge/docs-authzed.com-%234B4B6C "Authzed Documentation")](https://authzed.com/docs)
+[![YouTube](https://img.shields.io/youtube/channel/views/UCFeSgZf0rPqQteiTQNGgTPg?color=%23F40203&logo=youtube&style=flat-square&label=YouTube "Authzed YouTube Channel")](https://www.youtube.com/channel/UCFeSgZf0rPqQteiTQNGgTPg)
+[![Discord Server](https://img.shields.io/discord/844600078504951838?color=7289da&logo=discord "Discord Server")](https://authzed.com/discord)
+[![Twitter](https://img.shields.io/badge/twitter-%40authzed-1D8EEE?logo=twitter "@authzed on Twitter")](https://twitter.com/authzed)
 
-A command-line client for managing [SpiceDB] and [Authzed].
+A command-line client for managing [SpiceDB].
+
+[SpiceDB]: https://github.com/authzed/spicedb
 
 zed features include:
 
-- Unix-friendly interface for the [v1] Authzed [API]
 - Context switching that stores credentials securely in your OS keychain
-- An experimental [OPA] REPL with additional builtins for checking permissions
+- Check, Expand, Lookup Resources, Lookup Subjects commands for Permissions
+- Create, Read, Touch, Delete, Bulk-Delete commands for Relationships
+- Read, Write, Validate, Import, Copy commands for Schemas
+- Experimental Backup and Restore commands
 
-See [CONTRIBUTING.md] for instructions on how to contribute and perform common tasks like building the project and running tests.
+Have questions? Ask in our [Discord].
 
-[spicedb]: https://github.com/authzed/spicedb
-[authzed]: https://authzed.com
-[v1]: https://buf.build/authzed/api/docs/main/authzed.api.v1
-[api]: https://docs.authzed.com/reference/api
-[opa]: https://openpolicyagent.org
-[contributing.md]: CONTRIBUTING.md
+Looking to contribute? See [CONTRIBUTING.md].
+
+You can find issues by priority: [Urgent], [High], [Medium], [Low], [Maybe].
+There are also [good first issues].
+
+[Discord]: https://authzed.com/discord
+[CONTRIBUTING.md]: https://github.com/authzed/spicedb/blob/main/CONTRIBUTING.md
+[Urgent]: https://github.com/authzed/spicedb/labels/priority%2F0%20urgent
+[High]: https://github.com/authzed/spicedb/labels/priority%2F1%20high
+[Medium]: https://github.com/authzed/spicedb/labels/priority%2F2%20medium
+[Low]: https://github.com/authzed/spicedb/labels/priority%2F3%20low
+[Maybe]: https://github.com/authzed/spicedb/labels/priority%2F4%20maybe
+[good first issues]: https://github.com/authzed/spicedb/labels/hint%2Fgood%20first%20issue
 
 ## Getting Started
 
-### Follow the Guide
+### Installing the binary
 
-We highly recommend following the **[Protecting Your First App]** guide to learn the latest best practice to integrate an application with Authzed.
+Binary releases are available for Linux, macOS, and Windows on AMD64 and ARM64 architectures.
 
-[protecting your first app]: https://docs.authzed.com/guides/first-app
+[Homebrew] users for both macOS and Linux can install the latest binary releases of zed using the official tap:
 
-### Installation
-
-zed is currently packaged by [Homebrew] for both macOS and Linux.
-Individual releases are also available on the [releases page].
-
-[homebrew]: https://brew.sh
-[releases page]: https://github.com/authzed/zed/releases
-
-```sh
+```command
 brew install authzed/tap/zed
 ```
 
+[Debian-based Linux] users can install zed packages by adding a new APT source:
+
+```command
+sudo echo "deb [trusted=yes] https://apt.fury.io/authzed/ /" > /etc/apt/sources.list.d/authzed-fury.list
+sudo apt update && sudo apt install zed
+```
+
+[RPM-based Linux] users can install zed packages by adding a new YUM repository:
+
+```command
+sudo cat << EOF >> /etc/yum.repos.d/Authzed-Fury.repo
+[authzed-fury]
+name=AuthZed Fury Repository
+baseurl=https://yum.fury.io/authzed/
+enabled=1
+gpgcheck=0
+EOF
+sudo dnf install zed
+```
+
+[homebrew]: https://docs.authzed.com/spicedb/installing#brew
+[Debian-based Linux]: https://en.wikipedia.org/wiki/List_of_Linux_distributions#Debian-based
+[RPM-based Linux]: https://en.wikipedia.org/wiki/List_of_Linux_distributions#RPM-based
+
 ### Creating a context
 
-In order to do anything useful, zed first needs a context: a named pair of the endpoint and its accompanying credential.
+Contexts store connection credentials for accessing SpiceDB clusters securely in the OS keychain.
+Before performing most commands, a context must be set.
+Alternatively, you can provide context values via environment variables which will override the existing context for that execution.
 
-The `zed context` subcommand has operations for setting the current, creating, listing, deleting contexts.
+The `zed context` subcommand has operations for setting the current, creating, listing, deleting contexts:
 
 ```sh
 zed context set prod grpc.authzed.com:443 tc_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
@@ -56,23 +83,15 @@ zed context set dev localhost:80 testpresharedkey
 zed context list
 ```
 
-At any point in time, the `ZED_ENDPOINT` and `ZED_TOKEN` environment variables can be used to override their respective values in the current context.
+### Headless usage
 
-### Viewing & modifying data
-
-For each type of noun used in SpiceDB, there is a zed subcommand:
-
-- `zed schema`
-- `zed relationship`
-- `zed permission`
-
-For example, you can read a schema, check permissions, and create or delete relationships:
+If you provide all context values (e.g. `ZED_ENDPOINT`, `ZED_TOKEN`) as environment variables or flags (e.g. `--endpoint`, `--token`), you do not need to set a context.
+You can also provide the `ZED_KEYRING_PASSWORD` environment variable to access an existing context in a non-interactive way.
 
 ```sh
-zed schema read
-zed permission check document:firstdoc writer user:emilia
-zed relationship create document:firstdoc reader user:beatrice
-zed relationship delete document:firstdoc reader user:beatrice
+zed schema read --endpoint grpc.authzed.com:443 --token tc_zed_my_laptop_deadbeefdeadbeef
+ZED_ENDPOINT=grpc.authzed.com:443 ZED_TOKEN=tc_zed_my_laptop_deadbeefdeadbeef zed schema read
+ZED_KEYRING_PASSWORD=redacted zed schema read
 ```
 
 ### Debugging
@@ -83,38 +102,11 @@ The `--explain` flag can be used on `permission check` to see a trace:
 zed permission check document:firstdoc writer user:emilia --explain
 ```
 
-### Open Policy Agent (OPA)
+## Acknowledgements
 
-Experimentally, zed embeds an instance of [OPA] that supports additional builtin functions for accessing SpiceDB.
+zed is a community project fueled by contributions from both organizations and individuals.
+We appreciate all contributions, large and small, and would like to thank all those involved.
 
-The following functions have been added:
+In addition, we'd like to highlight a few notable contributions:
 
-```rego
-authzed.check("resource:id", "permission", "subject:id", "zedtoken")
-```
-
-It can be found under the `zed experiment opa` command:
-
-```sh
-$ zed experiment opa eval 'authzed.check("document:firstdoc", "reader", "user:emilia", "")'
-{
-  "result": [
-    {
-      "expressions": [
-        {
-          "value": true,
-          "text": "authzed.check(\"document:firstdoc\", \"reader\", \"user:emilia\", \"\")",
-          "location": {
-            "row": 1,
-            "col": 1
-          }
-        }
-      ]
-    }
-  ]
-}
-```
-
-If you are interested in OPA, please feel free to [reach out] to provide feedback.
-
-[reach out]: https://authzed.com/contact/
+- The GitHub Authorization Team for implementing the bulk-delete command
