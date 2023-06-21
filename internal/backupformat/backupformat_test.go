@@ -2,6 +2,7 @@ package backupformat
 
 import (
 	"bytes"
+	"encoding/base64"
 	"testing"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -82,6 +83,7 @@ func TestWriteAndRead(t *testing.T) {
 			require.NoError(err)
 
 			expectedSchema := string(schemaBytes)
+			expectedZedtoken := base64.StdEncoding.EncodeToString(gofakeit.ImageJpeg(10, 10))
 
 			expectedRels := make([]*v1.Relationship, 0, tc.numRandomRelationships+len(tc.extraRelationships))
 			expectedRels = append(expectedRels, tc.extraRelationships...)
@@ -103,7 +105,9 @@ func TestWriteAndRead(t *testing.T) {
 			}
 
 			buf := bytes.Buffer{}
-			enc, err := NewEncoder(&buf, expectedSchema)
+			enc, err := NewEncoder(&buf, expectedSchema, &v1.ZedToken{
+				Token: expectedZedtoken,
+			})
 			require.NoError(err)
 
 			for _, rel := range expectedRels {
@@ -116,6 +120,7 @@ func TestWriteAndRead(t *testing.T) {
 			require.NoError(err)
 
 			require.Equal(expectedSchema, dec.Schema())
+			require.Equal(expectedZedtoken, dec.ZedToken().Token)
 
 			for _, expected := range expectedRels {
 				rel, err := dec.Next()

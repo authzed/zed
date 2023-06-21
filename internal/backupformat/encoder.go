@@ -9,13 +9,17 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func NewEncoder(w io.Writer, schema string) (*Encoder, error) {
+func NewEncoder(w io.Writer, schema string, token *v1.ZedToken) (*Encoder, error) {
 	avroSchema, err := avroSchemaV1()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create avro schema: %w", err)
 	}
 
-	enc, err := ocf.NewEncoder(avroSchema, w, ocf.WithCodec(ocf.Snappy))
+	md := map[string][]byte{
+		metadataKeyZT: []byte(token.Token),
+	}
+
+	enc, err := ocf.NewEncoder(avroSchema, w, ocf.WithCodec(ocf.Snappy), ocf.WithMetadata(md))
 	if err != nil {
 		return nil, fmt.Errorf("unable to create encoder: %w", err)
 	}

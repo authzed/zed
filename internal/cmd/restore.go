@@ -22,6 +22,7 @@ func registerRestoreCmd(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(restoreCmd)
 	restoreCmd.Flags().Int("batch-size", 1_000, "restore relationship write batch size")
 	restoreCmd.Flags().Int("batches-per-transaction", 10, "number of batches per transaction")
+	restoreCmd.Flags().Bool("print-zedtoken-only", false, "just print the zedtoken and stop")
 }
 
 var restoreCmd = &cobra.Command{
@@ -46,9 +47,11 @@ func restoreCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unable to open restore file: %w", err)
 	}
 
+	printZTOnly := cobrautil.MustGetBool(cmd, "print-zedtoken-only")
+
 	var hasProgressbar bool
 	var restoreReader io.Reader = f
-	if isatty.IsTerminal(os.Stderr.Fd()) {
+	if isatty.IsTerminal(os.Stderr.Fd()) && !printZTOnly {
 		bar := progressbar.DefaultBytes(stats.Size(), "restoring")
 		restoreReader = io.TeeReader(f, bar)
 		hasProgressbar = true
@@ -57,6 +60,15 @@ func restoreCmdFunc(cmd *cobra.Command, args []string) error {
 	decoder, err := backupformat.NewDecoder(restoreReader)
 	if err != nil {
 		return fmt.Errorf("error creating restore file decoder: %w", err)
+	}
+
+	if loadedToken := decoder.ZedToken(); loadedToken != nil {
+		log.Info().Str("token", loadedToken.Token).Msg("printing ZedToken to stdout")
+		fmt.Println(loadedToken.Token)
+	}
+
+	if printZTOnly {
+		return nil
 	}
 
 	client, err := client.NewClient(cmd)
