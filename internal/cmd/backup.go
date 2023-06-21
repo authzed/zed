@@ -63,7 +63,7 @@ func backupCmdFunc(cmd *cobra.Command, args []string) error {
 		hasProgressbar = true
 	}
 
-	encoder, err := backupformat.NewEncoder(relWriter, schemaResp.SchemaText)
+	encoder, err := backupformat.NewEncoder(relWriter, schemaResp.SchemaText, schemaResp.ReadAt)
 	if err != nil {
 		return fmt.Errorf("error creating backup file encoder: %w", err)
 	}

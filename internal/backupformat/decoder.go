@@ -18,6 +18,15 @@ func NewDecoder(r io.Reader) (*Decoder, error) {
 		return nil, fmt.Errorf("unable to create ocf decoder: %w", err)
 	}
 
+	md := dec.Metadata()
+	var zedToken *v1.ZedToken
+
+	if token, ok := md[metadataKeyZT]; ok {
+		zedToken = &v1.ZedToken{
+			Token: string(token),
+		}
+	}
+
 	var schemaText string
 	if dec.HasNext() {
 		var decodedSchema any
@@ -38,16 +47,22 @@ func NewDecoder(r io.Reader) (*Decoder, error) {
 	return &Decoder{
 		dec,
 		schemaText,
+		zedToken,
 	}, nil
 }
 
 type Decoder struct {
-	dec    *ocf.Decoder
-	schema string
+	dec      *ocf.Decoder
+	schema   string
+	zedToken *v1.ZedToken
 }
 
 func (d *Decoder) Schema() string {
 	return d.schema
+}
+
+func (d *Decoder) ZedToken() *v1.ZedToken {
+	return d.zedToken
 }
 
 func (d *Decoder) Close() error {

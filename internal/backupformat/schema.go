@@ -33,6 +33,8 @@ const (
 
 	relationshipV1SchemaName = "relationship_v1"
 	schemaV1SchemaName       = "schema_v1"
+
+	metadataKeyZT = "com.authzed.spicedb.zedtoken.v1"
 )
 
 func avroSchemaV1() (string, error) {
