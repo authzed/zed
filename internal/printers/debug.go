@@ -74,14 +74,20 @@ func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp *TreePrinter, hasError
 		encountered[key] = struct{}{}
 	}
 
+	timing := ""
+	if checkTrace.Duration != nil {
+		timing = fmt.Sprintf(" (%s)", checkTrace.Duration.AsDuration().String())
+	}
+
 	tp = tp.Child(
 		fmt.Sprintf(
-			"%s %s:%s %s%s",
+			"%s %s:%s %s%s%s",
 			hasPermission,
 			resourceColor(checkTrace.Resource.ObjectType),
 			resourceColor(checkTrace.Resource.ObjectId),
 			permissionColor(checkTrace.Permission),
 			additional,
+			timing,
 		),
 	)
 
