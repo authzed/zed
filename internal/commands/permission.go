@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/authzed/authzed-go/pkg/requestmeta"
@@ -73,6 +74,7 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	_ = checkCmd.Flags().MarkHidden("revision")
 	checkCmd.Flags().Bool("explain", false, "requests debug information from SpiceDB and prints out a trace of the requests")
 	checkCmd.Flags().Bool("schema", false, "requests debug information from SpiceDB and prints out the schema used")
+	checkCmd.Flags().Bool("error-on-no-permission", false, "if true, zed will return exit code 1 if subject does not have unconditional permission")
 	checkCmd.Flags().String("caveat-context", "", "the caveat context to send along with the check, in JSON form")
 	registerConsistencyFlags(checkCmd.Flags())
 
@@ -232,7 +234,18 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unknown permission response: %v", resp.Permissionship)
 	}
 
-	return displayDebugInformationIfRequested(cmd, trailerMD, false)
+	err = displayDebugInformationIfRequested(cmd, trailerMD, false)
+	if err != nil {
+		return err
+	}
+
+	if cobrautil.MustGetBool(cmd, "error-on-no-permission") {
+		if resp.Permissionship != v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION {
+			os.Exit(1)
+		}
+	}
+
+	return nil
 }
 
 func expandCmdFunc(cmd *cobra.Command, args []string) error {
