@@ -12,7 +12,7 @@ require (
 	github.com/brianvoe/gofakeit/v6 v6.21.0
 	github.com/charmbracelet/lipgloss v0.7.1
 	github.com/gookit/color v1.5.3
-	github.com/hamba/avro/v2 v2.9.0
+	github.com/hamba/avro/v2 v2.12.0
 	github.com/jzelinskie/cobrautil v0.0.12
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20230403163312-3593f31d8fe1
 	github.com/jzelinskie/stringz v0.0.1
