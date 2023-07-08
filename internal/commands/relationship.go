@@ -250,6 +250,18 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 	}
 }
 
+func argsToRelationship(args []string) (*v1.Relationship, error) {
+	if len(args) != 3 {
+		return nil, fmt.Errorf("expected 3 arguments, but got %d", len(args))
+	}
+	tupleStr := fmt.Sprintf("%s#%s@%s", args[0], args[1], args[2])
+	rel := tuple.ParseRel(tupleStr)
+	if rel == nil {
+		return nil, errors.New("failed to parse input arguments")
+	}
+	return rel, nil
+}
+
 func relationshipToString(rel *v1.Relationship) (string, error) {
 	relString, err := tuple.StringRelationship(rel)
 	if err != nil {
@@ -262,29 +274,24 @@ func relationshipToString(rel *v1.Relationship) (string, error) {
 
 func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		var objectNS, objectID string
-		err := stringz.SplitExact(args[0], ":", &objectNS, &objectID)
+		relation, err := argsToRelationship(args)
 		if err != nil {
 			return err
 		}
 
-		relation := args[1]
-
-		subjectNS, subjectID, subjectRel, err := ParseSubject(args[2])
-		if err != nil {
-			return err
-		}
-
-		var contextualizedCaveat *v1.ContextualizedCaveat
 		if operation != v1.RelationshipUpdate_OPERATION_DELETE {
 			caveatString := cobrautil.MustGetString(cmd, "caveat")
 			if caveatString != "" {
+				if relation.OptionalCaveat != nil {
+					return errors.New("cannot specify a caveat in both the relationship and the --caveat flag")
+				}
+
 				parts := strings.SplitN(caveatString, ":", 2)
 				if len(parts) == 0 {
 					return fmt.Errorf("invalid --caveat argument. Must be in format `caveat_name:context`, but found `%s`", caveatString)
 				}
 
-				contextualizedCaveat = &v1.ContextualizedCaveat{
+				relation.OptionalCaveat = &v1.ContextualizedCaveat{
 					CaveatName: parts[0],
 				}
 
@@ -293,7 +300,7 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 					if err != nil {
 						return err
 					}
-					contextualizedCaveat.Context = context
+					relation.OptionalCaveat.Context = context
 				}
 			}
 		}
@@ -307,21 +314,7 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 			Updates: []*v1.RelationshipUpdate{
 				{
 					Operation: operation,
-					Relationship: &v1.Relationship{
-						Resource: &v1.ObjectReference{
-							ObjectType: objectNS,
-							ObjectId:   objectID,
-						},
-						Relation: relation,
-						Subject: &v1.SubjectReference{
-							Object: &v1.ObjectReference{
-								ObjectType: subjectNS,
-								ObjectId:   subjectID,
-							},
-							OptionalRelation: subjectRel,
-						},
-						OptionalCaveat: contextualizedCaveat,
-					},
+					Relationship: relation,
 				},
 			},
 			OptionalPreconditions: nil,
