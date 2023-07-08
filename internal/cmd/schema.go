@@ -117,7 +117,7 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 && term.IsTerminal(int(os.Stdout.Fd())) {
+	if len(args) == 0 && term.IsTerminal(int(os.Stdin.Fd())) {
 		return fmt.Errorf("must provide file path or contents via stdin")
 	}
 
