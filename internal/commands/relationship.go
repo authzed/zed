@@ -1,10 +1,12 @@
 package commands
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -13,6 +15,7 @@ import (
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/console"
@@ -47,6 +50,17 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	return relationshipCmd
 }
 
+func writeRelationshipArgs(cmd *cobra.Command, args []string) error {
+	nArgs := len(args)
+	if nArgs == 0 && term.IsTerminal(int(os.Stdin.Fd())) {
+		return fmt.Errorf("must provide relationship via arguments or stdin")
+	}
+	if nArgs > 0 && nArgs != 3 {
+		return fmt.Errorf("expected 3 arguments, but got %d", nArgs)
+	}
+	return nil
+}
+
 var relationshipCmd = &cobra.Command{
 	Use:   "relationship <subcommand>",
 	Short: "perform CRUD operations on the Relationships in a Permissions System",
@@ -55,21 +69,21 @@ var relationshipCmd = &cobra.Command{
 var createCmd = &cobra.Command{
 	Use:   "create <resource:id> <relation> <subject:id>",
 	Short: "create a Relationship for a Subject",
-	Args:  cobra.ExactArgs(3),
+	Args:  writeRelationshipArgs,
 	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE),
 }
 
 var touchCmd = &cobra.Command{
 	Use:   "touch <resource:id> <relation> <subject:id>",
 	Short: "idempotently update a Relationship for a Subject",
-	Args:  cobra.ExactArgs(3),
+	Args:  writeRelationshipArgs,
 	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH),
 }
 
 var deleteCmd = &cobra.Command{
 	Use:   "delete <resource:id> <relation> <subject:id>",
 	Short: "delete a Relationship",
-	Args:  cobra.ExactArgs(3),
+	Args:  writeRelationshipArgs,
 	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE),
 }
 
@@ -274,34 +288,28 @@ func relationshipToString(rel *v1.Relationship) (string, error) {
 
 func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		relation, err := argsToRelationship(args)
-		if err != nil {
-			return err
-		}
-
-		if operation != v1.RelationshipUpdate_OPERATION_DELETE {
-			caveatString := cobrautil.MustGetString(cmd, "caveat")
-			if caveatString != "" {
-				if relation.OptionalCaveat != nil {
-					return errors.New("cannot specify a caveat in both the relationship and the --caveat flag")
+		type nextRelationshipFunc func() ([]string, error)
+		// getNextRelationship is a function that will fetch the next relationship to write.
+		// Either it will read a stream of relationships from stdin, or it will simply return
+		// the command line arguments once. When there are no more relationships, it will return
+		// nil for the first parameter.
+		var getNextRelationship nextRelationshipFunc
+		if len(args) == 0 {
+			scanner := bufio.NewScanner(os.Stdin)
+			getNextRelationship = func() ([]string, error) {
+				if scanner.Scan() {
+					return strings.Fields(scanner.Text()), nil
 				}
-
-				parts := strings.SplitN(caveatString, ":", 2)
-				if len(parts) == 0 {
-					return fmt.Errorf("invalid --caveat argument. Must be in format `caveat_name:context`, but found `%s`", caveatString)
+				return nil, scanner.Err()
+			}
+		} else {
+			ran := false
+			getNextRelationship = func() ([]string, error) {
+				if ran {
+					return nil, nil
 				}
-
-				relation.OptionalCaveat = &v1.ContextualizedCaveat{
-					CaveatName: parts[0],
-				}
-
-				if len(parts) == 2 {
-					context, err := ParseCaveatContext(parts[1])
-					if err != nil {
-						return err
-					}
-					relation.OptionalCaveat.Context = context
-				}
+				ran = true
+				return args, nil
 			}
 		}
 
@@ -310,33 +318,76 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 			return err
 		}
 
-		request := &v1.WriteRelationshipsRequest{
-			Updates: []*v1.RelationshipUpdate{
-				{
-					Operation: operation,
-					Relationship: relation,
-				},
-			},
-			OptionalPreconditions: nil,
-		}
+		for {
+			relationPieces, err := getNextRelationship()
+			if err != nil {
+				return err
+			}
+			if relationPieces == nil {
+				break
+			}
 
-		log.Trace().Interface("request", request).Msg("writing relationships")
-		resp, err := client.WriteRelationships(cmd.Context(), request)
-		if err != nil {
-			return err
-		}
-
-		if cobrautil.MustGetBool(cmd, "json") {
-			prettyProto, err := PrettyProto(resp)
+			relation, err := argsToRelationship(relationPieces)
 			if err != nil {
 				return err
 			}
 
-			console.Println(string(prettyProto))
-			return nil
-		}
+			if operation != v1.RelationshipUpdate_OPERATION_DELETE {
+				caveatString := cobrautil.MustGetString(cmd, "caveat")
+				if caveatString != "" {
+					if relation.OptionalCaveat != nil {
+						return errors.New("cannot specify a caveat in both the relationship and the --caveat flag")
+					}
 
-		console.Println(resp.WrittenAt.GetToken())
+					parts := strings.SplitN(caveatString, ":", 2)
+					if len(parts) == 0 {
+						return fmt.Errorf("invalid --caveat argument. Must be in format `caveat_name:context`, but found `%s`", caveatString)
+					}
+
+					relation.OptionalCaveat = &v1.ContextualizedCaveat{
+						CaveatName: parts[0],
+					}
+
+					if len(parts) == 2 {
+						context, err := ParseCaveatContext(parts[1])
+						if err != nil {
+							return err
+						}
+						relation.OptionalCaveat.Context = context
+					}
+				}
+			}
+
+
+			request := &v1.WriteRelationshipsRequest{
+				Updates: []*v1.RelationshipUpdate{
+					{
+						Operation: operation,
+						Relationship: relation,
+					},
+				},
+				OptionalPreconditions: nil,
+			}
+
+			log.Trace().Interface("request", request).Msg("writing relationships")
+			resp, err := client.WriteRelationships(cmd.Context(), request)
+			if err != nil {
+				return err
+			}
+
+			if cobrautil.MustGetBool(cmd, "json") {
+				prettyProto, err := PrettyProto(resp)
+				if err != nil {
+					return err
+				}
+
+				console.Println(string(prettyProto))
+			} else {
+				console.Println(resp.WrittenAt.GetToken())
+			}
+
+
+		}
 		return nil
 	}
 }
