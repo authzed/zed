@@ -27,13 +27,16 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	relationshipCmd.AddCommand(createCmd)
 	createCmd.Flags().Bool("json", false, "output as JSON")
 	createCmd.Flags().String("caveat", "", `the caveat for the relationship, with format: 'caveat_name:{"some":"context"}'`)
+	createCmd.Flags().IntP("batch-size", "b", 100, "batch size when writing streams of relationships from stdin")
 
 	relationshipCmd.AddCommand(touchCmd)
 	touchCmd.Flags().Bool("json", false, "output as JSON")
 	touchCmd.Flags().String("caveat", "", `the caveat for the relationship, with format: 'caveat_name:{"some":"context"}'`)
+	touchCmd.Flags().IntP("batch-size", "b", 100, "batch size when writing streams of relationships from stdin")
 
 	relationshipCmd.AddCommand(deleteCmd)
 	deleteCmd.Flags().Bool("json", false, "output as JSON")
+	deleteCmd.Flags().IntP("batch-size", "b", 100, "batch size when deleting streams of relationships from stdin")
 
 	relationshipCmd.AddCommand(readCmd)
 	readCmd.Flags().Bool("json", false, "output as JSON")
@@ -318,13 +321,46 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 			return err
 		}
 
+		batchSize := cobrautil.MustGetInt(cmd, "batch-size")
+		updateBatch := make([]*v1.RelationshipUpdate, 0)
+		writeRelationships := func() error {
+			if len(updateBatch) == 0 {
+				return nil
+			}
+			request := &v1.WriteRelationshipsRequest{
+				Updates: updateBatch,
+				OptionalPreconditions: nil,
+			}
+
+			log.Trace().Interface("request", request).Msg("writing relationships")
+			resp, err := client.WriteRelationships(cmd.Context(), request)
+			if err != nil {
+				return err
+			}
+
+			if cobrautil.MustGetBool(cmd, "json") {
+				prettyProto, err := PrettyProto(resp)
+				if err != nil {
+					return err
+				}
+
+				console.Println(string(prettyProto))
+			} else {
+				console.Println(resp.WrittenAt.GetToken())
+			}
+			// Reset the batch
+			updateBatch = updateBatch[:0]
+			return nil
+		}
+
 		for {
 			relationPieces, err := getNextRelationship()
 			if err != nil {
 				return err
 			}
 			if relationPieces == nil {
-				break
+				// No more relationships coming. Write any batched requests not yet sent before exiting.
+				return writeRelationships()
 			}
 
 			relation, err := argsToRelationship(relationPieces)
@@ -357,37 +393,15 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 					}
 				}
 			}
-
-
-			request := &v1.WriteRelationshipsRequest{
-				Updates: []*v1.RelationshipUpdate{
-					{
-						Operation: operation,
-						Relationship: relation,
-					},
-				},
-				OptionalPreconditions: nil,
-			}
-
-			log.Trace().Interface("request", request).Msg("writing relationships")
-			resp, err := client.WriteRelationships(cmd.Context(), request)
-			if err != nil {
-				return err
-			}
-
-			if cobrautil.MustGetBool(cmd, "json") {
-				prettyProto, err := PrettyProto(resp)
-				if err != nil {
+			updateBatch = append(updateBatch, &v1.RelationshipUpdate{
+				Operation:    operation,
+				Relationship: relation,
+			})
+			if len(updateBatch) == batchSize {
+				if err := writeRelationships(); err != nil {
 					return err
 				}
-
-				console.Println(string(prettyProto))
-			} else {
-				console.Println(resp.WrittenAt.GetToken())
 			}
-
-
 		}
-		return nil
 	}
 }
