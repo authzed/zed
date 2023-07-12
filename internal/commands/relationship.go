@@ -289,6 +289,22 @@ func relationshipToString(rel *v1.Relationship) (string, error) {
 	return relString, nil
 }
 
+// parseRelationshipLine splits a line of update input that comes from stdin
+// and returns the fields representing the 3 arguments. This is to handle
+// the fact that relationships specified via stdin can't escape spaces like
+// shell arguments.
+func parseRelationshipLine(line string) ([]string, error) {
+	fields := strings.Fields(line)
+	if len(fields) < 3 {
+		return nil, fmt.Errorf("expected %s to have 3 arguments, but got %d", line, len(fields))
+	}
+	// Caveats can have spaces in the json string, so merge the fields past the first two
+	// into a single string again.
+	subjectTerm := strings.Join(fields[2:], " ")
+	fields[2] = subjectTerm
+	return fields[:3], nil
+}
+
 func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		type nextRelationshipFunc func() ([]string, error)
@@ -301,7 +317,11 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 			scanner := bufio.NewScanner(os.Stdin)
 			getNextRelationship = func() ([]string, error) {
 				if scanner.Scan() {
-					return strings.Fields(scanner.Text()), nil
+					args, err := parseRelationshipLine(scanner.Text())
+					if err != nil {
+						return nil, err
+					}
+					return args, nil
 				}
 				return nil, scanner.Err()
 			}

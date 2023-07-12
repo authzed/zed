@@ -90,7 +90,7 @@ func TestArgsToRelationship(t *testing.T) {
 			},
 		},
 		{
-			args:     []string{"res:123", "rel", `sub:1234#rel[only_certain_days:{"allowed_days":["friday","saturday"]}]`},
+			args:     []string{"res:123", "rel", `sub:1234#rel[only_certain_days:{"allowed_days":["friday", "saturday"]}]`},
 			expected: &v1.Relationship{
 				Resource:       &v1.ObjectReference{
 					ObjectType: "res",
@@ -126,6 +126,35 @@ func TestArgsToRelationship(t *testing.T) {
 			require.NoError(t, err)
 			t.Log(rel)
 			require.True(t, proto.Equal(rel, tt.expected))
+		})
+	}
+}
+
+func TestParseRelationshipLine(t *testing.T) {
+	for _, tt := range [] struct {
+		input string
+		expected []string
+	}{
+		{
+			input: "res:1 foo sub:1",
+			expected: []string{"res:1", "foo", "sub:1"},
+		},
+		{
+			input: "res:1      foo	sub:1",
+			expected: []string{"res:1", "foo", "sub:1"},
+		},
+		{
+			input: `res:1 foo sub:1[only_certain_days:{"allowed_days":["friday", "saturday",    "sunday"]}]`,
+			// Because we are splitting the string on whitespace and joining everything past
+			// the first two arguments back with a single space, extra spaces get collapsed
+			expected: []string{"res:1", "foo", `sub:1[only_certain_days:{"allowed_days":["friday", "saturday", "sunday"]}]`},
+		},
+	}{
+		tt := tt
+		t.Run(tt.input, func (t *testing.T) {
+			result, err := parseRelationshipLine(tt.input)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }
