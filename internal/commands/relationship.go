@@ -348,7 +348,7 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cm
 				return nil
 			}
 			request := &v1.WriteRelationshipsRequest{
-				Updates: updateBatch,
+				Updates:               updateBatch,
 				OptionalPreconditions: nil,
 			}
 

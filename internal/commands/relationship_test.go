@@ -53,60 +53,60 @@ func TestRelationshipToString(t *testing.T) {
 
 func TestArgsToRelationship(t *testing.T) {
 	for _, tt := range []struct {
-		args []string
+		args     []string
 		expected *v1.Relationship
 	}{
 		{
-			args:     []string{"res:123", "rel", "sub:1234"},
+			args: []string{"res:123", "rel", "sub:1234"},
 			expected: &v1.Relationship{
-				Resource:       &v1.ObjectReference{
+				Resource: &v1.ObjectReference{
 					ObjectType: "res",
 					ObjectId:   "123",
 				},
-				Relation:       "rel",
-				Subject:        &v1.SubjectReference{
-					Object:           &v1.ObjectReference{
+				Relation: "rel",
+				Subject: &v1.SubjectReference{
+					Object: &v1.ObjectReference{
 						ObjectType: "sub",
-						ObjectId: "1234",
+						ObjectId:   "1234",
 					},
 				},
 			},
 		},
 		{
-			args:     []string{"res:123", "rel", "sub:1234#rel"},
+			args: []string{"res:123", "rel", "sub:1234#rel"},
 			expected: &v1.Relationship{
-				Resource:       &v1.ObjectReference{
+				Resource: &v1.ObjectReference{
 					ObjectType: "res",
 					ObjectId:   "123",
 				},
-				Relation:       "rel",
-				Subject:        &v1.SubjectReference{
-					Object:           &v1.ObjectReference{
+				Relation: "rel",
+				Subject: &v1.SubjectReference{
+					Object: &v1.ObjectReference{
 						ObjectType: "sub",
-						ObjectId: "1234",
+						ObjectId:   "1234",
 					},
 					OptionalRelation: "rel",
 				},
 			},
 		},
 		{
-			args:     []string{"res:123", "rel", `sub:1234#rel[only_certain_days:{"allowed_days":["friday", "saturday"]}]`},
+			args: []string{"res:123", "rel", `sub:1234#rel[only_certain_days:{"allowed_days":["friday", "saturday"]}]`},
 			expected: &v1.Relationship{
-				Resource:       &v1.ObjectReference{
+				Resource: &v1.ObjectReference{
 					ObjectType: "res",
 					ObjectId:   "123",
 				},
-				Relation:       "rel",
-				Subject:        &v1.SubjectReference{
-					Object:           &v1.ObjectReference{
+				Relation: "rel",
+				Subject: &v1.SubjectReference{
+					Object: &v1.ObjectReference{
 						ObjectType: "sub",
-						ObjectId: "1234",
+						ObjectId:   "1234",
 					},
 					OptionalRelation: "rel",
 				},
 				OptionalCaveat: &v1.ContextualizedCaveat{
 					CaveatName: "only_certain_days",
-					Context:    &structpb.Struct{
+					Context: &structpb.Struct{
 						Fields: map[string]*structpb.Value{
 							"allowed_days": structpb.NewListValue(&structpb.ListValue{
 								Values: []*structpb.Value{
@@ -119,9 +119,9 @@ func TestArgsToRelationship(t *testing.T) {
 				},
 			},
 		},
-	}{
+	} {
 		tt := tt
-		t.Run(strings.Join(tt.args, " "), func (t *testing.T) {
+		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
 			rel, err := argsToRelationship(tt.args)
 			require.NoError(t, err)
 			t.Log(rel)
@@ -131,16 +131,16 @@ func TestArgsToRelationship(t *testing.T) {
 }
 
 func TestParseRelationshipLine(t *testing.T) {
-	for _, tt := range [] struct {
-		input string
+	for _, tt := range []struct {
+		input    string
 		expected []string
 	}{
 		{
-			input: "res:1 foo sub:1",
+			input:    "res:1 foo sub:1",
 			expected: []string{"res:1", "foo", "sub:1"},
 		},
 		{
-			input: "res:1      foo	sub:1",
+			input:    "res:1      foo	sub:1",
 			expected: []string{"res:1", "foo", "sub:1"},
 		},
 		{
@@ -149,9 +149,9 @@ func TestParseRelationshipLine(t *testing.T) {
 			// the first two arguments back with a single space, extra spaces get collapsed
 			expected: []string{"res:1", "foo", `sub:1[only_certain_days:{"allowed_days":["friday", "saturday", "sunday"]}]`},
 		},
-	}{
+	} {
 		tt := tt
-		t.Run(tt.input, func (t *testing.T) {
+		t.Run(tt.input, func(t *testing.T) {
 			result, err := parseRelationshipLine(tt.input)
 			require.NoError(t, err)
 			require.Equal(t, tt.expected, result)
