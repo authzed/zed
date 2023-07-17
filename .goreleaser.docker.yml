@@ -50,7 +50,7 @@ dockers:
     use: "buildx"
     build_flag_templates:
       - "--platform=linux/amd64"
-      - "--build-arg=BASE=cgr.dev/chainguard/alpine-base:latest"
+      - "--build-arg=BASE=cgr.dev/chainguard/busybox:latest"
   # ARM64
   - image_templates:
       - &arm_image_quay "quay.io/authzed/zed:v{{ .Version }}-arm64"
@@ -75,7 +75,7 @@ dockers:
     use: "buildx"
     build_flag_templates:
       - "--platform=linux/arm64"
-      - "--build-arg=BASE=cgr.dev/chainguard/alpine-base:latest"
+      - "--build-arg=BASE=cgr.dev/chainguard/busybox:latest"
 
 docker_manifests:
   # Quay
