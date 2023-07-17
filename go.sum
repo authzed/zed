@@ -61,8 +61,8 @@ github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2/go.mod h1:VSw
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 h1:yL7+Jz0jTC6yykIK/Wh74gnTJnrGr5AyrNMXuA0gves=
 github.com/antlr/antlr4/runtime/Go/antlr v1.4.10/go.mod h1:F7bn7fEU90QkQ3tnmaTx3LTKLEDqnwWODIYppRQ5hnY=
-github.com/authzed/authzed-go v0.8.1-0.20230620221821-0b6dd4aec7e2 h1:nQ9YC0IzSrs0Y8He38Q8RPXyT/DfXC1xp0ax3KY+Tgk=
-github.com/authzed/authzed-go v0.8.1-0.20230620221821-0b6dd4aec7e2/go.mod h1:9Pl5jDQJHrjbMDuCrsa+Q6Tqmi1f2pDdIn/qNGI++vA=
+github.com/authzed/authzed-go v0.9.0 h1:FBWWwYiZrreGN94R9EEIy1S2s0UAH0Hn7MWBRtbtF+w=
+github.com/authzed/authzed-go v0.9.0/go.mod h1:9Pl5jDQJHrjbMDuCrsa+Q6Tqmi1f2pDdIn/qNGI++vA=
 github.com/authzed/grpcutil v0.0.0-20230524151342-4caf7fd1108a h1:jc4x3fKS0vOO/1Ip5Dwt3/wvpkry1DV5TXVDH1wNj6E=
 github.com/authzed/grpcutil v0.0.0-20230524151342-4caf7fd1108a/go.mod h1:BeT5XA+d8z3NvvIVobx5qa0mCsX7JCsllKqEcwzeC0A=
 github.com/authzed/spicedb v1.22.0-rc2.0.20230530173245-26cb8a0c68ee h1:yl80xIag+8e8c5AuIv4Po46SUPvSiIzgIf3Qw7EfvPE=
