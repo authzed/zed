@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/99designs/keyring v1.2.2
-	github.com/AlecAivazis/survey/v2 v2.3.6
+	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
 	github.com/authzed/authzed-go v0.8.1-0.20230620221821-0b6dd4aec7e2
 	github.com/authzed/grpcutil v0.0.0-20230524151342-4caf7fd1108a
