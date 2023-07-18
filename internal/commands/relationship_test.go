@@ -148,10 +148,12 @@ func TestParseRelationshipLine(t *testing.T) {
 			expected: []string{"res:1", "foo", "sub:1"},
 		},
 		{
-			input: `res:1 foo sub:1[only_certain_days:{"allowed_days":["friday", "saturday",    "sunday"]}]`,
-			// Because we are splitting the string on whitespace and joining everything past
-			// the first two arguments back with a single space, extra spaces get collapsed
-			expected: []string{"res:1", "foo", `sub:1[only_certain_days:{"allowed_days":["friday", "saturday", "sunday"]}]`},
+			input:    `res:1 foo sub:1[only_certain_days:{"allowed_days": ["friday", "saturday",    "sunday"]}]`,
+			expected: []string{"res:1", "foo", `sub:1[only_certain_days:{"allowed_days": ["friday", "saturday",    "sunday"]}]`},
+		},
+		{
+			input:    `res:1 foo sub:1[auth_politely:{"nice_phrases": ["how are you?", "	it's good to see you!"]}]`,
+			expected: []string{"res:1", "foo", `sub:1[auth_politely:{"nice_phrases": ["how are you?", "	it's good to see you!"]}]`},
 		},
 	} {
 		tt := tt

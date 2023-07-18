@@ -303,15 +303,25 @@ func relationshipToString(rel *v1.Relationship) (string, error) {
 // the fact that relationships specified via stdin can't escape spaces like
 // shell arguments.
 func parseRelationshipLine(line string) ([]string, error) {
-	fields := strings.Fields(line)
-	if len(fields) < 3 {
-		return nil, fmt.Errorf("expected %s to have 3 arguments, but got %d", line, len(fields))
+	resourceIdx := strings.IndexFunc(line, unicode.IsSpace)
+	if resourceIdx == -1 {
+		return nil, fmt.Errorf("expected %s to have 3 arguments, but got 0", line)
 	}
-	// Caveats can have spaces in the json string, so merge the fields past the first two
-	// into a single string again.
-	subjectTerm := strings.Join(fields[2:], " ")
-	fields[2] = subjectTerm
-	return fields[:3], nil
+
+	resource := line[:resourceIdx]
+	rest := strings.TrimSpace(line[resourceIdx+1:])
+	relationIdx := strings.IndexFunc(rest, unicode.IsSpace)
+	if relationIdx == -1 {
+		return nil, fmt.Errorf("expected %s to have 3 arguments, but got 1", line)
+	}
+
+	relation := rest[:relationIdx]
+	rest = strings.TrimSpace(rest[relationIdx+1:])
+	if rest == "" {
+		return nil, fmt.Errorf("expected %s to have 3 arguments, but got 2", line)
+	}
+
+	return []string{resource, relation, rest}, nil
 }
 
 func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cmd *cobra.Command, args []string) error {
