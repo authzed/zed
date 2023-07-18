@@ -17,6 +17,7 @@ require (
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20230403163312-3593f31d8fe1
 	github.com/jzelinskie/stringz v0.0.1
 	github.com/mattn/go-isatty v0.0.19
+	github.com/mattn/go-tty v0.0.5
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/rs/zerolog v1.29.1

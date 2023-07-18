@@ -8,6 +8,10 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode"
+
+	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/console"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
@@ -16,9 +20,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-
-	"github.com/authzed/zed/internal/client"
-	"github.com/authzed/zed/internal/console"
 )
 
 func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
@@ -53,15 +54,20 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	return relationshipCmd
 }
 
-func writeRelationshipArgs(cmd *cobra.Command, args []string) error {
+func writeRelationshipsArgsWithStdin(cmd *cobra.Command, args []string) error {
+	return writeRelationshipsArgs(cmd, args, os.Stdin)
+}
+
+func writeRelationshipsArgs(cmd *cobra.Command, args []string, file *os.File) error {
 	nArgs := len(args)
-	if nArgs == 0 && term.IsTerminal(int(os.Stdin.Fd())) {
-		return fmt.Errorf("must provide relationship via arguments or stdin")
+	tty := term.IsTerminal(int(file.Fd()))
+	if !tty && nArgs > 0 {
+		return fmt.Errorf("cannot provide input both via arguments and Stdin")
 	}
-	if nArgs > 0 && nArgs != 3 {
-		return fmt.Errorf("expected 3 arguments, but got %d", nArgs)
+	if !tty {
+		return nil
 	}
-	return nil
+	return cobra.ExactArgs(3)(cmd, args)
 }
 
 var relationshipCmd = &cobra.Command{
@@ -72,21 +78,21 @@ var relationshipCmd = &cobra.Command{
 var createCmd = &cobra.Command{
 	Use:   "create <resource:id> <relation> <subject:id>",
 	Short: "create a Relationship for a Subject",
-	Args:  writeRelationshipArgs,
+	Args:  writeRelationshipsArgsWithStdin,
 	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE),
 }
 
 var touchCmd = &cobra.Command{
 	Use:   "touch <resource:id> <relation> <subject:id>",
 	Short: "idempotently update a Relationship for a Subject",
-	Args:  writeRelationshipArgs,
+	Args:  writeRelationshipsArgsWithStdin,
 	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH),
 }
 
 var deleteCmd = &cobra.Command{
 	Use:   "delete <resource:id> <relation> <subject:id>",
 	Short: "delete a Relationship",
-	Args:  writeRelationshipArgs,
+	Args:  writeRelationshipsArgsWithStdin,
 	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE),
 }
 
@@ -271,11 +277,13 @@ func argsToRelationship(args []string) (*v1.Relationship, error) {
 	if len(args) != 3 {
 		return nil, fmt.Errorf("expected 3 arguments, but got %d", len(args))
 	}
+
 	tupleStr := fmt.Sprintf("%s#%s@%s", args[0], args[1], args[2])
 	rel := tuple.ParseRel(tupleStr)
 	if rel == nil {
 		return nil, errors.New("failed to parse input arguments")
 	}
+
 	return rel, nil
 }
 
@@ -284,6 +292,7 @@ func relationshipToString(rel *v1.Relationship) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	relString = strings.Replace(relString, "@", " ", 1)
 	relString = strings.Replace(relString, "#", " ", 1)
 	return relString, nil

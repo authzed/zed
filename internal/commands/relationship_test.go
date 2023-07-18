@@ -1,12 +1,16 @@
 package commands
 
 import (
+	"os"
 	"strings"
 	"testing"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
+	"github.com/mattn/go-tty"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/term"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -157,4 +161,25 @@ func TestParseRelationshipLine(t *testing.T) {
 			require.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestWriteRelationshipsArgs(t *testing.T) {
+	// simulate terminal
+	f, err := os.CreateTemp("", "spicedb-")
+	require.NoError(t, err)
+
+	// returns accepts anything if input file is not a terminal
+	require.Nil(t, writeRelationshipsArgs(&cobra.Command{}, nil, f))
+
+	// does not accept both file input and arguments
+	require.ErrorContains(t, writeRelationshipsArgs(&cobra.Command{}, []string{"a", "b"}, f), "cannot provide input both via arguments and Stdin")
+
+	// checks there is 3 input arguments in case of tty
+	testTTY, err := tty.Open()
+	require.NoError(t, err)
+	defer require.NoError(t, testTTY.Close())
+
+	require.True(t, term.IsTerminal(int(testTTY.Input().Fd())))
+	require.ErrorContains(t, writeRelationshipsArgs(&cobra.Command{}, nil, testTTY.Input()), "accepts 3 arg(s), received 0")
+	require.Nil(t, writeRelationshipsArgs(&cobra.Command{}, []string{"a", "b", "c"}, testTTY.Input()))
 }
