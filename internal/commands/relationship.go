@@ -22,6 +22,8 @@ import (
 	"golang.org/x/term"
 )
 
+var isTerminal = term.IsTerminal
+
 func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	rootCmd.AddCommand(relationshipCmd)
 
@@ -100,7 +102,7 @@ func writeRelationshipsArgsWithStdin(cmd *cobra.Command, args []string) error {
 
 func writeRelationshipsArgs(cmd *cobra.Command, args []string, file *os.File) error {
 	nArgs := len(args)
-	tty := term.IsTerminal(int(file.Fd()))
+	tty := isTerminal(int(file.Fd()))
 	if !tty && nArgs > 0 {
 		return fmt.Errorf("cannot provide input both via arguments and Stdin")
 	}
@@ -111,7 +113,7 @@ func writeRelationshipsArgs(cmd *cobra.Command, args []string, file *os.File) er
 }
 
 func isArgsViaFile(file *os.File) bool {
-	return !term.IsTerminal(int(file.Fd()))
+	return !isTerminal(int(file.Fd()))
 }
 
 func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {

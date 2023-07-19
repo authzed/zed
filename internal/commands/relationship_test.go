@@ -10,10 +10,8 @@ import (
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
-	"github.com/mattn/go-tty"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/term"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -170,7 +168,6 @@ func TestParseRelationshipLine(t *testing.T) {
 }
 
 func TestWriteRelationshipsArgs(t *testing.T) {
-	// simulate terminal
 	f, err := os.CreateTemp("", "spicedb-")
 	require.NoError(t, err)
 
@@ -181,20 +178,18 @@ func TestWriteRelationshipsArgs(t *testing.T) {
 	require.ErrorContains(t, writeRelationshipsArgs(&cobra.Command{}, []string{"a", "b"}, f), "cannot provide input both via arguments and Stdin")
 
 	// checks there is 3 input arguments in case of tty
-	testTTY, err := tty.Open()
-	require.NoError(t, err)
-	defer require.NoError(t, testTTY.Close())
-
-	require.True(t, term.IsTerminal(int(testTTY.Input().Fd())))
-	require.ErrorContains(t, writeRelationshipsArgs(&cobra.Command{}, nil, testTTY.Input()), "accepts 3 arg(s), received 0")
-	require.Nil(t, writeRelationshipsArgs(&cobra.Command{}, []string{"a", "b", "c"}, testTTY.Input()))
+	originalFunc := isTerminal
+	isTerminal = func(fd int) bool {
+		return true
+	}
+	defer func() {
+		isTerminal = originalFunc
+	}()
+	require.ErrorContains(t, writeRelationshipsArgs(&cobra.Command{}, nil, f), "accepts 3 arg(s), received 0")
+	require.Nil(t, writeRelationshipsArgs(&cobra.Command{}, []string{"a", "b", "c"}, f))
 }
 
 func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
-	testTTY, err := tty.Open()
-	require.NoError(t, err)
-	defer require.NoError(t, testTTY.Close())
-
 	mock := func(*cobra.Command) (client.Client, error) {
 		return &mockClient{t: t, expectedWrites: []*v1.WriteRelationshipsRequest{{
 			Updates: []*v1.RelationshipUpdate{
@@ -206,7 +201,18 @@ func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
 		}}}, nil
 	}
 
-	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, mock, testTTY.Input())
+	originalFunc := isTerminal
+	isTerminal = func(fd int) bool {
+		return true
+	}
+	defer func() {
+		isTerminal = originalFunc
+	}()
+
+	tty, err := os.CreateTemp("", "spicedb-")
+	require.NoError(t, err)
+
+	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, mock, tty)
 	cmd := &cobra.Command{}
 	cmd.Flags().Int("batch-size", 100, "")
 	cmd.Flags().Bool("json", true, "")
