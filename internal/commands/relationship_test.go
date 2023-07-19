@@ -1,9 +1,12 @@
 package commands
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/authzed/zed/internal/client"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
@@ -11,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/term"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -184,4 +188,175 @@ func TestWriteRelationshipsArgs(t *testing.T) {
 	require.True(t, term.IsTerminal(int(testTTY.Input().Fd())))
 	require.ErrorContains(t, writeRelationshipsArgs(&cobra.Command{}, nil, testTTY.Input()), "accepts 3 arg(s), received 0")
 	require.Nil(t, writeRelationshipsArgs(&cobra.Command{}, []string{"a", "b", "c"}, testTTY.Input()))
+}
+
+func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
+	testTTY, err := tty.Open()
+	require.NoError(t, err)
+	defer require.NoError(t, testTTY.Close())
+
+	mock := func(*cobra.Command) (client.Client, error) {
+		return &mockClient{t: t, expectedWrites: []*v1.WriteRelationshipsRequest{{
+			Updates: []*v1.RelationshipUpdate{
+				{
+					Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+					Relationship: tuple.ParseRel("resource:1#view@user:1[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]"),
+				},
+			},
+		}}}, nil
+	}
+
+	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, mock, testTTY.Input())
+	cmd := &cobra.Command{}
+	cmd.Flags().Int("batch-size", 100, "")
+	cmd.Flags().Bool("json", true, "")
+	cmd.Flags().String("caveat", "cav:{\"letters\": [\"a\", \"b\", \"c\"]}", "")
+
+	err = f(cmd, []string{"resource:1", "view", "user:1"})
+	require.NoError(t, err)
+}
+
+func TestWriteRelationshipCmdFuncFromStdin(t *testing.T) {
+	mock := func(*cobra.Command) (client.Client, error) {
+		return &mockClient{t: t, expectedWrites: []*v1.WriteRelationshipsRequest{{
+			Updates: []*v1.RelationshipUpdate{
+				{
+					Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+					Relationship: tuple.ParseRel("resource:1#viewer@user:1"),
+				},
+				{
+					Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+					Relationship: tuple.ParseRel("resource:1#viewer@user:2"),
+				},
+			},
+		}}}, nil
+	}
+
+	fi := fileFromStrings(t, []string{
+		"resource:1 viewer user:1",
+		"resource:1 viewer user:2",
+	})
+	defer func() {
+		require.NoError(t, fi.Close())
+	}()
+
+	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, mock, fi)
+	cmd := &cobra.Command{}
+	cmd.Flags().Int("batch-size", 100, "")
+	cmd.Flags().Bool("json", true, "")
+	cmd.Flags().String("caveat", "", "")
+
+	err := f(cmd, nil)
+	require.NoError(t, err)
+}
+
+func TestWriteRelationshipCmdFuncFromStdinBatch(t *testing.T) {
+	mock := func(*cobra.Command) (client.Client, error) {
+		return &mockClient{t: t, expectedWrites: []*v1.WriteRelationshipsRequest{
+			{
+				Updates: []*v1.RelationshipUpdate{
+					{
+						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+						Relationship: tuple.ParseRel("resource:1#viewer@user:1[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]"),
+					},
+				},
+			},
+			{
+				Updates: []*v1.RelationshipUpdate{
+					{
+						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+						Relationship: tuple.ParseRel("resource:1#viewer@user:2[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]"),
+					},
+				},
+			},
+		}}, nil
+	}
+
+	fi := fileFromStrings(t, []string{
+		"resource:1 viewer user:1[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]",
+		"resource:1 viewer user:2[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]",
+	})
+	defer func() {
+		require.NoError(t, fi.Close())
+	}()
+
+	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, mock, fi)
+	cmd := &cobra.Command{}
+	cmd.Flags().Int("batch-size", 1, "")
+	cmd.Flags().Bool("json", true, "")
+	cmd.Flags().String("caveat", "", "")
+
+	err := f(cmd, nil)
+	require.NoError(t, err)
+}
+
+func TestWriteRelationshipCmdFuncFromFailsWithCaveatArg(t *testing.T) {
+	mock := func(*cobra.Command) (client.Client, error) {
+		return &mockClient{t: t, expectedWrites: []*v1.WriteRelationshipsRequest{
+			{
+				Updates: []*v1.RelationshipUpdate{
+					{
+						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+						Relationship: tuple.ParseRel("resource:1#viewer@user:1[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]"),
+					},
+				},
+			},
+		}}, nil
+	}
+
+	fi := fileFromStrings(t, []string{
+		"resource:1 viewer user:1[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]",
+	})
+	defer func() {
+		require.NoError(t, fi.Close())
+	}()
+
+	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, mock, fi)
+	cmd := &cobra.Command{}
+	cmd.Flags().Int("batch-size", 1, "")
+	cmd.Flags().Bool("json", true, "")
+	cmd.Flags().String("caveat", "cav:{\"letters\": [\"a\", \"b\", \"c\"]}", "")
+
+	err := f(cmd, nil)
+	require.ErrorContains(t, err, "cannot specify a caveat in both the relationship and the --caveat flag")
+}
+
+func fileFromStrings(t *testing.T, strings []string) *os.File {
+	t.Helper()
+
+	fi, err := os.CreateTemp("", "spicedb-")
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, fi.Close())
+	}()
+
+	for _, data := range strings {
+		_, err = fi.WriteString(data + "\n")
+		require.NoError(t, err)
+	}
+	require.NoError(t, fi.Sync())
+
+	file, err := os.Open(fi.Name())
+	require.NoError(t, err)
+	return file
+}
+
+type mockClient struct {
+	v1.SchemaServiceClient
+	v1.PermissionsServiceClient
+	v1.WatchServiceClient
+	v1.ExperimentalServiceClient
+
+	t              *testing.T
+	expectedWrites []*v1.WriteRelationshipsRequest
+}
+
+func (m *mockClient) WriteRelationships(_ context.Context, in *v1.WriteRelationshipsRequest, _ ...grpc.CallOption) (*v1.WriteRelationshipsResponse, error) {
+	if len(m.expectedWrites) == 0 {
+		require.Fail(m.t, "received unexpected write call")
+	}
+	expectedWrite := m.expectedWrites[0]
+	m.expectedWrites = m.expectedWrites[1:]
+	require.True(m.t, proto.Equal(expectedWrite, in))
+	return &v1.WriteRelationshipsResponse{WrittenAt: &v1.ZedToken{Token: "test"}}, nil
 }

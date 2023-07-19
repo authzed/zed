@@ -54,22 +54,6 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	return relationshipCmd
 }
 
-func writeRelationshipsArgsWithStdin(cmd *cobra.Command, args []string) error {
-	return writeRelationshipsArgs(cmd, args, os.Stdin)
-}
-
-func writeRelationshipsArgs(cmd *cobra.Command, args []string, file *os.File) error {
-	nArgs := len(args)
-	tty := term.IsTerminal(int(file.Fd()))
-	if !tty && nArgs > 0 {
-		return fmt.Errorf("cannot provide input both via arguments and Stdin")
-	}
-	if !tty {
-		return nil
-	}
-	return cobra.ExactArgs(3)(cmd, args)
-}
-
 var relationshipCmd = &cobra.Command{
 	Use:   "relationship <subcommand>",
 	Short: "perform CRUD operations on the Relationships in a Permissions System",
@@ -79,21 +63,21 @@ var createCmd = &cobra.Command{
 	Use:   "create <resource:id> <relation> <subject:id>",
 	Short: "create a Relationship for a Subject",
 	Args:  writeRelationshipsArgsWithStdin,
-	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE),
+	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE, client.NewClient, os.Stdin),
 }
 
 var touchCmd = &cobra.Command{
 	Use:   "touch <resource:id> <relation> <subject:id>",
 	Short: "idempotently update a Relationship for a Subject",
 	Args:  writeRelationshipsArgsWithStdin,
-	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH),
+	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, client.NewClient, os.Stdin),
 }
 
 var deleteCmd = &cobra.Command{
 	Use:   "delete <resource:id> <relation> <subject:id>",
 	Short: "delete a Relationship",
 	Args:  writeRelationshipsArgsWithStdin,
-	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE),
+	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE, client.NewClient, os.Stdin),
 }
 
 var readCmd = &cobra.Command{
@@ -110,8 +94,28 @@ var bulkDeleteCmd = &cobra.Command{
 	RunE:  bulkDeleteRelationships,
 }
 
+func writeRelationshipsArgsWithStdin(cmd *cobra.Command, args []string) error {
+	return writeRelationshipsArgs(cmd, args, os.Stdin)
+}
+
+func writeRelationshipsArgs(cmd *cobra.Command, args []string, file *os.File) error {
+	nArgs := len(args)
+	tty := term.IsTerminal(int(file.Fd()))
+	if !tty && nArgs > 0 {
+		return fmt.Errorf("cannot provide input both via arguments and Stdin")
+	}
+	if !tty {
+		return nil
+	}
+	return cobra.ExactArgs(3)(cmd, args)
+}
+
+func isArgsViaFile(file *os.File) bool {
+	return !term.IsTerminal(int(file.Fd()))
+}
+
 func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
-	client, err := client.NewClient(cmd)
+	grpcClient, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
@@ -129,7 +133,7 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 		defer cancel()
 
 		log.Trace().Interface("request", request).Send()
-		resp, err := client.ReadRelationships(ctx, request)
+		resp, err := grpcClient.ReadRelationships(ctx, request)
 		if err != nil {
 			return err
 		}
@@ -163,7 +167,7 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 	delRequest := &v1.DeleteRelationshipsRequest{RelationshipFilter: request.RelationshipFilter}
 	log.Trace().Interface("request", delRequest).Msg("deleting relationships")
 
-	resp, err := client.DeleteRelationships(cmd.Context(), delRequest)
+	resp, err := grpcClient.DeleteRelationships(cmd.Context(), delRequest)
 	if err != nil {
 		return err
 	}
@@ -231,13 +235,13 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := client.NewClient(cmd)
+	grpcClient, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
 
 	log.Trace().Interface("request", request).Msg("reading relationships")
-	resp, err := client.ReadRelationships(cmd.Context(), request)
+	resp, err := grpcClient.ReadRelationships(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -324,123 +328,146 @@ func parseRelationshipLine(line string) ([]string, error) {
 	return []string{resource, relation, rest}, nil
 }
 
-func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation) func(cmd *cobra.Command, args []string) error {
+type nextRelationshipFunc func() ([]string, error)
+
+func streamArgsFromFile(file *os.File) nextRelationshipFunc {
+	scanner := bufio.NewScanner(file)
+	return func() ([]string, error) {
+		if scanner.Scan() {
+			args, err := parseRelationshipLine(scanner.Text())
+			if err != nil {
+				return nil, err
+			}
+			return args, nil
+		}
+		return nil, scanner.Err()
+	}
+}
+
+func streamArgsFromCliArgs(args []string) nextRelationshipFunc {
+	ran := false
+	return func() ([]string, error) {
+		if ran {
+			return nil, nil
+		}
+		ran = true
+		return args, nil
+	}
+}
+
+func writeUpdates(ctx context.Context, grpcClient client.Client, updates []*v1.RelationshipUpdate, json bool) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	request := &v1.WriteRelationshipsRequest{
+		Updates:               updates,
+		OptionalPreconditions: nil,
+	}
+
+	log.Trace().Interface("request", request).Msg("writing relationships")
+	resp, err := grpcClient.WriteRelationships(ctx, request)
+	if err != nil {
+		return err
+	}
+
+	if json {
+		prettyProto, err := PrettyProto(resp)
+		if err != nil {
+			return err
+		}
+
+		console.Println(string(prettyProto))
+	} else {
+		console.Println(resp.WrittenAt.GetToken())
+	}
+
+	return nil
+}
+
+func toRelationship(f nextRelationshipFunc) (*v1.Relationship, error) {
+	args, err := f()
+	if err != nil {
+		return nil, err
+	}
+	if args == nil {
+		return nil, nil
+	}
+	return argsToRelationship(args)
+}
+
+func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation, clientFunc func(command *cobra.Command) (client.Client, error), input *os.File) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		type nextRelationshipFunc func() ([]string, error)
 		// getNextRelationship is a function that will fetch the next relationship to write.
 		// Either it will read a stream of relationships from stdin, or it will simply return
 		// the command line arguments once. When there are no more relationships, it will return
 		// nil for the first parameter.
-		var getNextRelationship nextRelationshipFunc
-		if len(args) == 0 {
-			scanner := bufio.NewScanner(os.Stdin)
-			getNextRelationship = func() ([]string, error) {
-				if scanner.Scan() {
-					args, err := parseRelationshipLine(scanner.Text())
-					if err != nil {
-						return nil, err
-					}
-					return args, nil
-				}
-				return nil, scanner.Err()
-			}
-		} else {
-			ran := false
-			getNextRelationship = func() ([]string, error) {
-				if ran {
-					return nil, nil
-				}
-				ran = true
-				return args, nil
-			}
+		getNextRelationship := streamArgsFromCliArgs(args)
+		if isArgsViaFile(input) {
+			getNextRelationship = streamArgsFromFile(input)
 		}
 
-		client, err := client.NewClient(cmd)
+		grpcClient, err := clientFunc(cmd)
 		if err != nil {
 			return err
 		}
 
 		batchSize := cobrautil.MustGetInt(cmd, "batch-size")
 		updateBatch := make([]*v1.RelationshipUpdate, 0)
-		writeRelationships := func() error {
-			if len(updateBatch) == 0 {
-				return nil
-			}
-			request := &v1.WriteRelationshipsRequest{
-				Updates:               updateBatch,
-				OptionalPreconditions: nil,
-			}
-
-			log.Trace().Interface("request", request).Msg("writing relationships")
-			resp, err := client.WriteRelationships(cmd.Context(), request)
-			if err != nil {
-				return err
-			}
-
-			if cobrautil.MustGetBool(cmd, "json") {
-				prettyProto, err := PrettyProto(resp)
-				if err != nil {
-					return err
-				}
-
-				console.Println(string(prettyProto))
-			} else {
-				console.Println(resp.WrittenAt.GetToken())
-			}
-			// Reset the batch
-			updateBatch = updateBatch[:0]
-			return nil
-		}
+		doJSON := cobrautil.MustGetBool(cmd, "json")
 
 		for {
-			relationPieces, err := getNextRelationship()
+			rel, err := toRelationship(getNextRelationship)
 			if err != nil {
 				return err
 			}
-			if relationPieces == nil {
+			if rel == nil {
 				// No more relationships coming. Write any batched requests not yet sent before exiting.
-				return writeRelationships()
-			}
-
-			relation, err := argsToRelationship(relationPieces)
-			if err != nil {
-				return err
+				return writeUpdates(cmd.Context(), grpcClient, updateBatch, doJSON)
 			}
 
 			if operation != v1.RelationshipUpdate_OPERATION_DELETE {
-				caveatString := cobrautil.MustGetString(cmd, "caveat")
-				if caveatString != "" {
-					if relation.OptionalCaveat != nil {
-						return errors.New("cannot specify a caveat in both the relationship and the --caveat flag")
-					}
-
-					parts := strings.SplitN(caveatString, ":", 2)
-					if len(parts) == 0 {
-						return fmt.Errorf("invalid --caveat argument. Must be in format `caveat_name:context`, but found `%s`", caveatString)
-					}
-
-					relation.OptionalCaveat = &v1.ContextualizedCaveat{
-						CaveatName: parts[0],
-					}
-
-					if len(parts) == 2 {
-						context, err := ParseCaveatContext(parts[1])
-						if err != nil {
-							return err
-						}
-						relation.OptionalCaveat.Context = context
-					}
-				}
-			}
-			updateBatch = append(updateBatch, &v1.RelationshipUpdate{
-				Operation:    operation,
-				Relationship: relation,
-			})
-			if len(updateBatch) == batchSize {
-				if err := writeRelationships(); err != nil {
+				if err := handleCaveatFlag(cmd, rel); err != nil {
 					return err
 				}
 			}
+
+			updateBatch = append(updateBatch, &v1.RelationshipUpdate{
+				Operation:    operation,
+				Relationship: rel,
+			})
+			if len(updateBatch) == batchSize {
+				if err := writeUpdates(cmd.Context(), grpcClient, updateBatch, doJSON); err != nil {
+					return err
+				}
+				updateBatch = nil
+			}
 		}
 	}
+}
+
+func handleCaveatFlag(cmd *cobra.Command, rel *v1.Relationship) error {
+	caveatString := cobrautil.MustGetString(cmd, "caveat")
+	if caveatString != "" {
+		if rel.OptionalCaveat != nil {
+			return errors.New("cannot specify a caveat in both the relationship and the --caveat flag")
+		}
+
+		parts := strings.SplitN(caveatString, ":", 2)
+		if len(parts) == 0 {
+			return fmt.Errorf("invalid --caveat argument. Must be in format `caveat_name:context`, but found `%s`", caveatString)
+		}
+
+		rel.OptionalCaveat = &v1.ContextualizedCaveat{
+			CaveatName: parts[0],
+		}
+
+		if len(parts) == 2 {
+			caveatCtx, err := ParseCaveatContext(parts[1])
+			if err != nil {
+				return err
+			}
+			rel.OptionalCaveat.Context = caveatCtx
+		}
+	}
+	return nil
 }
