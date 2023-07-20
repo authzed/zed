@@ -39,12 +39,12 @@ func TestRelationshipToString(t *testing.T) {
 			"res:123 rel resource:1234[caveat_name]",
 		},
 		{
-			"res:123#rel@resource:1234[caveat_name:{\"num\":1234}]",
-			"res:123 rel resource:1234[caveat_name:{\"num\":1234}]",
+			`res:123#rel@resource:1234[caveat_name:{"num":1234}]`,
+			`res:123 rel resource:1234[caveat_name:{"num":1234}]`,
 		},
 		{
-			"res:123#rel@resource:1234[caveat_name:{\"name\":\"##@@##@@\"}]",
-			"res:123 rel resource:1234[caveat_name:{\"name\":\"##@@##@@\"}]",
+			`res:123#rel@resource:1234[caveat_name:{"name":"##@@##@@"}]`,
+			`res:123 rel resource:1234[caveat_name:{"name":"##@@##@@"}]`,
 		},
 	} {
 		tt := tt
@@ -140,7 +140,28 @@ func TestParseRelationshipLine(t *testing.T) {
 	for _, tt := range []struct {
 		input    string
 		expected []string
+		err      string
 	}{
+		{
+			input: "   ",
+			err:   "to have 3 arguments, but got 0",
+		},
+		{
+			input: "res:1 ",
+			err:   "to have 3 arguments, but got 1",
+		},
+		{
+			input: "res:1 foo",
+			err:   "to have 3 arguments, but got 2",
+		},
+		{
+			input: "res:1 foo ",
+			err:   "to have 3 arguments, but got 2",
+		},
+		{
+			input: "res:1 foo ",
+			err:   "to have 3 arguments, but got 2",
+		},
 		{
 			input:    "res:1 foo sub:1",
 			expected: []string{"res:1", "foo", "sub:1"},
@@ -160,9 +181,13 @@ func TestParseRelationshipLine(t *testing.T) {
 	} {
 		tt := tt
 		t.Run(tt.input, func(t *testing.T) {
-			result, err := parseRelationshipLine(tt.input)
+			resource, relation, subject, err := parseRelationshipLine(tt.input)
+			if tt.err != "" {
+				require.ErrorContains(t, err, tt.err)
+				return
+			}
 			require.NoError(t, err)
-			require.Equal(t, tt.expected, result)
+			require.Equal(t, tt.expected, []string{resource, relation, subject})
 		})
 	}
 }
@@ -171,22 +196,26 @@ func TestWriteRelationshipsArgs(t *testing.T) {
 	f, err := os.CreateTemp("", "spicedb-")
 	require.NoError(t, err)
 
+	t.Cleanup(func() {
+		_ = os.Remove(f.Name())
+	})
+
 	// returns accepts anything if input file is not a terminal
-	require.Nil(t, writeRelationshipsArgs(&cobra.Command{}, nil, f))
+	require.Nil(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, nil))
 
 	// does not accept both file input and arguments
-	require.ErrorContains(t, writeRelationshipsArgs(&cobra.Command{}, []string{"a", "b"}, f), "cannot provide input both via arguments and Stdin")
+	require.ErrorContains(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, []string{"a", "b"}), "cannot provide input both via command-line args and stdin")
 
 	// checks there is 3 input arguments in case of tty
-	originalFunc := isTerminal
-	isTerminal = func(fd int) bool {
+	originalFunc := isFileTerminal
+	isFileTerminal = func(f *os.File) bool {
 		return true
 	}
 	defer func() {
-		isTerminal = originalFunc
+		isFileTerminal = originalFunc
 	}()
-	require.ErrorContains(t, writeRelationshipsArgs(&cobra.Command{}, nil, f), "accepts 3 arg(s), received 0")
-	require.Nil(t, writeRelationshipsArgs(&cobra.Command{}, []string{"a", "b", "c"}, f))
+	require.ErrorContains(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, nil), "accepts 3 arg(s), received 0")
+	require.Nil(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, []string{"a", "b", "c"}))
 }
 
 func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
@@ -195,28 +224,38 @@ func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
 			Updates: []*v1.RelationshipUpdate{
 				{
 					Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-					Relationship: tuple.ParseRel("resource:1#view@user:1[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]"),
+					Relationship: tuple.ParseRel(`resource:1#view@user:1[cav:{"letters": ["a", "b", "c"]}]`),
 				},
 			},
 		}}}, nil
 	}
 
-	originalFunc := isTerminal
-	isTerminal = func(fd int) bool {
+	originalFunc := isFileTerminal
+	isFileTerminal = func(f *os.File) bool {
 		return true
 	}
 	defer func() {
-		isTerminal = originalFunc
+		isFileTerminal = originalFunc
 	}()
 
 	tty, err := os.CreateTemp("", "spicedb-")
 	require.NoError(t, err)
 
-	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, mock, tty)
+	t.Cleanup(func() {
+		_ = os.Remove(tty.Name())
+	})
+
+	originalClient := client.NewClient
+	client.NewClient = mock
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, tty)
 	cmd := &cobra.Command{}
 	cmd.Flags().Int("batch-size", 100, "")
 	cmd.Flags().Bool("json", true, "")
-	cmd.Flags().String("caveat", "cav:{\"letters\": [\"a\", \"b\", \"c\"]}", "")
+	cmd.Flags().String("caveat", `cav:{"letters": ["a", "b", "c"]}`, "")
 
 	err = f(cmd, []string{"resource:1", "view", "user:1"})
 	require.NoError(t, err)
@@ -245,8 +284,17 @@ func TestWriteRelationshipCmdFuncFromStdin(t *testing.T) {
 	defer func() {
 		require.NoError(t, fi.Close())
 	}()
+	t.Cleanup(func() {
+		_ = os.Remove(fi.Name())
+	})
 
-	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, mock, fi)
+	originalClient := client.NewClient
+	client.NewClient = mock
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, fi)
 	cmd := &cobra.Command{}
 	cmd.Flags().Int("batch-size", 100, "")
 	cmd.Flags().Bool("json", true, "")
@@ -263,7 +311,7 @@ func TestWriteRelationshipCmdFuncFromStdinBatch(t *testing.T) {
 				Updates: []*v1.RelationshipUpdate{
 					{
 						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-						Relationship: tuple.ParseRel("resource:1#viewer@user:1[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]"),
+						Relationship: tuple.ParseRel(`resource:1#viewer@user:1[cav:{"letters": ["a", "b", "c"]}]`),
 					},
 				},
 			},
@@ -271,7 +319,7 @@ func TestWriteRelationshipCmdFuncFromStdinBatch(t *testing.T) {
 				Updates: []*v1.RelationshipUpdate{
 					{
 						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-						Relationship: tuple.ParseRel("resource:1#viewer@user:2[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]"),
+						Relationship: tuple.ParseRel(`resource:1#viewer@user:2[cav:{"letters": ["a", "b", "c"]}]`),
 					},
 				},
 			},
@@ -279,14 +327,23 @@ func TestWriteRelationshipCmdFuncFromStdinBatch(t *testing.T) {
 	}
 
 	fi := fileFromStrings(t, []string{
-		"resource:1 viewer user:1[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]",
-		"resource:1 viewer user:2[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]",
+		`resource:1 viewer user:1[cav:{"letters": ["a", "b", "c"]}]`,
+		`resource:1 viewer user:2[cav:{"letters": ["a", "b", "c"]}]`,
 	})
 	defer func() {
 		require.NoError(t, fi.Close())
 	}()
+	t.Cleanup(func() {
+		_ = os.Remove(fi.Name())
+	})
 
-	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, mock, fi)
+	originalClient := client.NewClient
+	client.NewClient = mock
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, fi)
 	cmd := &cobra.Command{}
 	cmd.Flags().Int("batch-size", 1, "")
 	cmd.Flags().Bool("json", true, "")
@@ -303,7 +360,7 @@ func TestWriteRelationshipCmdFuncFromFailsWithCaveatArg(t *testing.T) {
 				Updates: []*v1.RelationshipUpdate{
 					{
 						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-						Relationship: tuple.ParseRel("resource:1#viewer@user:1[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]"),
+						Relationship: tuple.ParseRel(`resource:1#viewer@user:1[cav:{"letters": ["a", "b", "c"]}]`),
 					},
 				},
 			},
@@ -311,17 +368,26 @@ func TestWriteRelationshipCmdFuncFromFailsWithCaveatArg(t *testing.T) {
 	}
 
 	fi := fileFromStrings(t, []string{
-		"resource:1 viewer user:1[cav:{\"letters\": [\"a\", \"b\", \"c\"]}]",
+		`resource:1 viewer user:1[cav:{"letters": ["a", "b", "c"]}]`,
 	})
 	defer func() {
-		require.NoError(t, fi.Close())
+		_ = fi.Close()
+	}()
+	t.Cleanup(func() {
+		_ = os.Remove(fi.Name())
+	})
+
+	originalClient := client.NewClient
+	client.NewClient = mock
+	defer func() {
+		client.NewClient = originalClient
 	}()
 
-	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, mock, fi)
+	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, fi)
 	cmd := &cobra.Command{}
 	cmd.Flags().Int("batch-size", 1, "")
 	cmd.Flags().Bool("json", true, "")
-	cmd.Flags().String("caveat", "cav:{\"letters\": [\"a\", \"b\", \"c\"]}", "")
+	cmd.Flags().String("caveat", `cav:{"letters": ["a", "b", "c"]}`, "")
 
 	err := f(cmd, nil)
 	require.ErrorContains(t, err, "cannot specify a caveat in both the relationship and the --caveat flag")

@@ -19,10 +19,7 @@ import (
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
-
-var isTerminal = term.IsTerminal
 
 func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	rootCmd.AddCommand(relationshipCmd)
@@ -64,22 +61,22 @@ var relationshipCmd = &cobra.Command{
 var createCmd = &cobra.Command{
 	Use:   "create <resource:id> <relation> <subject:id>",
 	Short: "create a Relationship for a Subject",
-	Args:  writeRelationshipsArgsWithStdin,
-	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE, client.NewClient, os.Stdin),
+	Args:  writeRelationshipsFromArgsOrStdin,
+	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE, os.Stdin),
 }
 
 var touchCmd = &cobra.Command{
 	Use:   "touch <resource:id> <relation> <subject:id>",
 	Short: "idempotently update a Relationship for a Subject",
-	Args:  writeRelationshipsArgsWithStdin,
-	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, client.NewClient, os.Stdin),
+	Args:  writeRelationshipsFromArgsOrStdin,
+	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, os.Stdin),
 }
 
 var deleteCmd = &cobra.Command{
 	Use:   "delete <resource:id> <relation> <subject:id>",
 	Short: "delete a Relationship",
-	Args:  writeRelationshipsArgsWithStdin,
-	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE, client.NewClient, os.Stdin),
+	Args:  writeRelationshipsFromArgsOrStdin,
+	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE, os.Stdin),
 }
 
 var readCmd = &cobra.Command{
@@ -96,28 +93,22 @@ var bulkDeleteCmd = &cobra.Command{
 	RunE:  bulkDeleteRelationships,
 }
 
-func writeRelationshipsArgsWithStdin(cmd *cobra.Command, args []string) error {
-	return writeRelationshipsArgs(cmd, args, os.Stdin)
-}
-
-func writeRelationshipsArgs(cmd *cobra.Command, args []string, file *os.File) error {
-	nArgs := len(args)
-	tty := isTerminal(int(file.Fd()))
-	if !tty && nArgs > 0 {
-		return fmt.Errorf("cannot provide input both via arguments and Stdin")
-	}
-	if !tty {
+func writeRelationshipsFromArgsOrStdin(cmd *cobra.Command, args []string) error {
+	if ok := isArgsViaFile(os.Stdin); ok {
+		if len(args) > 0 {
+			return fmt.Errorf("cannot provide input both via command-line args and stdin")
+		}
 		return nil
 	}
 	return cobra.ExactArgs(3)(cmd, args)
 }
 
 func isArgsViaFile(file *os.File) bool {
-	return !isTerminal(int(file.Fd()))
+	return !isFileTerminal(file)
 }
 
 func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
-	grpcClient, err := client.NewClient(cmd)
+	spicedbClient, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
@@ -135,7 +126,7 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 		defer cancel()
 
 		log.Trace().Interface("request", request).Send()
-		resp, err := grpcClient.ReadRelationships(ctx, request)
+		resp, err := spicedbClient.ReadRelationships(ctx, request)
 		if err != nil {
 			return err
 		}
@@ -169,7 +160,7 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 	delRequest := &v1.DeleteRelationshipsRequest{RelationshipFilter: request.RelationshipFilter}
 	log.Trace().Interface("request", delRequest).Msg("deleting relationships")
 
-	resp, err := grpcClient.DeleteRelationships(cmd.Context(), delRequest)
+	resp, err := spicedbClient.DeleteRelationships(cmd.Context(), delRequest)
 	if err != nil {
 		return err
 	}
@@ -237,13 +228,13 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	grpcClient, err := client.NewClient(cmd)
+	spicedbClient, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
 
 	log.Trace().Interface("request", request).Msg("reading relationships")
-	resp, err := grpcClient.ReadRelationships(cmd.Context(), request)
+	resp, err := spicedbClient.ReadRelationships(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -284,8 +275,7 @@ func argsToRelationship(args []string) (*v1.Relationship, error) {
 		return nil, fmt.Errorf("expected 3 arguments, but got %d", len(args))
 	}
 
-	tupleStr := fmt.Sprintf("%s#%s@%s", args[0], args[1], args[2])
-	rel := tuple.ParseRel(tupleStr)
+	rel := tupleToRel(args[0], args[1], args[2])
 	if rel == nil {
 		return nil, errors.New("failed to parse input arguments")
 	}
@@ -308,56 +298,70 @@ func relationshipToString(rel *v1.Relationship) (string, error) {
 // and returns the fields representing the 3 arguments. This is to handle
 // the fact that relationships specified via stdin can't escape spaces like
 // shell arguments.
-func parseRelationshipLine(line string) ([]string, error) {
+func parseRelationshipLine(line string) (string, string, string, error) {
+	line = strings.TrimSpace(line)
 	resourceIdx := strings.IndexFunc(line, unicode.IsSpace)
 	if resourceIdx == -1 {
-		return nil, fmt.Errorf("expected %s to have 3 arguments, but got 0", line)
+		args := 0
+		if line != "" {
+			args = 1
+		}
+		return "", "", "", fmt.Errorf("expected %s to have 3 arguments, but got %v", line, args)
 	}
 
 	resource := line[:resourceIdx]
 	rest := strings.TrimSpace(line[resourceIdx+1:])
 	relationIdx := strings.IndexFunc(rest, unicode.IsSpace)
 	if relationIdx == -1 {
-		return nil, fmt.Errorf("expected %s to have 3 arguments, but got 1", line)
+		args := 1
+		if strings.TrimSpace(rest) != "" {
+			args = 2
+		}
+		return "", "", "", fmt.Errorf("expected %s to have 3 arguments, but got %v", line, args)
 	}
 
 	relation := rest[:relationIdx]
 	rest = strings.TrimSpace(rest[relationIdx+1:])
 	if rest == "" {
-		return nil, fmt.Errorf("expected %s to have 3 arguments, but got 2", line)
+		return "", "", "", fmt.Errorf("expected %s to have 3 arguments, but got 2", line)
 	}
 
-	return []string{resource, relation, rest}, nil
+	return resource, relation, rest, nil
 }
 
-type nextRelationshipFunc func() ([]string, error)
-
-func streamArgsFromFile(file *os.File) nextRelationshipFunc {
-	scanner := bufio.NewScanner(file)
-	return func() ([]string, error) {
+func FileRelationshipParser(f *os.File) RelationshipParser {
+	scanner := bufio.NewScanner(f)
+	return func() (*v1.Relationship, error) {
 		if scanner.Scan() {
-			args, err := parseRelationshipLine(scanner.Text())
+			res, rel, subj, err := parseRelationshipLine(scanner.Text())
 			if err != nil {
 				return nil, err
 			}
-			return args, nil
+			return tupleToRel(res, rel, subj), nil
 		}
-		return nil, scanner.Err()
+		if err := scanner.Err(); err != nil {
+			return nil, err
+		}
+		return nil, ErrExhaustedRelationships
 	}
 }
 
-func streamArgsFromCliArgs(args []string) nextRelationshipFunc {
+func tupleToRel(resource, relation, subject string) *v1.Relationship {
+	return tuple.ParseRel(resource + "#" + relation + "@" + subject)
+}
+
+func SliceRelationshipParser(args []string) RelationshipParser {
 	ran := false
-	return func() ([]string, error) {
+	return func() (*v1.Relationship, error) {
 		if ran {
-			return nil, nil
+			return nil, ErrExhaustedRelationships
 		}
 		ran = true
-		return args, nil
+		return tupleToRel(args[0], args[1], args[2]), nil
 	}
 }
 
-func writeUpdates(ctx context.Context, grpcClient client.Client, updates []*v1.RelationshipUpdate, json bool) error {
+func writeUpdates(ctx context.Context, spicedbClient client.Client, updates []*v1.RelationshipUpdate, json bool) error {
 	if len(updates) == 0 {
 		return nil
 	}
@@ -367,7 +371,7 @@ func writeUpdates(ctx context.Context, grpcClient client.Client, updates []*v1.R
 	}
 
 	log.Trace().Interface("request", request).Msg("writing relationships")
-	resp, err := grpcClient.WriteRelationships(ctx, request)
+	resp, err := spicedbClient.WriteRelationships(ctx, request)
 	if err != nil {
 		return err
 	}
@@ -386,29 +390,23 @@ func writeUpdates(ctx context.Context, grpcClient client.Client, updates []*v1.R
 	return nil
 }
 
-func toRelationship(f nextRelationshipFunc) (*v1.Relationship, error) {
-	args, err := f()
-	if err != nil {
-		return nil, err
-	}
-	if args == nil {
-		return nil, nil
-	}
-	return argsToRelationship(args)
-}
+// RelationshipParser is a closure that can produce relationships.
+// When there are no more relationships, it will return ErrExhaustedRelationships.
+type RelationshipParser func() (*v1.Relationship, error)
 
-func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation, clientFunc func(command *cobra.Command) (client.Client, error), input *os.File) func(cmd *cobra.Command, args []string) error {
+// ErrExhaustedRelationships signals that the last producible value of a RelationshipParser
+// has already been consumed.
+// Functions should return this error to signal a graceful end of input.
+var ErrExhaustedRelationships = errors.New("exhausted all relationships")
+
+func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation, input *os.File) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		// getNextRelationship is a function that will fetch the next relationship to write.
-		// Either it will read a stream of relationships from stdin, or it will simply return
-		// the command line arguments once. When there are no more relationships, it will return
-		// nil for the first parameter.
-		getNextRelationship := streamArgsFromCliArgs(args)
+		parser := SliceRelationshipParser(args)
 		if isArgsViaFile(input) {
-			getNextRelationship = streamArgsFromFile(input)
+			parser = FileRelationshipParser(input)
 		}
 
-		grpcClient, err := clientFunc(cmd)
+		spicedbClient, err := client.NewClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -418,13 +416,11 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation, clientF
 		doJSON := cobrautil.MustGetBool(cmd, "json")
 
 		for {
-			rel, err := toRelationship(getNextRelationship)
-			if err != nil {
+			rel, err := parser()
+			if errors.Is(err, ErrExhaustedRelationships) {
+				return writeUpdates(cmd.Context(), spicedbClient, updateBatch, doJSON)
+			} else if err != nil {
 				return err
-			}
-			if rel == nil {
-				// No more relationships coming. Write any batched requests not yet sent before exiting.
-				return writeUpdates(cmd.Context(), grpcClient, updateBatch, doJSON)
 			}
 
 			if operation != v1.RelationshipUpdate_OPERATION_DELETE {
@@ -438,7 +434,7 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation, clientF
 				Relationship: rel,
 			})
 			if len(updateBatch) == batchSize {
-				if err := writeUpdates(cmd.Context(), grpcClient, updateBatch, doJSON); err != nil {
+				if err := writeUpdates(cmd.Context(), spicedbClient, updateBatch, doJSON); err != nil {
 					return err
 				}
 				updateBatch = nil

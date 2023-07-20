@@ -10,7 +10,10 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"golang.org/x/term"
 )
+
+var isFileTerminal = func(f *os.File) bool { return term.IsTerminal(int(f.Fd())) }
 
 func performBulkDeletionConfirmation(counter int) error {
 	message := fmt.Sprintf("Will delete %d relationships. Continue?", counter)
