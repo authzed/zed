@@ -58,4 +58,14 @@ func TestZedCommand(t *testing.T) {
 	require.Contains(t, updatedContext.Schema, "definition document")
 	require.Equal(t, `document:first#viewer@user:fred[somecaveat:{"somecondition":42}]`, tuple.MustString(updatedContext.Relationships[0]))
 	require.Equal(t, "document:first#viewer@user:tom", tuple.MustString(updatedContext.Relationships[1]))
+	require.Len(t, updatedContext.Relationships, 2)
+
+	// Run the actual command.
+	result = runZedCommand(rootCmd, string(encodedContext), []string{"relationship", "create", "document:1", "viewer", "user:1"})
+	require.Empty(t, result.Error, "failed to run relationship create: %s", result.Error)
+
+	updatedContext = &devinterface.RequestContext{}
+	err = protojson.Unmarshal([]byte(result.UpdatedContext), updatedContext)
+	require.NoError(t, err)
+	require.Len(t, updatedContext.Relationships, 3)
 }
