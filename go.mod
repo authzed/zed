@@ -1,6 +1,6 @@
 module github.com/authzed/zed
 
-go 1.19
+go 1.20
 
 require (
 	github.com/99designs/keyring v1.2.2
