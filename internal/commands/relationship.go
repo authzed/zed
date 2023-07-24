@@ -94,10 +94,7 @@ var bulkDeleteCmd = &cobra.Command{
 }
 
 func writeRelationshipsFromArgsOrStdin(cmd *cobra.Command, args []string) error {
-	if ok := isArgsViaFile(os.Stdin); ok {
-		if len(args) > 0 {
-			return fmt.Errorf("cannot provide input both via command-line args and stdin")
-		}
+	if ok := isArgsViaFile(os.Stdin) && len(args) == 0; ok {
 		return nil
 	}
 	return cobra.ExactArgs(3)(cmd, args)
@@ -402,7 +399,7 @@ var ErrExhaustedRelationships = errors.New("exhausted all relationships")
 func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation, input *os.File) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		parser := SliceRelationshipParser(args)
-		if isArgsViaFile(input) {
+		if isArgsViaFile(input) && len(args) == 0 {
 			parser = FileRelationshipParser(input)
 		}
 
