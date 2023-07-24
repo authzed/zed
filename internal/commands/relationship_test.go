@@ -200,20 +200,23 @@ func TestWriteRelationshipsArgs(t *testing.T) {
 		_ = os.Remove(f.Name())
 	})
 
-	// returns accepts anything if input file is not a terminal
-	require.Nil(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, nil))
-
-	// does not accept both file input and arguments
-	require.ErrorContains(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, []string{"a", "b"}), "cannot provide input both via command-line args and stdin")
-
-	// checks there is 3 input arguments in case of tty
+	isTerm := false
 	originalFunc := isFileTerminal
 	isFileTerminal = func(f *os.File) bool {
-		return true
+		return isTerm
 	}
 	defer func() {
 		isFileTerminal = originalFunc
 	}()
+
+	// returns accepts anything if input file is not a terminal
+	require.Nil(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, nil))
+
+	// if both STDIN and CLI args are provided, CLI args take precedence
+	require.ErrorContains(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, []string{"a", "b"}), "accepts 3 arg(s), received 2")
+
+	isTerm = true
+	// checks there is 3 input arguments in case of tty
 	require.ErrorContains(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, nil), "accepts 3 arg(s), received 0")
 	require.Nil(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, []string{"a", "b", "c"}))
 }
@@ -258,6 +261,52 @@ func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
 	cmd.Flags().String("caveat", `cav:{"letters": ["a", "b", "c"]}`, "")
 
 	err = f(cmd, []string{"resource:1", "view", "user:1"})
+	require.NoError(t, err)
+}
+
+func TestWriteRelationshipCmdFuncArgsTakePrecedence(t *testing.T) {
+	mock := func(*cobra.Command) (client.Client, error) {
+		return &mockClient{t: t, expectedWrites: []*v1.WriteRelationshipsRequest{{
+			Updates: []*v1.RelationshipUpdate{
+				{
+					Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+					Relationship: tuple.ParseRel("resource:1#viewer@user:1"),
+				},
+			},
+		}}}, nil
+	}
+
+	originalFunc := isFileTerminal
+	isFileTerminal = func(f *os.File) bool {
+		return false
+	}
+	defer func() {
+		isFileTerminal = originalFunc
+	}()
+
+	fi := fileFromStrings(t, []string{
+		"resource:1 viewer user:3",
+	})
+	defer func() {
+		require.NoError(t, fi.Close())
+	}()
+	t.Cleanup(func() {
+		_ = os.Remove(fi.Name())
+	})
+
+	originalClient := client.NewClient
+	client.NewClient = mock
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, fi)
+	cmd := &cobra.Command{}
+	cmd.Flags().Int("batch-size", 100, "")
+	cmd.Flags().Bool("json", true, "")
+	cmd.Flags().String("caveat", "", "")
+
+	err := f(cmd, []string{"resource:1", "viewer", "user:1"})
 	require.NoError(t, err)
 }
 
