@@ -59,21 +59,21 @@ var relationshipCmd = &cobra.Command{
 }
 
 var createCmd = &cobra.Command{
-	Use:   "create <resource:id> <relation> <subject:id>",
+	Use:   "create <resource:id> <relation> <subject:id#optional_subject_relation>",
 	Short: "create a Relationship for a Subject",
 	Args:  writeRelationshipsFromArgsOrStdin,
 	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE, os.Stdin),
 }
 
 var touchCmd = &cobra.Command{
-	Use:   "touch <resource:id> <relation> <subject:id>",
+	Use:   "touch <resource:id> <relation> <subject:id#optional_subject_relation>",
 	Short: "idempotently update a Relationship for a Subject",
 	Args:  writeRelationshipsFromArgsOrStdin,
 	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, os.Stdin),
 }
 
 var deleteCmd = &cobra.Command{
-	Use:   "delete <resource:id> <relation> <subject:id>",
+	Use:   "delete <resource:id> <relation> <subject:id#optional_subject_relation>",
 	Short: "delete a Relationship",
 	Args:  writeRelationshipsFromArgsOrStdin,
 	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE, os.Stdin),
