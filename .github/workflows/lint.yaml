@@ -56,8 +56,8 @@ jobs:
         with:
           scan-type: "fs"
           ignore-unfixed: true
-          format: 'table'
-          exit-code: '1'
+          format: "table"
+          exit-code: "1"
           severity: "CRITICAL,HIGH,MEDIUM"
 
   trivy-image:
@@ -85,6 +85,4 @@ jobs:
       - name: "Obtain container image to scan"
         run: 'echo "IMAGE_VERSION=$(jq .version dist/linux_amd64/metadata.json --raw-output)" >> $GITHUB_ENV'
       - name: "run trivy on release image"
-        run: 'docker run -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --format table --exit-code 1 --ignore-unfixed --vuln-type os,library --no-progress --severity CRITICAL,HIGH,MEDIUM authzed/zed:v${{ env.IMAGE_VERSION }}-amd64'
-      - name: "run trivy on debug image"
-        run: 'docker run -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --format table --exit-code 1 --ignore-unfixed --vuln-type os,library --no-progress --severity CRITICAL,HIGH,MEDIUM authzed/zed:v${{ env.IMAGE_VERSION }}-amd64-debug'
+        run: "docker run -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --format table --exit-code 1 --ignore-unfixed --vuln-type os,library --no-progress --severity CRITICAL,HIGH,MEDIUM authzed/zed:v${{ env.IMAGE_VERSION }}-amd64"
