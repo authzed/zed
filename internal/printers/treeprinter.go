@@ -1,6 +1,8 @@
 package printers
 
 import (
+	"strings"
+
 	"github.com/authzed/zed/internal/console"
 
 	"github.com/xlab/treeprint"
@@ -24,6 +26,16 @@ func (tp *TreePrinter) Child(val string) *TreePrinter {
 
 func (tp *TreePrinter) Print() {
 	console.Println(tp.String())
+}
+
+func (tp *TreePrinter) PrintIndented() {
+	lines := strings.Split(tp.String(), "\n")
+	indentedLines := make([]string, 0, len(lines))
+	for _, line := range lines {
+		indentedLines = append(indentedLines, "  "+line)
+	}
+
+	console.Println(strings.Join(indentedLines, "\n"))
 }
 
 func (tp *TreePrinter) String() string {
