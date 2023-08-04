@@ -15,7 +15,7 @@ require (
 	github.com/hamba/avro/v2 v2.13.0
 	github.com/jzelinskie/cobrautil v0.0.12
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20230714172849-80717639cec5
-	github.com/jzelinskie/stringz v0.0.1
+	github.com/jzelinskie/stringz v0.0.2
 	github.com/mattn/go-isatty v0.0.19
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/olekukonko/tablewriter v0.0.5
