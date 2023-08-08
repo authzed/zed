@@ -11,7 +11,7 @@ require (
 	github.com/authzed/spicedb v1.24.0-rc1.0.20230808182745-026190fb4d45
 	github.com/brianvoe/gofakeit/v6 v6.22.0
 	github.com/charmbracelet/lipgloss v0.7.1
-	github.com/gookit/color v1.5.3
+	github.com/gookit/color v1.5.4
 	github.com/hamba/avro/v2 v2.13.0
 	github.com/jzelinskie/cobrautil v0.0.12
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20230714172849-80717639cec5
