@@ -2,6 +2,8 @@ package grpcutil
 
 import (
 	"context"
+	"errors"
+	"io"
 	"time"
 
 	"github.com/authzed/authzed-go/pkg/requestmeta"
@@ -97,6 +99,11 @@ func LogDispatchTrailers(
 ) error {
 	var trailerMD metadata.MD
 	err := invoker(ctx, method, req, reply, cc, append(callOpts, grpc.Trailer(&trailerMD))...)
+	outputDispatchTrailers(trailerMD)
+	return err
+}
+
+func outputDispatchTrailers(trailerMD metadata.MD) {
 	log.Trace().Interface("trailers", trailerMD).Msg("parsed trailers")
 
 	dispatchCount, trailerErr := responsemeta.GetIntResponseTrailerMetadata(
@@ -119,6 +126,34 @@ func LogDispatchTrailers(
 		Int("dispatch", dispatchCount).
 		Int("cached", cachedCount).
 		Msg("extracted response dispatch metadata")
+}
 
+// StreamLogDispatchTrailers implements a gRPC stream interceptor that logs the
+// dispatch metadata that is present in response trailers from SpiceDB.
+func StreamLogDispatchTrailers(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	cc *grpc.ClientConn,
+	method string,
+	streamer grpc.Streamer,
+	callOpts ...grpc.CallOption,
+) (grpc.ClientStream, error) {
+	stream, err := streamer(ctx, desc, cc, method, callOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &wrappedStream{stream}, nil
+}
+
+type wrappedStream struct {
+	grpc.ClientStream
+}
+
+func (w *wrappedStream) RecvMsg(m interface{}) error {
+	err := w.ClientStream.RecvMsg(m)
+	if err != nil && errors.Is(err, io.EOF) {
+		outputDispatchTrailers(w.Trailer())
+	}
 	return err
 }
