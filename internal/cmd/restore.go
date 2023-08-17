@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -28,23 +27,41 @@ func registerRestoreCmd(rootCmd *cobra.Command) {
 var restoreCmd = &cobra.Command{
 	Use:   "restore <filename>",
 	Short: "Restore a permission system from a file",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MaximumNArgs(1),
 	RunE:  restoreCmdFunc,
 }
 
-func restoreCmdFunc(cmd *cobra.Command, args []string) error {
-	filename := args[0]
+func openRestoreFile(filename string) (*os.File, int64, error) {
+	if filename == "" {
+		log.Trace().Str("filename", "(stdin)").Send()
+		return os.Stdin, -1, nil
+	}
 
 	log.Trace().Str("filename", filename).Send()
 
 	stats, err := os.Stat(filename)
 	if err != nil {
-		return fmt.Errorf("unable to stat restore file: %w", err)
+		return nil, 0, fmt.Errorf("unable to stat restore file: %w", err)
 	}
 
 	f, err := os.Open(filename)
 	if err != nil {
-		return fmt.Errorf("unable to open restore file: %w", err)
+		return nil, 0, fmt.Errorf("unable to open restore file: %w", err)
+	}
+
+	return f, stats.Size(), nil
+}
+
+func restoreCmdFunc(cmd *cobra.Command, args []string) error {
+	filename := "" // Default to stdin.
+
+	if len(args) > 0 {
+		filename = args[0]
+	}
+
+	f, fSize, err := openRestoreFile(filename)
+	if err != nil {
+		return err
 	}
 
 	printZTOnly := cobrautil.MustGetBool(cmd, "print-zedtoken-only")
@@ -52,7 +69,7 @@ func restoreCmdFunc(cmd *cobra.Command, args []string) error {
 	var hasProgressbar bool
 	var restoreReader io.Reader = f
 	if isatty.IsTerminal(os.Stderr.Fd()) && !printZTOnly {
-		bar := progressbar.DefaultBytes(stats.Size(), "restoring")
+		bar := progressbar.DefaultBytes(fSize, "restoring")
 		restoreReader = io.TeeReader(f, bar)
 		hasProgressbar = true
 	}
@@ -76,7 +93,7 @@ func restoreCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unable to initialize client: %w", err)
 	}
 
-	ctx := context.Background()
+	ctx := cmd.Context()
 
 	if _, err := client.WriteSchema(ctx, &v1.WriteSchemaRequest{
 		Schema: decoder.Schema(),
