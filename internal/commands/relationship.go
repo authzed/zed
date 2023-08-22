@@ -43,6 +43,7 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	readCmd.Flags().String("revision", "", "optional revision at which to check")
 	_ = readCmd.Flags().MarkHidden("revision")
 	readCmd.Flags().String("subject-filter", "", "optional subject filter")
+	readCmd.Flags().Uint32("page-limit", 100, "limit of relations returned per page")
 	registerConsistencyFlags(readCmd.Flags())
 
 	relationshipCmd.AddCommand(bulkDeleteCmd)
@@ -209,62 +210,93 @@ func buildReadRequest(cmd *cobra.Command, args []string) (*v1.ReadRelationshipsR
 		}
 	}
 
+	limit := cobrautil.MustGetUint32(cmd, "page-limit")
 	return &v1.ReadRelationshipsRequest{
 		RelationshipFilter: readFilter,
+		OptionalLimit:      limit,
 	}, nil
 }
 
 func readRelationships(cmd *cobra.Command, args []string) error {
+	spicedbClient, err := client.NewClient(cmd)
+	if err != nil {
+		return err
+	}
+
 	request, err := buildReadRequest(cmd, args)
 	if err != nil {
 		return err
 	}
+	limit := request.OptionalLimit
 
 	request.Consistency, err = consistencyFromCmd(cmd)
 	if err != nil {
 		return err
 	}
 
-	spicedbClient, err := client.NewClient(cmd)
-	if err != nil {
-		return err
-	}
-
-	log.Trace().Interface("request", request).Msg("reading relationships")
-	resp, err := spicedbClient.ReadRelationships(cmd.Context(), request)
-	if err != nil {
-		return err
-	}
-
+	lastCursor := request.OptionalCursor
 	for {
-		if err := cmd.Context().Err(); err != nil {
-			return err
+		request.OptionalCursor = lastCursor
+		var cursorToken string
+		if lastCursor != nil {
+			cursorToken = lastCursor.Token
 		}
-
-		msg, err := resp.Recv()
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-
+		log.Trace().Interface("request", request).Str("cursor", cursorToken).Msg("reading relationships page")
+		readRelClient, err := spicedbClient.ReadRelationships(cmd.Context(), request)
 		if err != nil {
 			return err
 		}
 
-		if cobrautil.MustGetBool(cmd, "json") {
-			prettyProto, err := PrettyProto(msg)
+		var relCount uint32
+		for {
+			if err := cmd.Context().Err(); err != nil {
+				return err
+			}
+
+			msg, err := readRelClient.Recv()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
 			if err != nil {
 				return err
 			}
 
-			console.Println(string(prettyProto))
-		} else {
-			relString, err := relationshipToString(msg.Relationship)
-			if err != nil {
+			lastCursor = msg.AfterResultCursor
+			relCount++
+			if err := printRelationship(cmd, msg); err != nil {
 				return err
 			}
-			console.Println(relString)
+		}
+
+		if relCount < limit || limit == 0 {
+			return nil
+		}
+
+		if relCount > limit {
+			log.Warn().Uint32("limit-specified", limit).Uint32("relationships-received", relCount).Msg("page limit ignored, pagination may not be supported by the server, consider updating SpiceDB")
+			return nil
 		}
 	}
+}
+
+func printRelationship(cmd *cobra.Command, msg *v1.ReadRelationshipsResponse) error {
+	if cobrautil.MustGetBool(cmd, "json") {
+		prettyProto, err := PrettyProto(msg)
+		if err != nil {
+			return err
+		}
+
+		console.Println(string(prettyProto))
+	} else {
+		relString, err := relationshipToString(msg.Relationship)
+		if err != nil {
+			return err
+		}
+		console.Println(relString)
+	}
+
+	return nil
 }
 
 func argsToRelationship(args []string) (*v1.Relationship, error) {
