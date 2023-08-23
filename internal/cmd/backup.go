@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -29,18 +28,30 @@ var backupCmd = &cobra.Command{
 	RunE:  backupCmdFunc,
 }
 
-func backupCmdFunc(cmd *cobra.Command, args []string) error {
-	filename := args[0]
+func createBackupFile(filename string) (*os.File, error) {
+	if filename == "-" {
+		log.Trace().Str("filename", "- (stdout)").Send()
+		return os.Stdout, nil
+	}
 
 	log.Trace().Str("filename", filename).Send()
 
 	if _, err := os.Stat(filename); err == nil {
-		return fmt.Errorf("backup file already exists: %s", filename)
+		return nil, fmt.Errorf("backup file already exists: %s", filename)
 	}
 
 	f, err := os.Create(filename)
 	if err != nil {
-		return fmt.Errorf("unable to create backup file: %w", err)
+		return nil, fmt.Errorf("unable to create backup file: %w", err)
+	}
+
+	return f, nil
+}
+
+func backupCmdFunc(cmd *cobra.Command, args []string) error {
+	f, err := createBackupFile(args[0])
+	if err != nil {
+		return err
 	}
 
 	client, err := client.NewClient(cmd)
@@ -48,7 +59,7 @@ func backupCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unable to initialize client: %w", err)
 	}
 
-	ctx := context.Background()
+	ctx := cmd.Context()
 
 	schemaResp, err := client.ReadSchema(ctx, &v1.ReadSchemaRequest{})
 	if err != nil {
@@ -116,8 +127,10 @@ func backupCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error closing backup encoder: %w", err)
 	}
 
-	if err := f.Sync(); err != nil {
-		return fmt.Errorf("error syncing backup file: %w", err)
+	if f != os.Stdout {
+		if err := f.Sync(); err != nil {
+			return fmt.Errorf("error syncing backup file: %w", err)
+		}
 	}
 
 	if err := f.Close(); err != nil {
