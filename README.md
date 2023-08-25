@@ -48,8 +48,10 @@ brew install authzed/tap/zed
 [Debian-based Linux] users can install zed packages by adding a new APT source:
 
 ```command
-sudo echo "deb [trusted=yes] https://apt.fury.io/authzed/ /" > /etc/apt/sources.list.d/authzed-fury.list
-sudo apt update && sudo apt install zed
+sudo apt update && sudo apt install -y curl ca-certificates gpg
+curl https://apt.fury.io/authzed/gpg.key | sudo apt-key add -
+echo "deb https://apt.fury.io/authzed/ * *" > /etc/apt/sources.list.d/fury.list
+sudo apt update && sudo apt install -y zed
 ```
 
 [RPM-based Linux] users can install zed packages by adding a new YUM repository:
@@ -62,7 +64,7 @@ baseurl=https://yum.fury.io/authzed/
 enabled=1
 gpgcheck=0
 EOF
-sudo dnf install zed
+sudo dnf install -y zed
 ```
 
 [homebrew]: https://docs.authzed.com/spicedb/installing#brew

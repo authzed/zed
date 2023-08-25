@@ -117,6 +117,11 @@ nfpms:
     builds: ["linux-amd64-musl", "linux-arm64-musl"]
     formats: ["apk"]
 
+furies:
+  - account: "authzed"
+    secret_name: "GEMFURY_PUSH_TOKEN"
+    skip: "{{ gt (len .Prerelease) 0 }}"
+
 brews:
   - tap:
       owner: "authzed"
