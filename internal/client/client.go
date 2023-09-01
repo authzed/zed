@@ -83,8 +83,6 @@ func certOption(cmd *cobra.Command, token storage.Token) (opt grpc.DialOption, e
 
 // DialOptsFromFlags returns the dial options from the CLI-specified flags.
 func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOption, error) {
-	grpc.WithChainUnaryInterceptor()
-
 	interceptors := []grpc.UnaryClientInterceptor{
 		zgrpcutil.LogDispatchTrailers,
 	}
@@ -93,7 +91,10 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 		interceptors = append(interceptors, zgrpcutil.CheckServerVersion)
 	}
 
-	opts := []grpc.DialOption{grpc.WithChainUnaryInterceptor(interceptors...)}
+	opts := []grpc.DialOption{
+		grpc.WithChainUnaryInterceptor(interceptors...),
+		grpc.WithChainStreamInterceptor(zgrpcutil.StreamLogDispatchTrailers),
+	}
 
 	if cobrautil.MustGetBool(cmd, "insecure") || (token.IsInsecure()) {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
