@@ -20,6 +20,7 @@ import (
 
 	"github.com/authzed/zed/internal/console"
 	"github.com/authzed/zed/internal/decode"
+	"github.com/authzed/zed/internal/printers"
 )
 
 var (
@@ -31,6 +32,7 @@ var (
 	highlightedLineStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 	codeStyle              = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 	highlightedCodeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
+	traceStyle             = lipgloss.NewStyle().Bold(true)
 )
 
 func registerValidateCmd(rootCmd *cobra.Command) {
@@ -100,7 +102,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if devErrs != nil {
-		outputDeveloperErrors(validateContents, devErrs.InputErrors)
+		outputDeveloperErrorsWithLineOffset(validateContents, devErrs.InputErrors, 1 /* for the 'schema:' */)
 	}
 
 	// Run assertions.
@@ -146,24 +148,35 @@ func ouputErrorWithSource(validateContents []byte, errWithSource spiceerrors.Err
 }
 
 func outputDeveloperErrors(validateContents []byte, devErrors []*devinterface.DeveloperError) {
+	outputDeveloperErrorsWithLineOffset(validateContents, devErrors, 0)
+}
+
+func outputDeveloperErrorsWithLineOffset(validateContents []byte, devErrors []*devinterface.DeveloperError, lineOffset int) {
 	lines := strings.Split(string(validateContents), "\n")
 
 	for _, devErr := range devErrors {
-		outputDeveloperError(devErr, lines)
+		outputDeveloperError(devErr, lines, lineOffset)
 	}
 
 	os.Exit(1)
 }
 
-func outputDeveloperError(devError *devinterface.DeveloperError, lines []string) {
+func outputDeveloperError(devError *devinterface.DeveloperError, lines []string, lineOffset int) {
 	console.Printf("%s %s\n", errorPrefix, errorMessageStyle.Render(devError.Message))
-	errorLineNumber := int(devError.Line) // devError.Line is 0-indexed
+	errorLineNumber := int(devError.Line) - 1 + lineOffset // devError.Line is 1-indexed
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
 			renderLine(lines, i, devError.Context, errorLineNumber)
 		} else {
 			renderLine(lines, i, "", errorLineNumber)
 		}
+	}
+
+	if devError.CheckResolvedDebugInformation != nil && devError.CheckResolvedDebugInformation.Check != nil {
+		console.Printf("\n  %s\n", traceStyle.Render("Explanation:"))
+		tp := printers.NewTreePrinter()
+		printers.DisplayCheckTrace(devError.CheckResolvedDebugInformation.Check, tp, true)
+		tp.PrintIndented()
 	}
 
 	console.Printf("\n\n")
