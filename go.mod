@@ -10,7 +10,7 @@ require (
 	github.com/authzed/grpcutil v0.0.0-20230703173955-bdd0ac3f16a5
 	github.com/authzed/spicedb v1.24.0-rc1.0.20230808182745-026190fb4d45
 	github.com/brianvoe/gofakeit/v6 v6.22.0
-	github.com/charmbracelet/lipgloss v0.7.1
+	github.com/charmbracelet/lipgloss v0.8.0
 	github.com/gookit/color v1.5.3
 	github.com/hamba/avro/v2 v2.13.0
 	github.com/jzelinskie/cobrautil v0.0.12
@@ -91,7 +91,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
-	github.com/muesli/termenv v0.15.1 // indirect
+	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.9 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.16.0 // indirect
