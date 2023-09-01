@@ -6,15 +6,15 @@ require (
 	github.com/99designs/keyring v1.2.2
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
-	github.com/authzed/authzed-go v0.9.1-0.20230808160157-67ca5a9f8322
+	github.com/authzed/authzed-go v0.9.1-0.20230830212047-e1e7da6e877d
 	github.com/authzed/grpcutil v0.0.0-20230703173955-bdd0ac3f16a5
-	github.com/authzed/spicedb v1.24.0-rc1.0.20230808182745-026190fb4d45
+	github.com/authzed/spicedb v1.25.0-rc4
 	github.com/brianvoe/gofakeit/v6 v6.22.0
 	github.com/charmbracelet/lipgloss v0.7.1
 	github.com/gookit/color v1.5.3
 	github.com/hamba/avro/v2 v2.13.0
 	github.com/jzelinskie/cobrautil v0.0.12
-	github.com/jzelinskie/cobrautil/v2 v2.0.0-20230714172849-80717639cec5
+	github.com/jzelinskie/cobrautil/v2 v2.0.0-20230825161137-b46695920a60
 	github.com/jzelinskie/stringz v0.0.2
 	github.com/mattn/go-isatty v0.0.19
 	github.com/mitchellh/go-homedir v1.1.0
@@ -37,6 +37,7 @@ require (
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df // indirect
+	github.com/authzed/cel-go v0.17.5 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
@@ -59,7 +60,6 @@ require (
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/cel-go v0.17.1 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/go-github/v43 v43.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
