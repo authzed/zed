@@ -9,7 +9,7 @@ require (
 	github.com/authzed/authzed-go v0.9.1-0.20230808160157-67ca5a9f8322
 	github.com/authzed/grpcutil v0.0.0-20230703173955-bdd0ac3f16a5
 	github.com/authzed/spicedb v1.24.0-rc1.0.20230808182745-026190fb4d45
-	github.com/brianvoe/gofakeit/v6 v6.22.0
+	github.com/brianvoe/gofakeit/v6 v6.23.2
 	github.com/charmbracelet/lipgloss v0.7.1
 	github.com/gookit/color v1.5.3
 	github.com/hamba/avro/v2 v2.13.0
