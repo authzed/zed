@@ -210,10 +210,8 @@ func buildReadRequest(cmd *cobra.Command, args []string) (*v1.ReadRelationshipsR
 		}
 	}
 
-	limit := cobrautil.MustGetUint32(cmd, "page-limit")
 	return &v1.ReadRelationshipsRequest{
 		RelationshipFilter: readFilter,
-		OptionalLimit:      limit,
 	}, nil
 }
 
@@ -227,7 +225,10 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	limit := request.OptionalLimit
+
+	limit := cobrautil.MustGetUint32(cmd, "page-limit")
+
+	request.OptionalLimit = limit
 
 	request.Consistency, err = consistencyFromCmd(cmd)
 	if err != nil {
