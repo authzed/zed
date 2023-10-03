@@ -49,10 +49,12 @@ func DefaultToken(overrideEndpoint, overrideAPIToken string, cs ConfigStore, ss 
 	}
 
 	return Token{
-		Name:     token.Name,
-		Endpoint: stringz.DefaultEmpty(overrideEndpoint, token.Endpoint),
-		APIToken: stringz.DefaultEmpty(overrideAPIToken, token.APIToken),
-		Insecure: token.Insecure,
+		Name:       token.Name,
+		Endpoint:   stringz.DefaultEmpty(overrideEndpoint, token.Endpoint),
+		APIToken:   stringz.DefaultEmpty(overrideAPIToken, token.APIToken),
+		Insecure:   token.Insecure,
+		NoVerifyCA: token.NoVerifyCA,
+		CACert:     token.CACert,
 	}, nil
 }
 
