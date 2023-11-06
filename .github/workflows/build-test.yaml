@@ -11,15 +11,17 @@ on: # yamllint disable-line rule:truthy
   merge_group:
     types:
       - "checks_requested"
+env:
+  GO_VERSION: "~1.21.3"
 jobs:
   build:
     name: "Build Binary"
     runs-on: "ubuntu-latest"
     steps:
       - uses: "actions/checkout@v3"
-      - uses: "actions/setup-go@v3"
+      - uses: "authzed/actions/setup-go@main"
         with:
-          go-version: "~1.20"
+          go-version: "${{ env.GO_VERSION }}"
       - uses: "authzed/actions/go-build@main"
 
   image-build:
@@ -34,10 +36,9 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - uses: "actions/checkout@v3"
-      - uses: "actions/setup-go@v3"
+      - uses: "authzed/actions/setup-go@main"
         with:
           go-version: "${{ env.GO_VERSION }}"
-          cache: "true"
       - uses: "authzed/action-spicedb@v1"
       - uses: "authzed/actions/go-test@main"
 
@@ -46,7 +47,7 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - uses: "actions/checkout@v3"
-      - uses: "actions/setup-go@v3"
+      - uses: "authzed/actions/setup-go@main"
         with:
           go-version: "${{ env.GO_VERSION }}"
           cache: "false" # do not cache to prevent cache poisoning
