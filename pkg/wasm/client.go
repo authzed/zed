@@ -72,6 +72,11 @@ func (wc wasmClient) BulkImportRelationships(ctx context.Context, opts ...grpc.C
 	return client.BulkImportRelationships(ctx, opts...)
 }
 
+func (wc wasmClient) BulkCheckPermission(ctx context.Context, in *v1.BulkCheckPermissionRequest, opts ...grpc.CallOption) (*v1.BulkCheckPermissionResponse, error) {
+	client := v1.NewExperimentalServiceClient(wc.conn)
+	return client.BulkCheckPermission(ctx, in, opts...)
+}
+
 func (wc wasmClient) Watch(ctx context.Context, in *v1.WatchRequest, opts ...grpc.CallOption) (v1.WatchService_WatchClient, error) {
 	client := v1.NewWatchServiceClient(wc.conn)
 	return client.Watch(ctx, in, opts...)
