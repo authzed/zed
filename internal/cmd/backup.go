@@ -94,6 +94,10 @@ func backupCmdFunc(cmd *cobra.Command, args []string) error {
 
 	var stored uint
 	for {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("aborted backup: %w", err)
+		}
+
 		relsResp, err := relationshipStream.Recv()
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
