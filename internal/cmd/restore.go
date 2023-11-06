@@ -117,6 +117,10 @@ func restoreCmdFunc(cmd *cobra.Command, args []string) error {
 	var written uint64
 	var batchesWritten int
 	for rel, err := decoder.Next(); rel != nil && err == nil; rel, err = decoder.Next() {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("aborted restore: %w", err)
+		}
+
 		batch = append(batch, rel)
 
 		if len(batch)%batchSize == 0 {
