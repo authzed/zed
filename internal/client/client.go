@@ -108,5 +108,10 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 		opts = append(opts, certOpt)
 	}
 
+	hostnameOverride := cobrautil.MustGetString(cmd, "hostname-override")
+	if hostnameOverride != "" {
+		opts = append(opts, grpc.WithAuthority(hostnameOverride))
+	}
+
 	return opts, nil
 }
