@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -127,7 +128,8 @@ func restoreCmdFunc(cmd *cobra.Command, args []string) error {
 			if err := relationshipWriter.Send(&v1.BulkImportRelationshipsRequest{
 				Relationships: batch,
 			}); err != nil {
-				return fmt.Errorf("error sending batch to server: %w", err)
+				_, closeErr := relationshipWriter.CloseAndRecv()
+				return fmt.Errorf("error sending batch to server: %w", errors.Join(err, closeErr))
 			}
 
 			// Reset the relationships in the batch
