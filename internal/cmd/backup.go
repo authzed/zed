@@ -13,8 +13,8 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 
-	"github.com/authzed/zed/internal/backupformat"
 	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/pkg/backupformat"
 )
 
 func registerBackupCmd(rootCmd *cobra.Command) {
