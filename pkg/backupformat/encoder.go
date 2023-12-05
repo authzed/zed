@@ -1,6 +1,7 @@
 package backupformat
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -13,6 +14,10 @@ func NewEncoder(w io.Writer, schema string, token *v1.ZedToken) (*Encoder, error
 	avroSchema, err := avroSchemaV1()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create avro schema: %w", err)
+	}
+
+	if token == nil {
+		return nil, errors.New("missing expected token")
 	}
 
 	md := map[string][]byte{
