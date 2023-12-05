@@ -74,6 +74,10 @@ func backupCmdFunc(cmd *cobra.Command, args []string) error {
 		hasProgressbar = true
 	}
 
+	if schemaResp.ReadAt == nil {
+		return fmt.Errorf("`backup` is not supported on this version of SpiceDB")
+	}
+
 	encoder, err := backupformat.NewEncoder(relWriter, schemaResp.SchemaText, schemaResp.ReadAt)
 	if err != nil {
 		return fmt.Errorf("error creating backup file encoder: %w", err)
