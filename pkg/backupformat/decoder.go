@@ -4,13 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"reflect"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/hamba/avro/v2"
 	"github.com/hamba/avro/v2/ocf"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
+
+func init() {
+	// This defaults to a 1MiB limit, but large schemas can exceed this size.
+	avro.DefaultConfig = avro.Config{
+		MaxByteSliceSize: 1024 * 1024 * 100, // 100 MiB
+	}.Freeze()
+}
 
 func NewDecoder(r io.Reader) (*Decoder, error) {
 	dec, err := ocf.NewDecoder(r)
@@ -36,8 +43,7 @@ func NewDecoder(r io.Reader) (*Decoder, error) {
 
 		schema, ok := decodedSchema.(SchemaV1)
 		if !ok {
-			schemaType := reflect.TypeOf(decodedSchema)
-			return nil, fmt.Errorf("received schema object of wrong type: %s", schemaType.Name())
+			return nil, fmt.Errorf("received schema object of wrong type: %T", decodedSchema)
 		}
 		schemaText = schema.SchemaText
 	} else {

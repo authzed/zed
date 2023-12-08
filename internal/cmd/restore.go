@@ -22,6 +22,7 @@ func registerRestoreCmd(rootCmd *cobra.Command) {
 	restoreCmd.Flags().Int("batch-size", 1_000, "restore relationship write batch size")
 	restoreCmd.Flags().Int("batches-per-transaction", 10, "number of batches per transaction")
 	restoreCmd.Flags().Bool("print-zedtoken-only", false, "just print the zedtoken and stop")
+	restoreCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
 }
 
 var restoreCmd = &cobra.Command{
@@ -95,13 +96,22 @@ func restoreCmdFunc(cmd *cobra.Command, args []string) error {
 
 	ctx := cmd.Context()
 
+	schema := decoder.Schema()
+	prefixFilter := cobrautil.MustGetString(cmd, "prefix-filter")
+	if prefixFilter != "" {
+		schema, err = filterSchemaDefs(schema, prefixFilter)
+		if err != nil {
+			return err
+		}
+	}
+
+	log.Debug().Str("schema", schema).Msg("writing schema")
+
 	if _, err := client.WriteSchema(ctx, &v1.WriteSchemaRequest{
-		Schema: decoder.Schema(),
+		Schema: schema,
 	}); err != nil {
 		return fmt.Errorf("unable to write schema: %w", err)
 	}
-
-	log.Debug().Msg("schema written")
 
 	relationshipWriteStart := time.Now()
 
@@ -119,6 +129,10 @@ func restoreCmdFunc(cmd *cobra.Command, args []string) error {
 	for rel, err := decoder.Next(); rel != nil && err == nil; rel, err = decoder.Next() {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("aborted restore: %w", err)
+		}
+
+		if !hasRelPrefix(rel, prefixFilter) {
+			continue
 		}
 
 		batch = append(batch, rel)

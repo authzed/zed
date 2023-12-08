@@ -5,9 +5,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
+	"github.com/authzed/spicedb/pkg/schemadsl/generator"
+	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
 	"github.com/schollz/progressbar/v3"
@@ -19,6 +24,7 @@ import (
 
 func registerBackupCmd(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(backupCmd)
+	backupCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
 }
 
 var backupCmd = &cobra.Command{
@@ -46,6 +52,52 @@ func createBackupFile(filename string) (*os.File, error) {
 	}
 
 	return f, nil
+}
+
+var (
+	missingAllowedTypes = regexp.MustCompile(`(\s*)(relation)(.+)(\/\* missing allowed types \*\/)(.*)`)
+	shortRelations      = regexp.MustCompile(`(\s*)relation [a-z][a-z0-9_]:(.+)`)
+)
+
+func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) {
+	// Remove any invalid relations generated from old, backwards-incompat
+	// Serverless permission systems.
+	schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
+	schema = string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
+
+	compiledSchema, err := compiler.Compile(compiler.InputSchema{Source: "schema", SchemaString: schema}, compiler.SkipValidation())
+	if err != nil {
+		return "", fmt.Errorf("error reading schema: %w", err)
+	}
+
+	var prefixedDefs []compiler.SchemaDefinition
+	for _, def := range compiledSchema.ObjectDefinitions {
+		if strings.HasPrefix(def.Name, prefix) {
+			prefixedDefs = append(prefixedDefs, def)
+		}
+	}
+
+	for _, def := range compiledSchema.CaveatDefinitions {
+		if strings.HasPrefix(def.Name, prefix) {
+			prefixedDefs = append(prefixedDefs, def)
+		}
+	}
+
+	if len(prefixedDefs) == 0 {
+		return "", errors.New("filtered all definitions from schema")
+	}
+
+	filteredSchema, _, err = generator.GenerateSchema(prefixedDefs)
+	if err != nil {
+		return "", fmt.Errorf("error generating filtered schema: %w", err)
+	}
+	return
+}
+
+func hasRelPrefix(rel *v1.Relationship, prefix string) bool {
+	// Skip any relationships without the prefix on either side.
+	return strings.HasPrefix(rel.Resource.ObjectType, prefix) ||
+		strings.HasPrefix(rel.Subject.Object.ObjectType, prefix)
 }
 
 func backupCmdFunc(cmd *cobra.Command, args []string) error {
@@ -78,7 +130,17 @@ func backupCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("`backup` is not supported on this version of SpiceDB")
 	}
 
-	encoder, err := backupformat.NewEncoder(relWriter, schemaResp.SchemaText, schemaResp.ReadAt)
+	// Skip any definitions without the provided prefix
+	schema := schemaResp.SchemaText
+	prefixFilter := cobrautil.MustGetString(cmd, "prefix-filter")
+	if prefixFilter != "" {
+		schema, err = filterSchemaDefs(schema, prefixFilter)
+		if err != nil {
+			return err
+		}
+	}
+
+	encoder, err := backupformat.NewEncoder(relWriter, schema, schemaResp.ReadAt)
 	if err != nil {
 		return fmt.Errorf("error creating backup file encoder: %w", err)
 	}
@@ -111,6 +173,10 @@ func backupCmdFunc(cmd *cobra.Command, args []string) error {
 		}
 
 		for _, rel := range relsResp.Relationships {
+			if !hasRelPrefix(rel, prefixFilter) {
+				continue
+			}
+
 			if err := encoder.Append(rel); err != nil {
 				return fmt.Errorf("error storing relationship: %w", err)
 			}
