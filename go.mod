@@ -16,7 +16,7 @@ require (
 	github.com/gookit/color v1.5.4
 	github.com/hamba/avro/v2 v2.18.0
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20231016191810-9f8a4f6d038a
-	github.com/jzelinskie/stringz v0.0.2
+	github.com/jzelinskie/stringz v0.0.3
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/olekukonko/tablewriter v0.0.5

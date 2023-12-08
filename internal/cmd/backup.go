@@ -22,16 +22,36 @@ import (
 	"github.com/authzed/zed/pkg/backupformat"
 )
 
-func registerBackupCmd(rootCmd *cobra.Command) {
-	rootCmd.AddCommand(backupCmd)
-	backupCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
+var backupCmd = &cobra.Command{
+	Use:   "backup <subcommand>",
+	Short: "create, restore, and inspect Permissions System backups",
 }
 
-var backupCmd = &cobra.Command{
-	Use:   "backup <filename>",
+func registerBackupCmd(rootCmd *cobra.Command) {
+	rootCmd.AddCommand(backupCmd)
+
+	backupCmd.AddCommand(backupCreateCmd)
+	backupCreateCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
+	backupCreateCmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
+
+	backupCmd.AddCommand(backupRestoreCmd)
+	backupRestoreCmd.Flags().Int("batch-size", 1_000, "restore relationship write batch size")
+	backupRestoreCmd.Flags().Int("batches-per-transaction", 10, "number of batches per transaction")
+	backupRestoreCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
+	backupRestoreCmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
+
+	backupCmd.AddCommand(backupParseSchemaCmd)
+	backupParseSchemaCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
+	backupParseSchemaCmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
+
+	backupCmd.AddCommand(backupParseRevisionCmd)
+}
+
+var backupCreateCmd = &cobra.Command{
+	Use:   "create <filename>",
 	Short: "Backup a permission system to a file",
 	Args:  cobra.ExactArgs(1),
-	RunE:  backupCmdFunc,
+	RunE:  backupCreateCmdFunc,
 }
 
 func createBackupFile(filename string) (*os.File, error) {
@@ -59,12 +79,11 @@ var (
 	shortRelations      = regexp.MustCompile(`(\s*)relation [a-z][a-z0-9_]:(.+)`)
 )
 
-func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) {
-	// Remove any invalid relations generated from old, backwards-incompat
-	// Serverless permission systems.
-	schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
-	schema = string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
+func partialPrefixMatch(name, prefix string) bool {
+	return strings.HasPrefix(name, prefix+"/")
+}
 
+func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) {
 	compiledSchema, err := compiler.Compile(compiler.InputSchema{Source: "schema", SchemaString: schema}, compiler.SkipValidation())
 	if err != nil {
 		return "", fmt.Errorf("error reading schema: %w", err)
@@ -72,13 +91,12 @@ func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) 
 
 	var prefixedDefs []compiler.SchemaDefinition
 	for _, def := range compiledSchema.ObjectDefinitions {
-		if strings.HasPrefix(def.Name, prefix) {
+		if partialPrefixMatch(def.Name, prefix) {
 			prefixedDefs = append(prefixedDefs, def)
 		}
 	}
-
 	for _, def := range compiledSchema.CaveatDefinitions {
-		if strings.HasPrefix(def.Name, prefix) {
+		if partialPrefixMatch(def.Name, prefix) {
 			prefixedDefs = append(prefixedDefs, def)
 		}
 	}
@@ -100,7 +118,7 @@ func hasRelPrefix(rel *v1.Relationship, prefix string) bool {
 		strings.HasPrefix(rel.Subject.Object.ObjectType, prefix)
 }
 
-func backupCmdFunc(cmd *cobra.Command, args []string) error {
+func backupCreateCmdFunc(cmd *cobra.Command, args []string) error {
 	f, err := createBackupFile(args[0])
 	if err != nil {
 		return err
@@ -129,9 +147,16 @@ func backupCmdFunc(cmd *cobra.Command, args []string) error {
 	if schemaResp.ReadAt == nil {
 		return fmt.Errorf("`backup` is not supported on this version of SpiceDB")
 	}
+	schema := schemaResp.SchemaText
+
+	// Remove any invalid relations generated from old, backwards-incompat
+	// Serverless permission systems.
+	if cobrautil.MustGetBool(cmd, "rewrite-legacy") {
+		schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
+		schema = string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
+	}
 
 	// Skip any definitions without the provided prefix
-	schema := schemaResp.SchemaText
 	prefixFilter := cobrautil.MustGetString(cmd, "prefix-filter")
 	if prefixFilter != "" {
 		schema, err = filterSchemaDefs(schema, prefixFilter)
@@ -211,5 +236,256 @@ func backupCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error closing backup file: %w", err)
 	}
 
+	return nil
+}
+
+var backupRestoreCmd = &cobra.Command{
+	Use:   "restore <filename>",
+	Short: "Restore a permission system from a file",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  restoreCmdFunc,
+}
+
+func openRestoreFile(filename string) (*os.File, int64, error) {
+	if filename == "" {
+		log.Trace().Str("filename", "(stdin)").Send()
+		return os.Stdin, -1, nil
+	}
+
+	log.Trace().Str("filename", filename).Send()
+
+	stats, err := os.Stat(filename)
+	if err != nil {
+		return nil, 0, fmt.Errorf("unable to stat restore file: %w", err)
+	}
+
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, 0, fmt.Errorf("unable to open restore file: %w", err)
+	}
+
+	return f, stats.Size(), nil
+}
+
+func restoreCmdFunc(cmd *cobra.Command, args []string) error {
+	filename := "" // Default to stdin.
+	if len(args) > 0 {
+		filename = args[0]
+	}
+
+	f, fSize, err := openRestoreFile(filename)
+	if err != nil {
+		return err
+	}
+
+	var hasProgressbar bool
+	var restoreReader io.Reader = f
+	if isatty.IsTerminal(os.Stderr.Fd()) {
+		bar := progressbar.DefaultBytes(fSize, "restoring")
+		restoreReader = io.TeeReader(f, bar)
+		hasProgressbar = true
+	}
+
+	decoder, err := backupformat.NewDecoder(restoreReader)
+	if err != nil {
+		return fmt.Errorf("error creating restore file decoder: %w", err)
+	}
+
+	if loadedToken := decoder.ZedToken(); loadedToken != nil {
+		log.Debug().Str("revision", loadedToken.Token).Msg("parsed revision")
+	}
+
+	schema := decoder.Schema()
+
+	// Remove any invalid relations generated from old, backwards-incompat
+	// Serverless permission systems.
+	if cobrautil.MustGetBool(cmd, "rewrite-legacy") {
+		schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
+		schema = string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
+	}
+
+	// Skip any definitions without the provided prefix
+	prefixFilter := cobrautil.MustGetString(cmd, "prefix-filter")
+	if prefixFilter != "" {
+		schema, err = filterSchemaDefs(schema, prefixFilter)
+		if err != nil {
+			return err
+		}
+	}
+	log.Debug().Str("schema", schema).Bool("filtered", prefixFilter != "").Msg("parsed schema")
+
+	client, err := client.NewClient(cmd)
+	if err != nil {
+		return fmt.Errorf("unable to initialize client: %w", err)
+	}
+
+	ctx := cmd.Context()
+	if _, err := client.WriteSchema(ctx, &v1.WriteSchemaRequest{
+		Schema: schema,
+	}); err != nil {
+		return fmt.Errorf("unable to write schema: %w", err)
+	}
+
+	relationshipWriteStart := time.Now()
+
+	relationshipWriter, err := client.BulkImportRelationships(ctx)
+	if err != nil {
+		return fmt.Errorf("error creating writer stream: %w", err)
+	}
+
+	batchSize := cobrautil.MustGetInt(cmd, "batch-size")
+	batchesPerTransaction := cobrautil.MustGetInt(cmd, "batches-per-transaction")
+
+	batch := make([]*v1.Relationship, 0, batchSize)
+	var written uint64
+	var batchesWritten int
+	for rel, err := decoder.Next(); rel != nil && err == nil; rel, err = decoder.Next() {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("aborted restore: %w", err)
+		}
+
+		if !hasRelPrefix(rel, prefixFilter) {
+			continue
+		}
+
+		batch = append(batch, rel)
+
+		if len(batch)%batchSize == 0 {
+			if err := relationshipWriter.Send(&v1.BulkImportRelationshipsRequest{
+				Relationships: batch,
+			}); err != nil {
+				return fmt.Errorf("error sending batch to server: %w", err)
+			}
+
+			// Reset the relationships in the batch
+			batch = batch[:0]
+
+			batchesWritten++
+
+			if batchesWritten%batchesPerTransaction == 0 {
+				resp, err := relationshipWriter.CloseAndRecv()
+				if err != nil {
+					return fmt.Errorf("error finalizing write of %d batches: %w", batchesPerTransaction, err)
+				}
+				if !hasProgressbar {
+					log.Debug().Uint64("relationships", written).Msg("relationships written")
+				}
+				written += resp.NumLoaded
+
+				relationshipWriter, err = client.BulkImportRelationships(ctx)
+				if err != nil {
+					return fmt.Errorf("error creating new writer stream: %w", err)
+				}
+			}
+		}
+	}
+
+	// Write the last batch
+	if err := relationshipWriter.Send(&v1.BulkImportRelationshipsRequest{
+		Relationships: batch,
+	}); err != nil {
+		return fmt.Errorf("error sending last batch to server: %w", err)
+	}
+
+	// Finish the stream
+	resp, err := relationshipWriter.CloseAndRecv()
+	if err != nil {
+		return fmt.Errorf("error finalizing last write: %w", err)
+	}
+
+	written += resp.NumLoaded
+
+	totalTime := time.Since(relationshipWriteStart)
+	relsPerSec := float64(written) / totalTime.Seconds()
+
+	log.Info().
+		Uint64("relationships", written).
+		Stringer("duration", totalTime).
+		Float64("perSecond", relsPerSec).
+		Msg("finished restore")
+
+	if err := decoder.Close(); err != nil {
+		return fmt.Errorf("error closing restore encoder: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("error closing restore file: %w", err)
+	}
+
+	return nil
+}
+
+var backupParseSchemaCmd = &cobra.Command{
+	Use:   "parse-schema <filename>",
+	Short: "Extract the schema from a backup file",
+	Args:  cobra.ExactArgs(1),
+	RunE:  backupParseSchemaCmdFunc,
+}
+
+func backupParseSchemaCmdFunc(cmd *cobra.Command, args []string) error {
+	filename := "" // Default to stdin.
+	if len(args) > 0 {
+		filename = args[0]
+	}
+
+	f, _, err := openRestoreFile(filename)
+	if err != nil {
+		return err
+	}
+
+	decoder, err := backupformat.NewDecoder(f)
+	if err != nil {
+		return fmt.Errorf("error creating restore file decoder: %w", err)
+	}
+	schema := decoder.Schema()
+
+	// Remove any invalid relations generated from old, backwards-incompat
+	// Serverless permission systems.
+	if cobrautil.MustGetBool(cmd, "rewrite-legacy") {
+		schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
+		schema = string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
+	}
+
+	// Skip any definitions without the provided prefix
+	if prefixFilter := cobrautil.MustGetString(cmd, "prefix-filter"); prefixFilter != "" {
+		schema, err = filterSchemaDefs(schema, prefixFilter)
+		if err != nil {
+			return err
+		}
+	}
+
+	fmt.Println(schema)
+	return nil
+}
+
+var backupParseRevisionCmd = &cobra.Command{
+	Use:   "parse-revision <filename>",
+	Short: "Extract the revision from a backup file",
+	Args:  cobra.ExactArgs(1),
+	RunE:  backupParseRevisionCmdFunc,
+}
+
+func backupParseRevisionCmdFunc(_ *cobra.Command, args []string) error {
+	filename := "" // Default to stdin.
+	if len(args) > 0 {
+		filename = args[0]
+	}
+
+	f, _, err := openRestoreFile(filename)
+	if err != nil {
+		return err
+	}
+
+	decoder, err := backupformat.NewDecoder(f)
+	if err != nil {
+		return fmt.Errorf("error creating restore file decoder: %w", err)
+	}
+
+	loadedToken := decoder.ZedToken()
+	if loadedToken == nil {
+		return fmt.Errorf("failed to parse decoded revision")
+	}
+
+	fmt.Println(loadedToken.Token)
 	return nil
 }
