@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
+	"github.com/authzed/spicedb/pkg/typesystem"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
@@ -109,6 +111,23 @@ func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) 
 	if err != nil {
 		return "", fmt.Errorf("error generating filtered schema: %w", err)
 	}
+
+	// Validate that the type system for the generated schema is comprehensive.
+	compiledFilteredSchema, err := compiler.Compile(compiler.InputSchema{Source: "generated-schema", SchemaString: filteredSchema})
+	if err != nil {
+		return "", fmt.Errorf("generated invalid schema: %w", err)
+	}
+
+	for _, def := range compiledFilteredSchema.ObjectDefinitions {
+		ts, err := typesystem.NewNamespaceTypeSystem(def, typesystem.ResolverForSchema(*compiledFilteredSchema))
+		if err != nil {
+			return "", fmt.Errorf("generated invalid schema: %w", err)
+		}
+		if _, err := ts.Validate(context.Background()); err != nil {
+			return "", fmt.Errorf("generated invalid schema: %w", err)
+		}
+	}
+
 	return
 }
 
