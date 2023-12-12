@@ -13,6 +13,7 @@ import (
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
+	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/authzed/spicedb/pkg/typesystem"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/mattn/go-isatty"
@@ -47,6 +48,8 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	backupParseSchemaCmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
 
 	backupCmd.AddCommand(backupParseRevisionCmd)
+	backupCmd.AddCommand(backupParseRelsCmd)
+	backupParseRelsCmd.Flags().String("prefix-filter", "", "Include only relationships with a given prefix")
 }
 
 var backupCreateCmd = &cobra.Command{
@@ -132,8 +135,8 @@ func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) 
 }
 
 func hasRelPrefix(rel *v1.Relationship, prefix string) bool {
-	// Skip any relationships without the prefix on either side.
-	return strings.HasPrefix(rel.Resource.ObjectType, prefix) ||
+	// Skip any relationships without the prefix on both sides.
+	return strings.HasPrefix(rel.Resource.ObjectType, prefix) &&
 		strings.HasPrefix(rel.Subject.Object.ObjectType, prefix)
 }
 
@@ -149,21 +152,10 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := cmd.Context()
-
 	schemaResp, err := client.ReadSchema(ctx, &v1.ReadSchemaRequest{})
 	if err != nil {
 		return fmt.Errorf("error reading schema: %w", err)
-	}
-
-	var hasProgressbar bool
-	var relWriter io.Writer = f
-	if isatty.IsTerminal(os.Stderr.Fd()) {
-		bar := progressbar.DefaultBytes(-1, "backing up")
-		relWriter = io.MultiWriter(bar, f)
-		hasProgressbar = true
-	}
-
-	if schemaResp.ReadAt == nil {
+	} else if schemaResp.ReadAt == nil {
 		return fmt.Errorf("`backup` is not supported on this version of SpiceDB")
 	}
 	schema := schemaResp.SchemaText
@@ -184,6 +176,14 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	var hasProgressbar bool
+	var relWriter io.Writer = f
+	if isatty.IsTerminal(os.Stderr.Fd()) {
+		bar := progressbar.DefaultBytes(-1, "backing up")
+		relWriter = io.MultiWriter(bar, f)
+		hasProgressbar = true
+	}
+
 	encoder, err := backupformat.NewEncoder(relWriter, schema, schemaResp.ReadAt)
 	if err != nil {
 		return fmt.Errorf("error creating backup file encoder: %w", err)
@@ -202,7 +202,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) error {
 
 	relationshipReadStart := time.Now()
 
-	var stored uint
+	var processed uint
 	for {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("aborted backup: %w", err)
@@ -224,19 +224,19 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) error {
 			if err := encoder.Append(rel); err != nil {
 				return fmt.Errorf("error storing relationship: %w", err)
 			}
-			stored++
+			processed++
 
-			if stored%100_000 == 0 && !hasProgressbar {
-				log.Trace().Uint("relationships", stored).Msg("relationships stored")
+			if processed%100_000 == 0 && !hasProgressbar {
+				log.Trace().Uint("relationships", processed).Msg("relationships stored")
 			}
 		}
 	}
 
 	totalTime := time.Since(relationshipReadStart)
-	relsPerSec := float64(stored) / totalTime.Seconds()
+	relsPerSec := float64(processed) / totalTime.Seconds()
 
 	log.Info().
-		Uint("relationships", stored).
+		Uint("relationships", processed).
 		Stringer("duration", totalTime).
 		Float64("perSecond", relsPerSec).
 		Msg("finished backup")
@@ -507,5 +507,42 @@ func backupParseRevisionCmdFunc(_ *cobra.Command, args []string) error {
 	}
 
 	fmt.Println(loadedToken.Token)
+	return nil
+}
+
+var backupParseRelsCmd = &cobra.Command{
+	Use:   "parse-relationships <filename>",
+	Short: "Extract the relationships from a backup file",
+	Args:  cobra.ExactArgs(1),
+	RunE:  backupParseRelsCmdFunc,
+}
+
+func backupParseRelsCmdFunc(cmd *cobra.Command, args []string) error {
+	filename := "" // Default to stdin.
+	if len(args) > 0 {
+		filename = args[0]
+	}
+
+	f, _, err := openRestoreFile(filename)
+	if err != nil {
+		return err
+	}
+
+	decoder, err := backupformat.NewDecoder(f)
+	if err != nil {
+		return fmt.Errorf("error creating restore file decoder: %w", err)
+	}
+
+	for rel, err := decoder.Next(); rel != nil && err == nil; rel, err = decoder.Next() {
+		if hasRelPrefix(rel, cobrautil.MustGetString(cmd, "prefix-filter")) {
+			relString, err := tuple.StringRelationship(rel)
+			if err != nil {
+				return err
+			}
+			relString = strings.Replace(relString, "@", " ", 1)
+			relString = strings.Replace(relString, "#", " ", 1)
+			fmt.Println(relString)
+		}
+	}
 	return nil
 }
