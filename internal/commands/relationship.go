@@ -62,21 +62,21 @@ var relationshipCmd = &cobra.Command{
 var createCmd = &cobra.Command{
 	Use:   "create <resource:id> <relation> <subject:id#optional_subject_relation>",
 	Short: "create a Relationship for a Subject",
-	Args:  writeRelationshipsFromArgsOrStdin,
+	Args:  StdinOrExactArgs(3),
 	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE, os.Stdin),
 }
 
 var touchCmd = &cobra.Command{
 	Use:   "touch <resource:id> <relation> <subject:id#optional_subject_relation>",
 	Short: "idempotently update a Relationship for a Subject",
-	Args:  writeRelationshipsFromArgsOrStdin,
+	Args:  StdinOrExactArgs(3),
 	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, os.Stdin),
 }
 
 var deleteCmd = &cobra.Command{
 	Use:   "delete <resource:id> <relation> <subject:id#optional_subject_relation>",
 	Short: "delete a Relationship",
-	Args:  writeRelationshipsFromArgsOrStdin,
+	Args:  StdinOrExactArgs(3),
 	RunE:  writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE, os.Stdin),
 }
 
@@ -94,11 +94,14 @@ var bulkDeleteCmd = &cobra.Command{
 	RunE:  bulkDeleteRelationships,
 }
 
-func writeRelationshipsFromArgsOrStdin(cmd *cobra.Command, args []string) error {
-	if ok := isArgsViaFile(os.Stdin) && len(args) == 0; ok {
-		return nil
+func StdinOrExactArgs(n int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if ok := isArgsViaFile(os.Stdin) && len(args) == 0; ok {
+			return nil
+		}
+
+		return cobra.ExactArgs(n)(cmd, args)
 	}
-	return cobra.ExactArgs(3)(cmd, args)
 }
 
 func isArgsViaFile(file *os.File) bool {

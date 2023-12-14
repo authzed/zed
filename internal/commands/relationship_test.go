@@ -210,15 +210,15 @@ func TestWriteRelationshipsArgs(t *testing.T) {
 	}()
 
 	// returns accepts anything if input file is not a terminal
-	require.Nil(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, nil))
+	require.Nil(t, StdinOrExactArgs(3)(&cobra.Command{}, nil))
 
 	// if both STDIN and CLI args are provided, CLI args take precedence
-	require.ErrorContains(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, []string{"a", "b"}), "accepts 3 arg(s), received 2")
+	require.ErrorContains(t, StdinOrExactArgs(3)(&cobra.Command{}, []string{"a", "b"}), "accepts 3 arg(s), received 2")
 
 	isTerm = true
 	// checks there is 3 input arguments in case of tty
-	require.ErrorContains(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, nil), "accepts 3 arg(s), received 0")
-	require.Nil(t, writeRelationshipsFromArgsOrStdin(&cobra.Command{}, []string{"a", "b", "c"}))
+	require.ErrorContains(t, StdinOrExactArgs(3)(&cobra.Command{}, nil), "accepts 3 arg(s), received 0")
+	require.Nil(t, StdinOrExactArgs(3)(&cobra.Command{}, []string{"a", "b", "c"}))
 }
 
 func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
