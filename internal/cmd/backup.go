@@ -26,8 +26,11 @@ import (
 )
 
 var backupCmd = &cobra.Command{
-	Use:   "backup <subcommand>",
-	Short: "create, restore, and inspect Permissions System backups",
+	Use:   "backup <filename>",
+	Short: "Create, restore, and inspect Permissions System backups",
+	Args:  cobra.ExactArgs(1),
+	// Create used to be on the root, so add it here for back-compat.
+	RunE: backupCreateCmdFunc,
 }
 
 func registerBackupCmd(rootCmd *cobra.Command) {
@@ -42,6 +45,15 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	backupRestoreCmd.Flags().Int("batches-per-transaction", 10, "number of batches per transaction")
 	backupRestoreCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
 	backupRestoreCmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
+
+	// Restore used to be on the root, so add it there too, but hidden.
+	rootCmd.AddCommand(&cobra.Command{
+		Use:    "restore <filename>",
+		Short:  "Restore a permission system from a file",
+		Args:   cobra.MaximumNArgs(1),
+		RunE:   restoreCmdFunc,
+		Hidden: true,
+	})
 
 	backupCmd.AddCommand(backupParseSchemaCmd)
 	backupParseSchemaCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
