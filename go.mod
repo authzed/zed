@@ -12,7 +12,7 @@ require (
 	github.com/authzed/grpcutil v0.0.0-20230908193239-4286bb1d6403
 	github.com/authzed/spicedb v1.28.1-0.20231208003000-90be4e6762da
 	github.com/brianvoe/gofakeit/v6 v6.26.3
-	github.com/charmbracelet/lipgloss v0.7.1
+	github.com/charmbracelet/lipgloss v0.9.1
 	github.com/google/uuid v1.4.0
 	github.com/gookit/color v1.5.4
 	github.com/hamba/avro/v2 v2.18.0
@@ -145,7 +145,7 @@ require (
 	github.com/mostynb/go-grpc-compression v1.2.2 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
-	github.com/muesli/termenv v0.15.1 // indirect
+	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79 // indirect
 	github.com/outcaste-io/ristretto v0.2.3 // indirect
