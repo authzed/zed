@@ -187,7 +187,7 @@ func rewriteSchema(existingSchemaText string, definitionPrefix string) (string, 
 
 	compiled, err := compiler.Compile(compiler.InputSchema{
 		Source: input.Source("schema"), SchemaString: existingSchemaText,
-	}, &definitionPrefix)
+	}, compiler.ObjectTypePrefix(&definitionPrefix), compiler.SkipValidation())
 	if err != nil {
 		return "", err
 	}
@@ -223,10 +223,9 @@ func determinePrefixForSchema(ctx context.Context, specifiedPrefix string, clien
 	}
 
 	// Otherwise, compile the schema and grab the prefixes of the namespaces defined.
-	empty := ""
 	found, err := compiler.Compile(compiler.InputSchema{
 		Source: input.Source("schema"), SchemaString: schemaText,
-	}, &empty)
+	}, compiler.SkipValidation())
 	if err != nil {
 		return "", err
 	}
