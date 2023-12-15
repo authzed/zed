@@ -67,7 +67,9 @@ var (
 		Use:   "parse-relationships <filename>",
 		Short: "Extract the relationships from a backup file",
 		Args:  cobra.ExactArgs(1),
-		RunE:  backupParseRelsCmdFunc,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return backupParseRelsCmdFunc(cmd, os.Stdout, args)
+		},
 	}
 )
 
@@ -556,11 +558,12 @@ func backupParseRevisionCmdFunc(_ *cobra.Command, args []string) error {
 	return nil
 }
 
-func backupParseRelsCmdFunc(cmd *cobra.Command, args []string) error {
+func backupParseRelsCmdFunc(cmd *cobra.Command, out *os.File, args []string) error {
 	filename := "" // Default to stdin.
 	if len(args) > 0 {
 		filename = args[0]
 	}
+	prefix := cobrautil.MustGetString(cmd, "prefix-filter")
 
 	f, _, err := openRestoreFile(filename)
 	if err != nil {
@@ -573,15 +576,24 @@ func backupParseRelsCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	for rel, err := decoder.Next(); rel != nil && err == nil; rel, err = decoder.Next() {
-		if hasRelPrefix(rel, cobrautil.MustGetString(cmd, "prefix-filter")) {
-			relString, err := tuple.StringRelationship(rel)
-			if err != nil {
-				return err
-			}
-			relString = strings.Replace(relString, "@", " ", 1)
-			relString = strings.Replace(relString, "#", " ", 1)
-			fmt.Println(relString)
+		if !hasRelPrefix(rel, prefix) {
+			continue
+		}
+
+		relString, err := tuple.StringRelationship(rel)
+		if err != nil {
+			return err
+		}
+
+		if _, err = fmt.Fprintln(out, replaceRelString(relString)); err != nil {
+			return err
 		}
 	}
+
 	return nil
+}
+
+func replaceRelString(rel string) string {
+	rel = strings.Replace(rel, "@", " ", 1)
+	return strings.Replace(rel, "#", " ", 1)
 }
