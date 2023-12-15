@@ -40,11 +40,30 @@ func readLines(t *testing.T, fileName string) []string {
 	return lines
 }
 
-func createTestCobraCommandWithFlagValue(t *testing.T, flagName, flagValue string) *cobra.Command {
+type stringFlag struct {
+	flagName  string
+	flagValue string
+}
+
+type boolFlag struct {
+	flagName  string
+	flagValue bool
+}
+
+func createTestCobraCommandWithFlagValue(t *testing.T, flagAndValues ...any) *cobra.Command {
 	t.Helper()
 
 	c := cobra.Command{}
-	c.Flags().String(flagName, flagValue, "")
+	for _, flagAndValue := range flagAndValues {
+		switch f := flagAndValue.(type) {
+		case stringFlag:
+			c.Flags().String(f.flagName, f.flagValue, "")
+		case boolFlag:
+			c.Flags().Bool(f.flagName, f.flagValue, "")
+		default:
+			t.Fatalf("unknown flag type: %T", f)
+		}
+	}
 
 	return &c
 }

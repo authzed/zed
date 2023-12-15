@@ -53,7 +53,9 @@ var (
 		Use:   "parse-schema <filename>",
 		Short: "Extract the schema from a backup file",
 		Args:  cobra.ExactArgs(1),
-		RunE:  backupParseSchemaCmdFunc,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return backupParseSchemaCmdFunc(cmd, os.Stdout, args)
+		},
 	}
 
 	backupParseRevisionCmd = &cobra.Command{
@@ -490,7 +492,7 @@ func perSec(i uint64, d time.Duration) uint64 {
 	return i / secs
 }
 
-func backupParseSchemaCmdFunc(cmd *cobra.Command, args []string) error {
+func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
 	decoder, closer, err := decoderFromArgs(cmd, args)
 	if err != nil {
 		return err
@@ -516,11 +518,11 @@ func backupParseSchemaCmdFunc(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Println(schema)
-	return nil
+	_, err = fmt.Fprintln(out, schema)
+	return err
 }
 
-func backupParseRevisionCmdFunc(cmd *cobra.Command, out *os.File, args []string) error {
+func backupParseRevisionCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
 	decoder, closer, err := decoderFromArgs(cmd, args)
 	if err != nil {
 		return err
@@ -534,14 +536,11 @@ func backupParseRevisionCmdFunc(cmd *cobra.Command, out *os.File, args []string)
 		return fmt.Errorf("failed to parse decoded revision")
 	}
 
-	if _, err = fmt.Fprintln(out, loadedToken.Token); err != nil {
-		return err
-	}
-
-	return nil
+	_, err = fmt.Fprintln(out, loadedToken.Token)
+	return err
 }
 
-func backupParseRelsCmdFunc(cmd *cobra.Command, out *os.File, args []string) error {
+func backupParseRelsCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
 	prefix := cobrautil.MustGetString(cmd, "prefix-filter")
 	decoder, closer, err := decoderFromArgs(cmd, args)
 	if err != nil {

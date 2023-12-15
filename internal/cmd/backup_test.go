@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -12,7 +13,11 @@ func init() {
 	zerolog.SetGlobalLevel(zerolog.Disabled)
 }
 
-const testSchema = `definition test/user {}\ndefinition resource {relation reader: test/user}\n`
+const testSchema = `definition test/user {}
+
+definition test/resource {
+	relation reader: test/user
+}`
 
 var testRelationships = []string{
 	`test/user:1#reader@test/resource:1`,
@@ -149,7 +154,7 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 			tt := tt
 			t.Parallel()
 
-			cmd := createTestCobraCommandWithFlagValue(t, "prefix-filter", tt.filter)
+			cmd := createTestCobraCommandWithFlagValue(t, stringFlag{"prefix-filter", tt.filter})
 			backupName := createTestBackup(t, tt.schema, tt.relationships)
 			f, err := os.CreateTemp("", "parse-output")
 			require.NoError(t, err)
@@ -170,7 +175,7 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 }
 
 func TestBackupParseRevisionCmdFunc(t *testing.T) {
-	cmd := createTestCobraCommandWithFlagValue(t, "prefix-filter", "test")
+	cmd := createTestCobraCommandWithFlagValue(t, stringFlag{"prefix-filter", "test"})
 	backupName := createTestBackup(t, testSchema, testRelationships)
 	f, err := os.CreateTemp("", "parse-output")
 	require.NoError(t, err)
@@ -186,4 +191,66 @@ func TestBackupParseRevisionCmdFunc(t *testing.T) {
 
 	lines := readLines(t, f.Name())
 	require.Equal(t, []string{"test"}, lines)
+}
+
+func TestBackupParseSchemaCmdFunc(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		filter        string
+		rewriteLegacy bool
+		schema        string
+		output        []string
+		err           string
+	}{
+		{
+			name:   "basic schema test",
+			filter: "test",
+			schema: testSchema,
+			output: strings.Split(testSchema, "\n"),
+		},
+		{
+			name:   "filters schema definitions",
+			filter: "test",
+			schema: "definition test/user {}\n\ndefinition foo/user {}",
+			output: []string{"definition test/user {}"},
+		},
+		{
+			name:          "rewrites short relations",
+			filter:        "",
+			rewriteLegacy: true,
+			schema:        "definition user {relation aa: user}",
+			output:        []string{"definition user {", "/* deleted short relation name */"},
+		},
+		{
+			name:          "rewrites legacy missing allowed types",
+			filter:        "",
+			rewriteLegacy: true,
+			schema:        "definition user { relation foo /* missing allowed types */}",
+			output:        []string{"definition user {", "/* deleted missing allowed type error */"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tt := tt
+			t.Parallel()
+
+			cmd := createTestCobraCommandWithFlagValue(t,
+				stringFlag{"prefix-filter", tt.filter},
+				boolFlag{"rewrite-legacy", tt.rewriteLegacy})
+			backupName := createTestBackup(t, tt.schema, nil)
+			f, err := os.CreateTemp("", "parse-output")
+			require.NoError(t, err)
+			defer func() {
+				_ = f.Close()
+			}()
+			t.Cleanup(func() {
+				_ = os.Remove(f.Name())
+			})
+
+			err = backupParseSchemaCmdFunc(cmd, f, []string{backupName})
+			require.NoError(t, err)
+
+			lines := readLines(t, f.Name())
+			require.Equal(t, tt.output, lines)
+		})
+	}
 }
