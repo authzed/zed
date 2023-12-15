@@ -1,10 +1,17 @@
 package cmd
 
 import (
+	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/authzed/zed/internal/client"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/tuple"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
@@ -13,16 +20,16 @@ func init() {
 	zerolog.SetGlobalLevel(zerolog.Disabled)
 }
 
-const testSchema = `definition test/user {}
-
-definition test/resource {
+const testSchema = `definition test/resource {
 	relation reader: test/user
-}`
+}
+
+definition test/user {}`
 
 var testRelationships = []string{
-	`test/user:1#reader@test/resource:1`,
-	`test/user:2#reader@test/resource:2`,
-	`test/user:3#reader@test/resource:3`,
+	`test/resource:1#reader@test/user:1`,
+	`test/resource:2#reader@test/user:2`,
+	`test/resource:3#reader@test/user:3`,
 }
 
 func TestFilterSchemaDefs(t *testing.T) {
@@ -253,4 +260,65 @@ func TestBackupParseSchemaCmdFunc(t *testing.T) {
 			require.Equal(t, tt.output, lines)
 		})
 	}
+}
+
+func TestBackupCreateCmdFunc(t *testing.T) {
+	cmd := createTestCobraCommandWithFlagValue(t,
+		stringFlag{"prefix-filter", ""},
+		boolFlag{"rewrite-legacy", false})
+	f := filepath.Join(os.TempDir(), uuid.NewString())
+	_, err := os.Stat(f)
+	require.Error(t, err)
+	defer func() {
+		_ = os.Remove(f)
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv := newServer(ctx, t)
+	go func() {
+		require.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(t, err)
+
+	originalClient := client.NewClient
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	client.NewClient = clientFromConn(conn)
+
+	c, err := clientFromConn(conn)(cmd)
+	require.NoError(t, err)
+
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: testSchema})
+	require.NoError(t, err)
+
+	testRel := "test/resource:1#reader@test/user:1"
+	resp, err := c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{
+		Updates: []*v1.RelationshipUpdate{
+			{
+				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+				Relationship: tuple.ParseRel(testRel),
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	err = backupCreateCmdFunc(cmd, []string{f})
+	require.NoError(t, err)
+
+	d, closer, err := decoderFromArgs(cmd, []string{f})
+	require.NoError(t, err)
+	defer func() {
+		_ = d.Close()
+		_ = closer.Close()
+	}()
+
+	require.Equal(t, testSchema, d.Schema())
+	rel, err := d.Next()
+	require.NoError(t, err)
+	require.Equal(t, testRel, tuple.MustStringRelationship(rel))
+	require.Equal(t, resp.WrittenAt.Token, d.ZedToken().Token)
 }

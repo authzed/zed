@@ -2,8 +2,17 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"os"
 	"testing"
+
+	"github.com/authzed/authzed-go/v1"
+	"github.com/authzed/spicedb/pkg/cmd/datastore"
+	"github.com/authzed/spicedb/pkg/cmd/server"
+	"github.com/authzed/spicedb/pkg/cmd/util"
+	"google.golang.org/grpc"
+
+	"github.com/authzed/zed/internal/client"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
@@ -65,6 +74,7 @@ func createTestCobraCommandWithFlagValue(t *testing.T, flagAndValues ...any) *co
 		}
 	}
 
+	c.SetContext(context.Background())
 	return &c
 }
 
@@ -91,4 +101,48 @@ func createTestBackup(t *testing.T, schema string, relationships []string) strin
 	}
 
 	return f.Name()
+}
+
+func clientFromConn(conn *grpc.ClientConn) func(cmd *cobra.Command) (client.Client, error) {
+	return func(cmd *cobra.Command) (client.Client, error) {
+		return &authzed.ClientWithExperimental{
+			Client: authzed.Client{
+				SchemaServiceClient:      v1.NewSchemaServiceClient(conn),
+				PermissionsServiceClient: v1.NewPermissionsServiceClient(conn),
+				WatchServiceClient:       v1.NewWatchServiceClient(conn),
+			},
+			ExperimentalServiceClient: v1.NewExperimentalServiceClient(conn),
+		}, nil
+	}
+}
+
+func newServer(ctx context.Context, t *testing.T) server.RunnableServer {
+	t.Helper()
+
+	ds, err := datastore.NewDatastore(ctx,
+		datastore.DefaultDatastoreConfig().ToOption(),
+		datastore.WithRequestHedgingEnabled(false),
+	)
+	require.NoError(t, err, "unable to start memdb datastore")
+
+	configOpts := []server.ConfigOption{
+		server.WithGRPCServer(util.GRPCServerConfig{
+			Network: util.BufferedNetwork,
+			Enabled: true,
+		}),
+		server.WithGRPCAuthFunc(func(ctx context.Context) (context.Context, error) {
+			return ctx, nil
+		}),
+		server.WithHTTPGateway(util.HTTPServerConfig{HTTPEnabled: false}),
+		server.WithMetricsAPI(util.HTTPServerConfig{HTTPEnabled: true}),
+		server.WithDispatchCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
+		server.WithNamespaceCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
+		server.WithClusterDispatchCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
+		server.WithDatastore(ds),
+	}
+
+	srv, err := server.NewConfigWithOptionsAndDefaults(configOpts...).Complete(ctx)
+	require.NoError(t, err)
+
+	return srv
 }

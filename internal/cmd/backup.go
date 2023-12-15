@@ -222,6 +222,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+
 	defer func(e *error) { *e = errors.Join(*e, f.Close()) }(&err)
 	defer func(e *error) { *e = errors.Join(*e, f.Sync()) }(&err)
 
@@ -242,8 +243,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	// Remove any invalid relations generated from old, backwards-incompat
 	// Serverless permission systems.
 	if cobrautil.MustGetBool(cmd, "rewrite-legacy") {
-		schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
-		schema = string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
+		schema = rewriteLegacy(schema)
 	}
 
 	// Skip any definitions without the provided prefix
@@ -364,8 +364,7 @@ func restoreCmdFunc(cmd *cobra.Command, args []string) error {
 	// Remove any invalid relations generated from old, backwards-incompat
 	// Serverless permission systems.
 	if cobrautil.MustGetBool(cmd, "rewrite-legacy") {
-		schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
-		schema = string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
+		schema = rewriteLegacy(schema)
 	}
 
 	// Skip any definitions without the provided prefix
@@ -506,8 +505,7 @@ func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) 
 	// Remove any invalid relations generated from old, backwards-incompat
 	// Serverless permission systems.
 	if cobrautil.MustGetBool(cmd, "rewrite-legacy") {
-		schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
-		schema = string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
+		schema = rewriteLegacy(schema)
 	}
 
 	// Skip any definitions without the provided prefix
@@ -590,4 +588,9 @@ func decoderFromArgs(_ *cobra.Command, args []string) (*backupformat.Decoder, io
 func replaceRelString(rel string) string {
 	rel = strings.Replace(rel, "@", " ", 1)
 	return strings.Replace(rel, "#", " ", 1)
+}
+
+func rewriteLegacy(schema string) string {
+	schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
+	return string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
 }
