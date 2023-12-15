@@ -322,3 +322,56 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 	require.Equal(t, testRel, tuple.MustStringRelationship(rel))
 	require.Equal(t, resp.WrittenAt.Token, d.ZedToken().Token)
 }
+
+func TestBackupRestoreCmdFunc(t *testing.T) {
+	cmd := createTestCobraCommandWithFlagValue(t,
+		stringFlag{"prefix-filter", "test"},
+		boolFlag{"rewrite-legacy", false},
+		intFlag{"batch-size", 100},
+		int64Flag{"batches-per-transaction", 10},
+	)
+	backupName := createTestBackup(t, testSchema, testRelationships)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv := newServer(ctx, t)
+	go func() {
+		require.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(t, err)
+
+	originalClient := client.NewClient
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	client.NewClient = clientFromConn(conn)
+
+	c, err := clientFromConn(conn)(cmd)
+	require.NoError(t, err)
+	err = backupRestoreCmdFunc(cmd, []string{backupName})
+	require.NoError(t, err)
+
+	resp, err := c.ReadSchema(ctx, &v1.ReadSchemaRequest{})
+	require.NoError(t, err)
+	require.Equal(t, testSchema, resp.SchemaText)
+
+	rrCli, err := c.ReadRelationships(ctx, &v1.ReadRelationshipsRequest{
+		Consistency: &v1.Consistency{
+			Requirement: &v1.Consistency_FullyConsistent{
+				FullyConsistent: true,
+			},
+		},
+		RelationshipFilter: &v1.RelationshipFilter{
+			ResourceType: "test/resource",
+		},
+	})
+	require.NoError(t, err)
+
+	rrResp, err := rrCli.Recv()
+	require.NoError(t, err)
+
+	require.NoError(t, rrCli.CloseSend())
+	require.Equal(t, "test/resource:1#reader@test/user:1", tuple.MustStringRelationship(rrResp.Relationship))
+}

@@ -46,7 +46,7 @@ var (
 		Use:   "restore <filename>",
 		Short: "Restore a permission system from a file",
 		Args:  commands.StdinOrExactArgs(1),
-		RunE:  restoreCmdFunc,
+		RunE:  backupRestoreCmdFunc,
 	}
 
 	backupParseSchemaCmd = &cobra.Command{
@@ -95,7 +95,7 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 		Use:    "restore <filename>",
 		Short:  "Restore a permission system from a file",
 		Args:   cobra.MaximumNArgs(1),
-		RunE:   restoreCmdFunc,
+		RunE:   backupRestoreCmdFunc,
 		Hidden: true,
 	})
 
@@ -346,7 +346,7 @@ func openRestoreFile(filename string) (*os.File, int64, error) {
 	return f, stats.Size(), nil
 }
 
-func restoreCmdFunc(cmd *cobra.Command, args []string) error {
+func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 	decoder, closer, err := decoderFromArgs(cmd, args)
 	if err != nil {
 		return err

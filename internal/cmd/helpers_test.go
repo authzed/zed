@@ -59,6 +59,16 @@ type boolFlag struct {
 	flagValue bool
 }
 
+type intFlag struct {
+	flagName  string
+	flagValue int
+}
+
+type int64Flag struct {
+	flagName  string
+	flagValue int64
+}
+
 func createTestCobraCommandWithFlagValue(t *testing.T, flagAndValues ...any) *cobra.Command {
 	t.Helper()
 
@@ -69,6 +79,10 @@ func createTestCobraCommandWithFlagValue(t *testing.T, flagAndValues ...any) *co
 			c.Flags().String(f.flagName, f.flagValue, "")
 		case boolFlag:
 			c.Flags().Bool(f.flagName, f.flagValue, "")
+		case intFlag:
+			c.Flags().Int(f.flagName, f.flagValue, "")
+		case int64Flag:
+			c.Flags().Int64(f.flagName, f.flagValue, "")
 		default:
 			t.Fatalf("unknown flag type: %T", f)
 		}
@@ -134,7 +148,7 @@ func newServer(ctx context.Context, t *testing.T) server.RunnableServer {
 			return ctx, nil
 		}),
 		server.WithHTTPGateway(util.HTTPServerConfig{HTTPEnabled: false}),
-		server.WithMetricsAPI(util.HTTPServerConfig{HTTPEnabled: true}),
+		server.WithMetricsAPI(util.HTTPServerConfig{HTTPEnabled: false}),
 		server.WithDispatchCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithNamespaceCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithClusterDispatchCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
