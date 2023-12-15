@@ -132,6 +132,10 @@ func partialPrefixMatch(name, prefix string) bool {
 }
 
 func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) {
+	if schema == "" || prefix == "" {
+		return schema, nil
+	}
+
 	compiledSchema, err := compiler.Compile(compiler.InputSchema{Source: "schema", SchemaString: schema}, compiler.SkipValidation())
 	if err != nil {
 		return "", fmt.Errorf("error reading schema: %w", err)
