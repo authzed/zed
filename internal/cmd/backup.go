@@ -129,7 +129,7 @@ func createBackupFile(filename string) (*os.File, error) {
 }
 
 var (
-	missingAllowedTypes = regexp.MustCompile(`(\s*)(relation)(.+)(\/\* missing allowed types \*\/)(.*)`)
+	missingAllowedTypes = regexp.MustCompile(`(\s*)(relation)(.+)(/\* missing allowed types \*/)(.*)`)
 	shortRelations      = regexp.MustCompile(`(\s*)relation [a-z][a-z0-9_]:(.+)`)
 )
 
@@ -208,7 +208,7 @@ func relProgressBar(description string) *progressbar.ProgressBar {
 			progressbar.OptionShowCount(),
 			progressbar.OptionShowIts(),
 			progressbar.OptionSetItsString("relationship"),
-			progressbar.OptionOnCompletion(func() { fmt.Fprint(os.Stderr, "\n") }),
+			progressbar.OptionOnCompletion(func() { _, _ = fmt.Fprint(os.Stderr, "\n") }),
 			progressbar.OptionSpinnerType(14),
 			progressbar.OptionFullWidth(),
 			progressbar.OptionSetRenderBlankState(true),
@@ -222,8 +222,8 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	defer func(e *error) { *e = errors.Join((*e), f.Close()) }(&err)
-	defer func(e *error) { *e = errors.Join((*e), f.Sync()) }(&err)
+	defer func(e *error) { *e = errors.Join(*e, f.Close()) }(&err)
+	defer func(e *error) { *e = errors.Join(*e, f.Sync()) }(&err)
 
 	client, err := client.NewClient(cmd)
 	if err != nil {
@@ -259,7 +259,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return fmt.Errorf("error creating backup file encoder: %w", err)
 	}
-	defer func(e *error) { *e = errors.Join((*e), encoder.Close()) }(&err)
+	defer func(e *error) { *e = errors.Join(*e, encoder.Close()) }(&err)
 
 	relationshipStream, err := client.BulkExportRelationships(ctx, &v1.BulkExportRelationshipsRequest{
 		Consistency: &v1.Consistency{
