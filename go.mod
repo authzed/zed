@@ -11,7 +11,7 @@ require (
 	github.com/authzed/authzed-go v0.10.1
 	github.com/authzed/grpcutil v0.0.0-20230908193239-4286bb1d6403
 	github.com/authzed/spicedb v1.28.1-0.20231208003000-90be4e6762da
-	github.com/brianvoe/gofakeit/v6 v6.22.0
+	github.com/brianvoe/gofakeit/v6 v6.26.3
 	github.com/charmbracelet/lipgloss v0.7.1
 	github.com/google/uuid v1.4.0
 	github.com/gookit/color v1.5.4
