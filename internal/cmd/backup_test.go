@@ -168,3 +168,22 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 		})
 	}
 }
+
+func TestBackupParseRevisionCmdFunc(t *testing.T) {
+	cmd := createTestCobraCommandWithFlagValue(t, "prefix-filter", "test")
+	backupName := createTestBackup(t, testSchema, testRelationships)
+	f, err := os.CreateTemp("", "parse-output")
+	require.NoError(t, err)
+	defer func() {
+		_ = f.Close()
+	}()
+	t.Cleanup(func() {
+		_ = os.Remove(f.Name())
+	})
+
+	err = backupParseRevisionCmdFunc(cmd, f, []string{backupName})
+	require.NoError(t, err)
+
+	lines := readLines(t, f.Name())
+	require.Equal(t, []string{"test"}, lines)
+}

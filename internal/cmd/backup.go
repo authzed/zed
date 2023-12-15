@@ -60,7 +60,9 @@ var (
 		Use:   "parse-revision <filename>",
 		Short: "Extract the revision from a backup file",
 		Args:  cobra.ExactArgs(1),
-		RunE:  backupParseRevisionCmdFunc,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return backupParseRevisionCmdFunc(cmd, os.Stdout, args)
+		},
 	}
 
 	backupParseRelsCmd = &cobra.Command{
@@ -343,22 +345,13 @@ func openRestoreFile(filename string) (*os.File, int64, error) {
 }
 
 func restoreCmdFunc(cmd *cobra.Command, args []string) error {
-	filename := "" // Default to stdin.
-	if len(args) > 0 {
-		filename = args[0]
-	}
-
-	f, _, err := openRestoreFile(filename)
+	decoder, closer, err := decoderFromArgs(cmd, args)
 	if err != nil {
 		return err
 	}
-	defer func(e *error) { *e = errors.Join((*e), f.Close()) }(&err)
 
-	decoder, err := backupformat.NewDecoder(f)
-	if err != nil {
-		return fmt.Errorf("error creating restore file decoder: %w", err)
-	}
-	defer func(e *error) { *e = errors.Join((*e), decoder.Close()) }(&err)
+	defer func(e *error) { *e = errors.Join(*e, closer.Close()) }(&err)
+	defer func(e *error) { *e = errors.Join(*e, decoder.Close()) }(&err)
 
 	if loadedToken := decoder.ZedToken(); loadedToken != nil {
 		log.Debug().Str("revision", loadedToken.Token).Msg("parsed revision")
@@ -498,20 +491,14 @@ func perSec(i uint64, d time.Duration) uint64 {
 }
 
 func backupParseSchemaCmdFunc(cmd *cobra.Command, args []string) error {
-	filename := "" // Default to stdin.
-	if len(args) > 0 {
-		filename = args[0]
-	}
-
-	f, _, err := openRestoreFile(filename)
+	decoder, closer, err := decoderFromArgs(cmd, args)
 	if err != nil {
 		return err
 	}
 
-	decoder, err := backupformat.NewDecoder(f)
-	if err != nil {
-		return fmt.Errorf("error creating restore file decoder: %w", err)
-	}
+	defer func(e *error) { *e = errors.Join(*e, closer.Close()) }(&err)
+	defer func(e *error) { *e = errors.Join(*e, decoder.Close()) }(&err)
+
 	schema := decoder.Schema()
 
 	// Remove any invalid relations generated from old, backwards-incompat
@@ -533,47 +520,36 @@ func backupParseSchemaCmdFunc(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func backupParseRevisionCmdFunc(_ *cobra.Command, args []string) error {
-	filename := "" // Default to stdin.
-	if len(args) > 0 {
-		filename = args[0]
-	}
-
-	f, _, err := openRestoreFile(filename)
+func backupParseRevisionCmdFunc(cmd *cobra.Command, out *os.File, args []string) error {
+	decoder, closer, err := decoderFromArgs(cmd, args)
 	if err != nil {
 		return err
 	}
 
-	decoder, err := backupformat.NewDecoder(f)
-	if err != nil {
-		return fmt.Errorf("error creating restore file decoder: %w", err)
-	}
+	defer func(e *error) { *e = errors.Join(*e, closer.Close()) }(&err)
+	defer func(e *error) { *e = errors.Join(*e, decoder.Close()) }(&err)
 
 	loadedToken := decoder.ZedToken()
 	if loadedToken == nil {
 		return fmt.Errorf("failed to parse decoded revision")
 	}
 
-	fmt.Println(loadedToken.Token)
+	if _, err = fmt.Fprintln(out, loadedToken.Token); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func backupParseRelsCmdFunc(cmd *cobra.Command, out *os.File, args []string) error {
-	filename := "" // Default to stdin.
-	if len(args) > 0 {
-		filename = args[0]
-	}
 	prefix := cobrautil.MustGetString(cmd, "prefix-filter")
-
-	f, _, err := openRestoreFile(filename)
+	decoder, closer, err := decoderFromArgs(cmd, args)
 	if err != nil {
 		return err
 	}
 
-	decoder, err := backupformat.NewDecoder(f)
-	if err != nil {
-		return fmt.Errorf("error creating restore file decoder: %w", err)
-	}
+	defer func(e *error) { *e = errors.Join(*e, closer.Close()) }(&err)
+	defer func(e *error) { *e = errors.Join(*e, decoder.Close()) }(&err)
 
 	for rel, err := decoder.Next(); rel != nil && err == nil; rel, err = decoder.Next() {
 		if !hasRelPrefix(rel, prefix) {
@@ -591,6 +567,25 @@ func backupParseRelsCmdFunc(cmd *cobra.Command, out *os.File, args []string) err
 	}
 
 	return nil
+}
+
+func decoderFromArgs(_ *cobra.Command, args []string) (*backupformat.Decoder, io.Closer, error) {
+	filename := "" // Default to stdin.
+	if len(args) > 0 {
+		filename = args[0]
+	}
+
+	f, _, err := openRestoreFile(filename)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	decoder, err := backupformat.NewDecoder(f)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error creating restore file decoder: %w", err)
+	}
+
+	return decoder, f, nil
 }
 
 func replaceRelString(rel string) string {
