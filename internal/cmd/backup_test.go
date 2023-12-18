@@ -327,6 +327,9 @@ func TestBackupRestoreCmdFunc(t *testing.T) {
 	cmd := createTestCobraCommandWithFlagValue(t,
 		stringFlag{"prefix-filter", "test"},
 		boolFlag{"rewrite-legacy", false},
+		boolFlag{"skip-conflicts", false},
+		boolFlag{"touch-conflicts", false},
+		boolFlag{"disable-retries", false},
 		intFlag{"batch-size", 100},
 		int64Flag{"batches-per-transaction", 10},
 	)

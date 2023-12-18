@@ -87,6 +87,9 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	backupCmd.AddCommand(backupRestoreCmd)
 	backupRestoreCmd.Flags().Int("batch-size", 1_000, "restore relationship write batch size")
 	backupRestoreCmd.Flags().Int64("batches-per-transaction", 10, "number of batches per transaction")
+	backupRestoreCmd.Flags().Bool("skip-conflicts", false, "skips any batch found to be conflicting")
+	backupRestoreCmd.Flags().Bool("touch-conflicts", false, "retries writing conflicting batches with TOUCH semantics")
+	backupRestoreCmd.Flags().Bool("disable-retries", false, "retries when an errors is determined to be retryable (e.g. serialization errors)")
 	backupRestoreCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
 	backupRestoreCmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
 
@@ -377,118 +380,29 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Debug().Str("schema", schema).Bool("filtered", prefixFilter != "").Msg("parsed schema")
 
-	client, err := client.NewClient(cmd)
+	c, err := client.NewClient(cmd)
 	if err != nil {
 		return fmt.Errorf("unable to initialize client: %w", err)
 	}
 
 	ctx := cmd.Context()
-	if _, err := client.WriteSchema(ctx, &v1.WriteSchemaRequest{
+	if _, err := c.WriteSchema(ctx, &v1.WriteSchemaRequest{
 		Schema: schema,
 	}); err != nil {
 		return fmt.Errorf("unable to write schema: %w", err)
 	}
 
-	relationshipWriteStart := time.Now()
-
-	relationshipWriter, err := client.BulkImportRelationships(ctx)
-	if err != nil {
-		return fmt.Errorf("error creating writer stream: %w", err)
-	}
-
 	batchSize := cobrautil.MustGetInt(cmd, "batch-size")
 	batchesPerTransaction := cobrautil.MustGetInt64(cmd, "batches-per-transaction")
 
-	batch := make([]*v1.Relationship, 0, batchSize)
-	var written, batchesWritten int64
-	bar := relProgressBar("restoring from backup")
-	for rel, err := decoder.Next(); rel != nil && err == nil; rel, err = decoder.Next() {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("aborted restore: %w", err)
-		}
-
-		if !hasRelPrefix(rel, prefixFilter) {
-			continue
-		}
-
-		batch = append(batch, rel)
-
-		if len(batch)%batchSize == 0 {
-			if err := relationshipWriter.Send(&v1.BulkImportRelationshipsRequest{
-				Relationships: batch,
-			}); err != nil {
-				_, closeErr := relationshipWriter.CloseAndRecv()
-				return fmt.Errorf("error sending batch to server: %w", errors.Join(err, closeErr))
-			}
-
-			// Reset the relationships in the batch
-			batch = batch[:0]
-			batchesWritten++
-
-			if batchesWritten%batchesPerTransaction == 0 {
-				resp, err := relationshipWriter.CloseAndRecv()
-				if err != nil {
-					return fmt.Errorf("error finalizing write of %d batches: %w", batchesPerTransaction, err)
-				}
-				written += int64(resp.NumLoaded)
-				if err := bar.Set64(written); err != nil {
-					return fmt.Errorf("error incrementing progress bar: %w", err)
-				}
-
-				if !isatty.IsTerminal(os.Stderr.Fd()) {
-					log.Trace().
-						Int64("batches", batchesWritten).
-						Int64("relationships", written).
-						Msg("restore progress")
-				}
-
-				relationshipWriter, err = client.BulkImportRelationships(ctx)
-				if err != nil {
-					return fmt.Errorf("error creating new writer stream: %w", err)
-				}
-			}
-		}
+	skipConflicts := cobrautil.MustGetBool(cmd, "skip-conflicts")
+	touchConflicts := cobrautil.MustGetBool(cmd, "touch-conflicts")
+	disableRetries := cobrautil.MustGetBool(cmd, "disable-retries")
+	if touchConflicts && skipConflicts {
+		return errors.New("cannot use --skip-conflicts and --touch-conflicts together")
 	}
 
-	// Write the last batch
-	if err := relationshipWriter.Send(&v1.BulkImportRelationshipsRequest{
-		Relationships: batch,
-	}); err != nil {
-		return fmt.Errorf("error sending last batch to server: %w", err)
-	}
-
-	// Finish the stream
-	resp, err := relationshipWriter.CloseAndRecv()
-	if err != nil {
-		return fmt.Errorf("error finalizing last write: %w", err)
-	}
-	batchesWritten++
-	written += int64(resp.NumLoaded)
-	if err := bar.Set64(written); err != nil {
-		return fmt.Errorf("error incrementing progress bar: %w", err)
-	}
-	totalTime := time.Since(relationshipWriteStart)
-
-	if err := bar.Finish(); err != nil {
-		return fmt.Errorf("error finalizing progress bar: %w", err)
-	}
-
-	log.Info().
-		Int64("batches", batchesWritten).
-		Int64("relationships", written).
-		Uint64("perSecond", perSec(uint64(written), totalTime)).
-		Stringer("duration", totalTime).
-		Msg("finished restore")
-
-	return nil
-}
-
-func perSec(i uint64, d time.Duration) uint64 {
-	secs := uint64(d.Seconds())
-	if secs == 0 {
-		return i
-	}
-	return i / secs
+	return newRestorer(decoder, c, prefixFilter, batchSize, batchesPerTransaction, skipConflicts, touchConflicts, disableRetries).restoreFromDecoder(ctx)
 }
 
 func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
