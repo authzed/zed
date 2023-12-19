@@ -54,15 +54,17 @@ type restorer struct {
 	duplicateRels    int64
 	duplicateBatches int64
 	totalRetries     int64
+	requestTimeout   time.Duration
 }
 
 func newRestorer(decoder *backupformat.Decoder, client client.Client, prefixFilter string, batchSize int,
 	batchesPerTransaction int64, skipOnConflicts bool, touchOnConflicts bool, disableRetryErrors bool,
-) *restorer {
+	requestTimeout time.Duration) *restorer {
 	return &restorer{
 		decoder:               decoder,
 		client:                client,
 		prefixFilter:          prefixFilter,
+		requestTimeout:        requestTimeout,
 		batchSize:             batchSize,
 		batchesPerTransaction: batchesPerTransaction,
 		skipOnConflicts:       skipOnConflicts,
@@ -290,16 +292,19 @@ func (r *restorer) writeBatchesWithRetry(ctx context.Context, batches [][]*v1.Re
 		for {
 			// throttle the writes so we don't overwhelm the server
 			time.Sleep(backoffInterval.NextBackOff())
-			_, err := r.client.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{Updates: updates})
+			cancelCtx, cancel := context.WithTimeout(ctx, r.requestTimeout)
+			_, err := r.client.WriteRelationships(cancelCtx, &v1.WriteRelationshipsRequest{Updates: updates})
+			cancel()
 
 			if isRetryableError(err) && currentRetries < 10 {
 				currentRetries++
 				r.totalRetries++
 				totalRetries++
+				r.bar.Describe(fmt.Sprintf("retrying after error (attempt %d)", currentRetries+1))
 				continue
 			}
 			if err != nil {
-				return 0, 0, fmt.Errorf("error on attempting to WriteRelationships a previously failed batch: %w", err)
+				return 0, 0, err
 			}
 
 			currentRetries = 0
@@ -338,7 +343,7 @@ func isRetryableError(err error) bool {
 	}
 
 	if s, ok := status.FromError(err); ok {
-		if s.Code() == codes.Unavailable {
+		if s.Code() == codes.Unavailable || s.Code() == codes.DeadlineExceeded {
 			return true
 		}
 	}
@@ -347,6 +352,10 @@ func isRetryableError(err error) bool {
 		if strings.Contains(err.Error(), code) {
 			return true
 		}
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
 	}
 
 	return false

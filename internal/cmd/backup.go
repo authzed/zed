@@ -92,6 +92,7 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	backupRestoreCmd.Flags().Bool("disable-retries", false, "retries when an errors is determined to be retryable (e.g. serialization errors)")
 	backupRestoreCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
 	backupRestoreCmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
+	backupRestoreCmd.Flags().Duration("request-timeout", 30*time.Second, "timeout for each request performed during restore")
 
 	// Restore used to be on the root, so add it there too, but hidden.
 	rootCmd.AddCommand(&cobra.Command{
@@ -401,8 +402,10 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 	if touchConflicts && skipConflicts {
 		return errors.New("cannot use --skip-conflicts and --touch-conflicts together")
 	}
+	requestTimeout := cobrautil.MustGetDuration(cmd, "request-timeout")
 
-	return newRestorer(decoder, c, prefixFilter, batchSize, batchesPerTransaction, skipConflicts, touchConflicts, disableRetries).restoreFromDecoder(ctx)
+	return newRestorer(decoder, c, prefixFilter, batchSize, batchesPerTransaction, skipConflicts, touchConflicts,
+		disableRetries, requestTimeout).restoreFromDecoder(ctx)
 }
 
 func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {

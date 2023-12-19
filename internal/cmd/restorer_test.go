@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
@@ -152,7 +153,7 @@ func TestRestorer(t *testing.T) {
 				expectedSkippedRels += expectedConflicts * tt.batchSize
 			}
 
-			r := newRestorer(d, c, tt.prefixFilter, tt.batchSize, tt.batchesPerTransaction, tt.skipOnConflicts, tt.touchOnConflicts, tt.disableRetryErrors)
+			r := newRestorer(d, c, tt.prefixFilter, tt.batchSize, tt.batchesPerTransaction, tt.skipOnConflicts, tt.touchOnConflicts, tt.disableRetryErrors, 0*time.Second)
 			err = r.restoreFromDecoder(context.Background())
 			if expectsError != nil || (expectedConflicts > 0 && !tt.skipOnConflicts && !tt.touchOnConflicts) {
 				require.ErrorIs(t, err, expectsError)
