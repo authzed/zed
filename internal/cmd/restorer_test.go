@@ -1,0 +1,249 @@
+package cmd
+
+import (
+	"context"
+	"os"
+	"testing"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/tuple"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/authzed/zed/internal/client"
+)
+
+var (
+	unrecoverableError    = status.Error(codes.Internal, "unrecoverable")
+	retryableError        = status.Error(codes.Unavailable, "serialization")
+	conflictError         = status.Error(codes.AlreadyExists, "conflict")
+	oneUnrecoverableError = []error{unrecoverableError}
+	oneRetryableError     = []error{retryableError}
+	oneConflictError      = []error{conflictError}
+)
+
+func TestRestorer(t *testing.T) {
+	for _, tt := range []struct {
+		name                  string
+		prefixFilter          string
+		batchSize             int
+		batchesPerTransaction int64
+		skipOnConflicts       bool
+		touchOnConflicts      bool
+		disableRetryErrors    bool
+		sendErrors            []error
+		commitErrors          []error
+		touchErrors           []error
+		relationships         []string
+	}{
+		{"honors batch size = 1", "", 1, 1, false, false, false, nil, nil, nil, testRelationships},
+		{"correctly handles remainder batch", "", 2, 1, false, false, false, nil, nil, nil, testRelationships},
+		{"correctly handles batch size == total rels", "", 3, 1, false, false, false, nil, nil, nil, testRelationships},
+		{"correctly handles batch size > total rels", "", 4, 1, false, false, false, nil, nil, nil, testRelationships},
+		{"correctly handles empty set", "", 1, 1, false, false, false, nil, nil, nil, nil},
+		{"skips conflicting writes when skipOnConflict is enabled", "", 1, 1, true, false, false, nil, oneConflictError, nil, testRelationships},
+		{"applies touch when touchOnConflict is enabled", "", 1, 1, false, true, false, nil, oneConflictError, nil, testRelationships},
+		{"skips on conflict when skipOnConflict is enabled", "", 2, 1, true, false, false, nil, oneConflictError, nil, testRelationships},
+		{"failed batches are written individually when touchOnConflict is enabled", "", 1, 2, false, true, false, nil, oneConflictError, nil, testRelationships},
+		{"fails on conflict if touchOnConflict=false && skipOnConflict=false", "", 1, 1, false, false, false, oneConflictError, nil, nil, testRelationships},
+		{"fails on unexpected commit error", "", 1, 1, false, false, false, nil, oneUnrecoverableError, nil, testRelationships},
+		{"retries commit retryable errors", "", 1, 1, false, false, false, nil, oneRetryableError, nil, testRelationships},
+		{"retries on conflict when fallback WriteRelationships fails", "", 1, 1, false, true, false, nil, oneConflictError, oneRetryableError, testRelationships},
+		{"returns error on retryable error if retries are disabled", "", 1, 1, false, false, true, nil, oneRetryableError, nil, testRelationships},
+		{"fails fast if conflict-triggered touch fails with an unrecoverable error", "", 1, 1, false, true, false, nil, oneConflictError, oneUnrecoverableError, testRelationships},
+		{"retries if error happens right after sending a batch over the stream", "", 1, 1, false, true, false, oneConflictError, oneConflictError, nil, testRelationships},
+		{"filters relationships", "test", 1, 1, false, false, false, nil, nil, nil, append([]string{"foo/resource:1#reader@foo/user:1"}, testRelationships...)},
+		{"handles gracefully all rels as filtered", "invalid", 1, 1, false, false, false, nil, nil, nil, testRelationships},
+	} {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			backupFileName := createTestBackup(t, testSchema, tt.relationships)
+			d, closer, err := decoderFromArgs(backupFileName)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				require.NoError(t, closer.Close())
+				require.NoError(t, os.Remove(backupFileName))
+			})
+
+			expectedFilteredRels := make([]string, 0, len(tt.relationships))
+			for _, rel := range tt.relationships {
+				if !hasRelPrefix(tuple.ParseRel(rel), tt.prefixFilter) {
+					continue
+				}
+
+				expectedFilteredRels = append(expectedFilteredRels, rel)
+			}
+
+			expectedBatches := len(expectedFilteredRels) / tt.batchSize
+			// there is always one extra commit, regardless there is or not a remainder batch
+			expectedCommits := expectedBatches/int(tt.batchesPerTransaction) + 1
+			remainderBatch := false
+			if len(expectedFilteredRels)%tt.batchSize != 0 {
+				expectedBatches++
+				remainderBatch = true
+			}
+
+			c := &mockClient{
+				t:                              t,
+				remainderBatch:                 remainderBatch,
+				expectedRels:                   expectedFilteredRels,
+				expectedBatches:                expectedBatches,
+				requestedBatchSize:             tt.batchSize,
+				requestedBatchesPerTransaction: tt.batchesPerTransaction,
+				commitErrors:                   tt.commitErrors,
+				touchErrors:                    tt.touchErrors,
+				sendErrors:                     tt.sendErrors,
+			}
+
+			expectedConflicts := 0
+			expectedRetries := 0
+			var expectsError error
+			for _, err := range tt.commitErrors {
+				if isRetryableError(err) {
+					expectedRetries++
+					if tt.disableRetryErrors {
+						expectsError = err
+					}
+				} else if isAlreadyExistsError(err) {
+					expectedConflicts++
+				} else {
+					expectsError = err
+				}
+			}
+			for _, err := range tt.touchErrors {
+				if isRetryableError(err) {
+					expectedRetries++
+					if tt.disableRetryErrors {
+						expectsError = err
+					}
+				} else {
+					expectsError = err
+				}
+			}
+
+			// if skip is enabled, there will be N less relationships written, where N is the number of conflicts
+			expectedWrittenRels := len(expectedFilteredRels)
+			if tt.skipOnConflicts {
+				expectedWrittenRels -= expectedConflicts * tt.batchSize
+			}
+
+			expectedWrittenBatches := len(expectedFilteredRels) / tt.batchSize
+			if tt.skipOnConflicts {
+				expectedWrittenBatches -= expectedConflicts
+			}
+			if remainderBatch {
+				expectedWrittenBatches++
+			}
+
+			expectedTouchedBatches := expectedRetries
+			expectedTouchedRels := expectedRetries * tt.batchSize
+			if tt.touchOnConflicts {
+				expectedTouchedBatches += expectedConflicts * int(tt.batchesPerTransaction)
+				expectedTouchedRels += expectedConflicts * int(tt.batchesPerTransaction) * tt.batchSize
+			}
+
+			expectedSkippedBatches := 0
+			expectedSkippedRels := 0
+			if tt.skipOnConflicts {
+				expectedSkippedBatches += expectedConflicts
+				expectedSkippedRels += expectedConflicts * tt.batchSize
+			}
+
+			r := newRestorer(d, c, tt.prefixFilter, tt.batchSize, tt.batchesPerTransaction, tt.skipOnConflicts, tt.touchOnConflicts, tt.disableRetryErrors)
+			err = r.restoreFromDecoder(context.Background())
+			if expectsError != nil || (expectedConflicts > 0 && !tt.skipOnConflicts && !tt.touchOnConflicts) {
+				require.ErrorIs(t, err, expectsError)
+				return
+			}
+
+			require.NoError(t, err)
+
+			// assert on mock stats
+			require.Equal(t, expectedBatches, c.receivedBatches, "unexpected number of received batches")
+			require.Equal(t, expectedCommits, c.receivedCommits, "unexpected number of batch commits")
+			require.Equal(t, len(expectedFilteredRels), c.receivedRels, "unexpected number of received relationships")
+			require.Equal(t, expectedTouchedBatches, c.touchedBatches, "unexpected number of touched batches")
+			require.Equal(t, expectedTouchedRels, c.touchedRels, "unexpected number of touched commits")
+
+			// assert on restorer stats
+			require.Equal(t, expectedWrittenRels, int(r.writtenRels), "unexpected number of written relationships")
+			require.Equal(t, expectedWrittenBatches, int(r.writtenBatches), "unexpected number of written relationships")
+			require.Equal(t, expectedSkippedBatches, int(r.skippedBatches), "unexpected number of conflicting batches skipped")
+			require.Equal(t, expectedSkippedRels, int(r.skippedRels), "unexpected number of conflicting relationships skipped")
+			require.Equal(t, int64(expectedConflicts)*tt.batchesPerTransaction, r.duplicateBatches, "unexpected number of duplicate batches detected")
+			require.Equal(t, expectedConflicts*int(tt.batchesPerTransaction)*tt.batchSize, int(r.duplicateRels), "unexpected number of duplicate relationships detected")
+			require.Equal(t, int64(expectedRetries+expectedConflicts-expectedSkippedBatches), r.totalRetries, "unexpected number of retries")
+			require.Equal(t, len(tt.relationships)-len(expectedFilteredRels), int(r.filteredOutRels), "unexpected number of filtered out relationships")
+		})
+	}
+}
+
+type mockClient struct {
+	client.Client
+	v1.ExperimentalService_BulkImportRelationshipsClient
+	t                              *testing.T
+	remainderBatch                 bool
+	expectedRels                   []string
+	expectedBatches                int
+	requestedBatchSize             int
+	requestedBatchesPerTransaction int64
+	receivedBatches                int
+	receivedCommits                int
+	receivedRels                   int
+	touchedBatches                 int
+	touchedRels                    int
+	lastReceivedBatch              []*v1.Relationship
+	sendErrors                     []error
+	commitErrors                   []error
+	touchErrors                    []error
+}
+
+func (m *mockClient) BulkImportRelationships(_ context.Context, _ ...grpc.CallOption) (v1.ExperimentalService_BulkImportRelationshipsClient, error) {
+	return m, nil
+}
+
+func (m *mockClient) Send(req *v1.BulkImportRelationshipsRequest) error {
+	m.receivedBatches++
+	m.receivedRels += len(req.Relationships)
+	m.lastReceivedBatch = req.Relationships
+	if m.receivedBatches <= len(m.sendErrors) {
+		return m.sendErrors[m.receivedBatches-1]
+	}
+
+	if m.receivedBatches == m.expectedBatches && m.remainderBatch {
+		require.Equal(m.t, len(m.expectedRels)%m.requestedBatchSize, len(req.Relationships))
+	} else {
+		require.Equal(m.t, m.requestedBatchSize, len(req.Relationships))
+	}
+
+	for i, rel := range req.Relationships {
+		require.True(m.t, proto.Equal(rel, tuple.ParseRel(m.expectedRels[((m.receivedBatches-1)*m.requestedBatchSize)+i])))
+	}
+
+	return nil
+}
+
+func (m *mockClient) WriteRelationships(_ context.Context, in *v1.WriteRelationshipsRequest, _ ...grpc.CallOption) (*v1.WriteRelationshipsResponse, error) {
+	m.touchedBatches++
+	m.touchedRels += len(in.Updates)
+	if m.touchedBatches <= len(m.touchErrors) {
+		return nil, m.touchErrors[m.touchedBatches-1]
+	}
+
+	return &v1.WriteRelationshipsResponse{}, nil
+}
+
+func (m *mockClient) CloseAndRecv() (*v1.BulkImportRelationshipsResponse, error) {
+	m.receivedCommits++
+	lastBatch := m.lastReceivedBatch
+	defer func() { m.lastReceivedBatch = nil }()
+
+	if m.receivedCommits <= len(m.commitErrors) {
+		return nil, m.commitErrors[m.receivedCommits-1]
+	}
+
+	return &v1.BulkImportRelationshipsResponse{NumLoaded: uint64(len(lastBatch))}, nil
+}

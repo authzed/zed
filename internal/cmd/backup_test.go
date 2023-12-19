@@ -309,7 +309,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 	err = backupCreateCmdFunc(cmd, []string{f})
 	require.NoError(t, err)
 
-	d, closer, err := decoderFromArgs(cmd, []string{f})
+	d, closer, err := decoderFromArgs(f)
 	require.NoError(t, err)
 	defer func() {
 		_ = d.Close()

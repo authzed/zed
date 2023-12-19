@@ -350,7 +350,7 @@ func openRestoreFile(filename string) (*os.File, int64, error) {
 }
 
 func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
-	decoder, closer, err := decoderFromArgs(cmd, args)
+	decoder, closer, err := decoderFromArgs(args...)
 	if err != nil {
 		return err
 	}
@@ -406,7 +406,7 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
-	decoder, closer, err := decoderFromArgs(cmd, args)
+	decoder, closer, err := decoderFromArgs(args...)
 	if err != nil {
 		return err
 	}
@@ -434,8 +434,8 @@ func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) 
 	return err
 }
 
-func backupParseRevisionCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
-	decoder, closer, err := decoderFromArgs(cmd, args)
+func backupParseRevisionCmdFunc(_ *cobra.Command, out io.Writer, args []string) error {
+	decoder, closer, err := decoderFromArgs(args...)
 	if err != nil {
 		return err
 	}
@@ -454,7 +454,7 @@ func backupParseRevisionCmdFunc(cmd *cobra.Command, out io.Writer, args []string
 
 func backupParseRelsCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
 	prefix := cobrautil.MustGetString(cmd, "prefix-filter")
-	decoder, closer, err := decoderFromArgs(cmd, args)
+	decoder, closer, err := decoderFromArgs(args...)
 	if err != nil {
 		return err
 	}
@@ -480,7 +480,7 @@ func backupParseRelsCmdFunc(cmd *cobra.Command, out io.Writer, args []string) er
 	return nil
 }
 
-func decoderFromArgs(_ *cobra.Command, args []string) (*backupformat.Decoder, io.Closer, error) {
+func decoderFromArgs(args ...string) (*backupformat.Decoder, io.Closer, error) {
 	filename := "" // Default to stdin.
 	if len(args) > 0 {
 		filename = args[0]
