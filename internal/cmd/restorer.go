@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -188,6 +189,9 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 	unknown := !retryable && !conflict && err != nil
 
 	switch {
+	case errors.Is(ctx.Err(), context.Canceled):
+		r.bar.Describe("backup restore aborted")
+		return ctx.Err()
 	case unknown:
 		r.bar.Describe("failed with unrecoverable error")
 		return fmt.Errorf("error finalizing write of %d batches: %w", len(batchesToBeCommitted), err)
