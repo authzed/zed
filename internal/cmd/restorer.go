@@ -21,10 +21,17 @@ import (
 	"github.com/authzed/zed/pkg/backupformat"
 )
 
-// Fallback for CRDB datastore on SpiceDB < 1.29.0 not returning proper gRPC codes
+// Fallback for datastore implementations on SpiceDB < 1.29.0 not returning proper gRPC codes
+// Remove once https://github.com/authzed/spicedb/pull/1688 lands
 var (
-	txConflictCodes     = []string{"SQLSTATE 23505"}
-	retryableErrorCodes = []string{"retryable error"}
+	txConflictCodes = []string{
+		"SQLSTATE 23505",     // CockroachDB
+		"Error 1062 (23000)", // MySQL
+	}
+	retryableErrorCodes = []string{
+		"retryable error",                          // CockroachDB, PostgreSQL
+		"try restarting transaction", "Error 1205", // MySQL
+	}
 )
 
 type restorer struct {
