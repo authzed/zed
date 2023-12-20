@@ -79,29 +79,24 @@ var (
 
 func registerBackupCmd(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(backupCmd)
+	registerBackupCreateFlags(backupCmd)
 
 	backupCmd.AddCommand(backupCreateCmd)
-	backupCreateCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
-	backupCreateCmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
+	registerBackupCreateFlags(backupCreateCmd)
 
 	backupCmd.AddCommand(backupRestoreCmd)
-	backupRestoreCmd.Flags().Int("batch-size", 1_000, "restore relationship write batch size")
-	backupRestoreCmd.Flags().Uint("batches-per-transaction", 10, "number of batches per transaction")
-	backupRestoreCmd.Flags().Bool("skip-conflicts", false, "skips any batch found to be conflicting")
-	backupRestoreCmd.Flags().Bool("touch-conflicts", false, "retries writing conflicting batches with TOUCH semantics")
-	backupRestoreCmd.Flags().Bool("disable-retries", false, "retries when an errors is determined to be retryable (e.g. serialization errors)")
-	backupRestoreCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
-	backupRestoreCmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
-	backupRestoreCmd.Flags().Duration("request-timeout", 30*time.Second, "timeout for each request performed during restore")
+	registerBackupRestoreFlags(backupRestoreCmd)
 
 	// Restore used to be on the root, so add it there too, but hidden.
-	rootCmd.AddCommand(&cobra.Command{
+	restoreCmd := &cobra.Command{
 		Use:    "restore <filename>",
 		Short:  "Restore a permission system from a file",
 		Args:   cobra.MaximumNArgs(1),
 		RunE:   backupRestoreCmdFunc,
 		Hidden: true,
-	})
+	}
+	rootCmd.AddCommand(restoreCmd)
+	registerBackupRestoreFlags(restoreCmd)
 
 	backupCmd.AddCommand(backupParseSchemaCmd)
 	backupParseSchemaCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
@@ -110,6 +105,22 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	backupCmd.AddCommand(backupParseRevisionCmd)
 	backupCmd.AddCommand(backupParseRelsCmd)
 	backupParseRelsCmd.Flags().String("prefix-filter", "", "Include only relationships with a given prefix")
+}
+
+func registerBackupRestoreFlags(cmd *cobra.Command) {
+	cmd.Flags().Int("batch-size", 1_000, "restore relationship write batch size")
+	cmd.Flags().Uint("batches-per-transaction", 10, "number of batches per transaction")
+	cmd.Flags().Bool("skip-conflicts", false, "skips any batch found to be conflicting")
+	cmd.Flags().Bool("touch-conflicts", false, "retries writing conflicting batches with TOUCH semantics")
+	cmd.Flags().Bool("disable-retries", false, "retries when an errors is determined to be retryable (e.g. serialization errors)")
+	cmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
+	cmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
+	cmd.Flags().Duration("request-timeout", 30*time.Second, "timeout for each request performed during restore")
+}
+
+func registerBackupCreateFlags(cmd *cobra.Command) {
+	cmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
+	cmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
 }
 
 func createBackupFile(filename string) (*os.File, error) {
