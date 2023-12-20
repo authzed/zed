@@ -27,6 +27,9 @@ const (
 	Fail ConflictStrategy = iota
 	Skip
 	Touch
+
+	defaultBackoff    = 50 * time.Millisecond
+	defaultMaxRetries = 10
 )
 
 var conflictStrategyMapping = map[string]ConflictStrategy{
@@ -299,7 +302,7 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 // each batch will be committed independently. If a batch fails, it will be retried up to 10 times with a backoff.
 func (r *restorer) writeBatchesWithRetry(ctx context.Context, batches [][]*v1.Relationship) (uint64, uint64, error) {
 	backoffInterval := backoff.NewExponentialBackOff()
-	backoffInterval.InitialInterval = 10 * time.Millisecond
+	backoffInterval.InitialInterval = defaultBackoff
 	backoffInterval.MaxInterval = 2 * time.Second
 	backoffInterval.MaxElapsedTime = 0
 	backoffInterval.Reset()
@@ -314,17 +317,19 @@ func (r *restorer) writeBatchesWithRetry(ctx context.Context, batches [][]*v1.Re
 		})
 
 		for {
-			// throttle the writes so we don't overwhelm the server
-			time.Sleep(backoffInterval.NextBackOff())
 			cancelCtx, cancel := context.WithTimeout(ctx, r.requestTimeout)
 			_, err := r.client.WriteRelationships(cancelCtx, &v1.WriteRelationshipsRequest{Updates: updates})
 			cancel()
 
-			if isRetryableError(err) && currentRetries < 10 {
+			if isRetryableError(err) && currentRetries < defaultMaxRetries {
+				// throttle the writes so we don't overwhelm the server
+				bo := backoffInterval.NextBackOff()
+				r.bar.Describe(fmt.Sprintf("retrying write with backoff %s after error (attempt %d/%d)", bo,
+					currentRetries+1, defaultMaxRetries))
+				time.Sleep(bo)
 				currentRetries++
 				r.totalRetries++
 				totalRetries++
-				r.bar.Describe(fmt.Sprintf("retrying after error (attempt %d)", currentRetries+1))
 				continue
 			}
 			if err != nil {
