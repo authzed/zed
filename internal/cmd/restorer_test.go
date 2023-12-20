@@ -31,7 +31,7 @@ func TestRestorer(t *testing.T) {
 		name                  string
 		prefixFilter          string
 		batchSize             int
-		batchesPerTransaction int64
+		batchesPerTransaction uint
 		skipOnConflicts       bool
 		touchOnConflicts      bool
 		disableRetryErrors    bool
@@ -175,7 +175,7 @@ func TestRestorer(t *testing.T) {
 			require.Equal(t, expectedWrittenBatches, int(r.writtenBatches), "unexpected number of written relationships")
 			require.Equal(t, expectedSkippedBatches, int(r.skippedBatches), "unexpected number of conflicting batches skipped")
 			require.Equal(t, expectedSkippedRels, int(r.skippedRels), "unexpected number of conflicting relationships skipped")
-			require.Equal(t, int64(expectedConflicts)*tt.batchesPerTransaction, r.duplicateBatches, "unexpected number of duplicate batches detected")
+			require.Equal(t, uint(expectedConflicts)*tt.batchesPerTransaction, uint(r.duplicateBatches), "unexpected number of duplicate batches detected")
 			require.Equal(t, expectedConflicts*int(tt.batchesPerTransaction)*tt.batchSize, int(r.duplicateRels), "unexpected number of duplicate relationships detected")
 			require.Equal(t, int64(expectedRetries+expectedConflicts-expectedSkippedBatches), r.totalRetries, "unexpected number of retries")
 			require.Equal(t, len(tt.relationships)-len(expectedFilteredRels), int(r.filteredOutRels), "unexpected number of filtered out relationships")
@@ -192,7 +192,7 @@ type mockClient struct {
 	expectedRels                   []string
 	expectedBatches                int
 	requestedBatchSize             int
-	requestedBatchesPerTransaction int64
+	requestedBatchesPerTransaction uint
 	receivedBatches                int
 	receivedCommits                int
 	receivedRels                   int

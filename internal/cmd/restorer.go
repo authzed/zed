@@ -40,7 +40,7 @@ type restorer struct {
 	client                client.Client
 	prefixFilter          string
 	batchSize             int
-	batchesPerTransaction int64
+	batchesPerTransaction uint
 	skipOnConflicts       bool
 	touchOnConflicts      bool
 	disableRetryErrors    bool
@@ -59,7 +59,7 @@ type restorer struct {
 }
 
 func newRestorer(schema string, decoder *backupformat.Decoder, client client.Client, prefixFilter string, batchSize int,
-	batchesPerTransaction int64, skipOnConflicts bool, touchOnConflicts bool, disableRetryErrors bool,
+	batchesPerTransaction uint, skipOnConflicts bool, touchOnConflicts bool, disableRetryErrors bool,
 	requestTimeout time.Duration,
 ) *restorer {
 	return &restorer{
@@ -141,7 +141,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 			batch = make([]*v1.Relationship, 0, r.batchSize)
 
 			// if we've sent the maximum number of batches per transaction, proceed to commit
-			if int64(len(batchesToBeCommitted))%r.batchesPerTransaction != 0 {
+			if uint(len(batchesToBeCommitted))%r.batchesPerTransaction != 0 {
 				continue
 			}
 

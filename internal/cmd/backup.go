@@ -86,7 +86,7 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 
 	backupCmd.AddCommand(backupRestoreCmd)
 	backupRestoreCmd.Flags().Int("batch-size", 1_000, "restore relationship write batch size")
-	backupRestoreCmd.Flags().Int64("batches-per-transaction", 10, "number of batches per transaction")
+	backupRestoreCmd.Flags().Uint("batches-per-transaction", 10, "number of batches per transaction")
 	backupRestoreCmd.Flags().Bool("skip-conflicts", false, "skips any batch found to be conflicting")
 	backupRestoreCmd.Flags().Bool("touch-conflicts", false, "retries writing conflicting batches with TOUCH semantics")
 	backupRestoreCmd.Flags().Bool("disable-retries", false, "retries when an errors is determined to be retryable (e.g. serialization errors)")
@@ -387,7 +387,7 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	batchSize := cobrautil.MustGetInt(cmd, "batch-size")
-	batchesPerTransaction := cobrautil.MustGetInt64(cmd, "batches-per-transaction")
+	batchesPerTransaction := cobrautil.MustGetUint(cmd, "batches-per-transaction")
 	skipConflicts := cobrautil.MustGetBool(cmd, "skip-conflicts")
 	touchConflicts := cobrautil.MustGetBool(cmd, "touch-conflicts")
 	disableRetries := cobrautil.MustGetBool(cmd, "disable-retries")
