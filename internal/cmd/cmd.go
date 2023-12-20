@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,12 +10,16 @@ import (
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/cobrautil/v2/cobrazerolog"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/authzed/zed/internal/commands"
 )
 
-var SyncFlagsCmdFunc = cobrautil.SyncViperPreRunE("ZED")
+var (
+	SyncFlagsCmdFunc = cobrautil.SyncViperPreRunE("ZED")
+	errParsing       = errors.New("parsing error")
+)
 
 func Run() {
 	zl := cobrazerolog.New(cobrazerolog.WithPreRunLevel(zerolog.DebugLevel))
@@ -27,7 +32,14 @@ func Run() {
 			zl.RunE(),
 			SyncFlagsCmdFunc,
 		),
+		SilenceErrors: true,
+		SilenceUsage:  true,
 	}
+	rootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		cmd.Println(err)
+		cmd.Println(cmd.UsageString())
+		return errParsing
+	})
 
 	zl.RegisterFlags(rootCmd.PersistentFlags())
 
@@ -91,6 +103,10 @@ func Run() {
 	}()
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
+		if !errors.Is(err, errParsing) {
+			log.Err(err).Msg("terminated with errors")
+		}
+
 		os.Exit(1)
 	}
 }
