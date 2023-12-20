@@ -35,6 +35,7 @@ var (
 )
 
 type restorer struct {
+	schema                string
 	decoder               *backupformat.Decoder
 	client                client.Client
 	prefixFilter          string
@@ -57,12 +58,13 @@ type restorer struct {
 	requestTimeout   time.Duration
 }
 
-func newRestorer(decoder *backupformat.Decoder, client client.Client, prefixFilter string, batchSize int,
+func newRestorer(schema string, decoder *backupformat.Decoder, client client.Client, prefixFilter string, batchSize int,
 	batchesPerTransaction int64, skipOnConflicts bool, touchOnConflicts bool, disableRetryErrors bool,
 	requestTimeout time.Duration,
 ) *restorer {
 	return &restorer{
 		decoder:               decoder,
+		schema:                schema,
 		client:                client,
 		prefixFilter:          prefixFilter,
 		requestTimeout:        requestTimeout,
@@ -83,11 +85,19 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 		}
 	}()
 
+	r.bar.Describe("restoring schema from backup")
+	if _, err := r.client.WriteSchema(ctx, &v1.WriteSchemaRequest{
+		Schema: r.schema,
+	}); err != nil {
+		return fmt.Errorf("unable to write schema: %w", err)
+	}
+
 	relationshipWriter, err := r.client.BulkImportRelationships(ctx)
 	if err != nil {
 		return fmt.Errorf("error creating writer stream: %w", err)
 	}
 
+	r.bar.Describe("restoring relationships from backup")
 	batch := make([]*v1.Relationship, 0, r.batchSize)
 	batchesToBeCommitted := make([][]*v1.Relationship, 0, r.batchesPerTransaction)
 	for rel, err := r.decoder.Next(); rel != nil && err == nil; rel, err = r.decoder.Next() {
@@ -242,7 +252,7 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 		r.writtenBatches += int64(len(batchesToBeCommitted))
 		r.writtenRels += int64(numLoaded)
 	default:
-		r.bar.Describe("restoring from backup")
+		r.bar.Describe("restoring relationships from backup")
 		r.writtenBatches += int64(len(batchesToBeCommitted))
 	}
 

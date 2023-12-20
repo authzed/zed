@@ -89,6 +89,7 @@ func TestRestorer(t *testing.T) {
 
 			c := &mockClient{
 				t:                              t,
+				schema:                         testSchema,
 				remainderBatch:                 remainderBatch,
 				expectedRels:                   expectedFilteredRels,
 				expectedBatches:                expectedBatches,
@@ -153,7 +154,7 @@ func TestRestorer(t *testing.T) {
 				expectedSkippedRels += expectedConflicts * tt.batchSize
 			}
 
-			r := newRestorer(d, c, tt.prefixFilter, tt.batchSize, tt.batchesPerTransaction, tt.skipOnConflicts, tt.touchOnConflicts, tt.disableRetryErrors, 0*time.Second)
+			r := newRestorer(testSchema, d, c, tt.prefixFilter, tt.batchSize, tt.batchesPerTransaction, tt.skipOnConflicts, tt.touchOnConflicts, tt.disableRetryErrors, 0*time.Second)
 			err = r.restoreFromDecoder(context.Background())
 			if expectsError != nil || (expectedConflicts > 0 && !tt.skipOnConflicts && !tt.touchOnConflicts) {
 				require.ErrorIs(t, err, expectsError)
@@ -186,6 +187,7 @@ type mockClient struct {
 	client.Client
 	v1.ExperimentalService_BulkImportRelationshipsClient
 	t                              *testing.T
+	schema                         string
 	remainderBatch                 bool
 	expectedRels                   []string
 	expectedBatches                int
@@ -247,4 +249,9 @@ func (m *mockClient) CloseAndRecv() (*v1.BulkImportRelationshipsResponse, error)
 	}
 
 	return &v1.BulkImportRelationshipsResponse{NumLoaded: uint64(len(lastBatch))}, nil
+}
+
+func (m *mockClient) WriteSchema(_ context.Context, wsr *v1.WriteSchemaRequest, _ ...grpc.CallOption) (*v1.WriteSchemaResponse, error) {
+	require.Equal(m.t, m.schema, wsr.Schema, "unexpected schema in write schema request")
+	return &v1.WriteSchemaResponse{}, nil
 }

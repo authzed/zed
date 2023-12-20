@@ -386,16 +386,8 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unable to initialize client: %w", err)
 	}
 
-	ctx := cmd.Context()
-	if _, err := c.WriteSchema(ctx, &v1.WriteSchemaRequest{
-		Schema: schema,
-	}); err != nil {
-		return fmt.Errorf("unable to write schema: %w", err)
-	}
-
 	batchSize := cobrautil.MustGetInt(cmd, "batch-size")
 	batchesPerTransaction := cobrautil.MustGetInt64(cmd, "batches-per-transaction")
-
 	skipConflicts := cobrautil.MustGetBool(cmd, "skip-conflicts")
 	touchConflicts := cobrautil.MustGetBool(cmd, "touch-conflicts")
 	disableRetries := cobrautil.MustGetBool(cmd, "disable-retries")
@@ -404,8 +396,8 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	requestTimeout := cobrautil.MustGetDuration(cmd, "request-timeout")
 
-	return newRestorer(decoder, c, prefixFilter, batchSize, batchesPerTransaction, skipConflicts, touchConflicts,
-		disableRetries, requestTimeout).restoreFromDecoder(ctx)
+	return newRestorer(schema, decoder, c, prefixFilter, batchSize, batchesPerTransaction, skipConflicts, touchConflicts,
+		disableRetries, requestTimeout).restoreFromDecoder(cmd.Context())
 }
 
 func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
