@@ -32,32 +32,31 @@ func TestRestorer(t *testing.T) {
 		prefixFilter          string
 		batchSize             int
 		batchesPerTransaction uint
-		skipOnConflicts       bool
-		touchOnConflicts      bool
+		conflictStrategy      ConflictStrategy
 		disableRetryErrors    bool
 		sendErrors            []error
 		commitErrors          []error
 		touchErrors           []error
 		relationships         []string
 	}{
-		{"honors batch size = 1", "", 1, 1, false, false, false, nil, nil, nil, testRelationships},
-		{"correctly handles remainder batch", "", 2, 1, false, false, false, nil, nil, nil, testRelationships},
-		{"correctly handles batch size == total rels", "", 3, 1, false, false, false, nil, nil, nil, testRelationships},
-		{"correctly handles batch size > total rels", "", 4, 1, false, false, false, nil, nil, nil, testRelationships},
-		{"correctly handles empty set", "", 1, 1, false, false, false, nil, nil, nil, nil},
-		{"skips conflicting writes when skipOnConflict is enabled", "", 1, 1, true, false, false, nil, oneConflictError, nil, testRelationships},
-		{"applies touch when touchOnConflict is enabled", "", 1, 1, false, true, false, nil, oneConflictError, nil, testRelationships},
-		{"skips on conflict when skipOnConflict is enabled", "", 2, 1, true, false, false, nil, oneConflictError, nil, testRelationships},
-		{"failed batches are written individually when touchOnConflict is enabled", "", 1, 2, false, true, false, nil, oneConflictError, nil, testRelationships},
-		{"fails on conflict if touchOnConflict=false && skipOnConflict=false", "", 1, 1, false, false, false, oneConflictError, nil, nil, testRelationships},
-		{"fails on unexpected commit error", "", 1, 1, false, false, false, nil, oneUnrecoverableError, nil, testRelationships},
-		{"retries commit retryable errors", "", 1, 1, false, false, false, nil, oneRetryableError, nil, testRelationships},
-		{"retries on conflict when fallback WriteRelationships fails", "", 1, 1, false, true, false, nil, oneConflictError, oneRetryableError, testRelationships},
-		{"returns error on retryable error if retries are disabled", "", 1, 1, false, false, true, nil, oneRetryableError, nil, testRelationships},
-		{"fails fast if conflict-triggered touch fails with an unrecoverable error", "", 1, 1, false, true, false, nil, oneConflictError, oneUnrecoverableError, testRelationships},
-		{"retries if error happens right after sending a batch over the stream", "", 1, 1, false, true, false, oneConflictError, oneConflictError, nil, testRelationships},
-		{"filters relationships", "test", 1, 1, false, false, false, nil, nil, nil, append([]string{"foo/resource:1#reader@foo/user:1"}, testRelationships...)},
-		{"handles gracefully all rels as filtered", "invalid", 1, 1, false, false, false, nil, nil, nil, testRelationships},
+		{"honors batch size = 1", "", 1, 1, Fail, false, nil, nil, nil, testRelationships},
+		{"correctly handles remainder batch", "", 2, 1, Fail, false, nil, nil, nil, testRelationships},
+		{"correctly handles batch size == total rels", "", 3, 1, Fail, false, nil, nil, nil, testRelationships},
+		{"correctly handles batch size > total rels", "", 4, 1, Fail, false, nil, nil, nil, testRelationships},
+		{"correctly handles empty set", "", 1, 1, Fail, false, nil, nil, nil, nil},
+		{"skips conflicting writes when skipOnConflict is enabled", "", 1, 1, Skip, false, nil, oneConflictError, nil, testRelationships},
+		{"applies touch when touchOnConflict is enabled", "", 1, 1, Touch, false, nil, oneConflictError, nil, testRelationships},
+		{"skips on conflict when skipOnConflict is enabled", "", 2, 1, Skip, false, nil, oneConflictError, nil, testRelationships},
+		{"failed batches are written individually when touchOnConflict is enabled", "", 1, 2, Touch, false, nil, oneConflictError, nil, testRelationships},
+		{"fails on conflict if touchOnConflict=false && skipOnConflict=false", "", 1, 1, Fail, false, oneConflictError, nil, nil, testRelationships},
+		{"fails on unexpected commit error", "", 1, 1, Fail, false, nil, oneUnrecoverableError, nil, testRelationships},
+		{"retries commit retryable errors", "", 1, 1, Fail, false, nil, oneRetryableError, nil, testRelationships},
+		{"retries on conflict when fallback WriteRelationships fails", "", 1, 1, Touch, false, nil, oneConflictError, oneRetryableError, testRelationships},
+		{"returns error on retryable error if retries are disabled", "", 1, 1, Fail, true, nil, oneRetryableError, nil, testRelationships},
+		{"fails fast if conflict-triggered touch fails with an unrecoverable error", "", 1, 1, Touch, false, nil, oneConflictError, oneUnrecoverableError, testRelationships},
+		{"retries if error happens right after sending a batch over the stream", "", 1, 1, Touch, false, oneConflictError, oneConflictError, nil, testRelationships},
+		{"filters relationships", "test", 1, 1, Fail, false, nil, nil, nil, append([]string{"foo/resource:1#reader@foo/user:1"}, testRelationships...)},
+		{"handles gracefully all rels as filtered", "invalid", 1, 1, Fail, false, nil, nil, nil, testRelationships},
 	} {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
@@ -128,12 +127,12 @@ func TestRestorer(t *testing.T) {
 
 			// if skip is enabled, there will be N less relationships written, where N is the number of conflicts
 			expectedWrittenRels := len(expectedFilteredRels)
-			if tt.skipOnConflicts {
+			if tt.conflictStrategy == Skip {
 				expectedWrittenRels -= expectedConflicts * tt.batchSize
 			}
 
 			expectedWrittenBatches := len(expectedFilteredRels) / tt.batchSize
-			if tt.skipOnConflicts {
+			if tt.conflictStrategy == Skip {
 				expectedWrittenBatches -= expectedConflicts
 			}
 			if remainderBatch {
@@ -142,21 +141,21 @@ func TestRestorer(t *testing.T) {
 
 			expectedTouchedBatches := expectedRetries
 			expectedTouchedRels := expectedRetries * tt.batchSize
-			if tt.touchOnConflicts {
+			if tt.conflictStrategy == Touch {
 				expectedTouchedBatches += expectedConflicts * int(tt.batchesPerTransaction)
 				expectedTouchedRels += expectedConflicts * int(tt.batchesPerTransaction) * tt.batchSize
 			}
 
 			expectedSkippedBatches := 0
 			expectedSkippedRels := 0
-			if tt.skipOnConflicts {
+			if tt.conflictStrategy == Skip {
 				expectedSkippedBatches += expectedConflicts
 				expectedSkippedRels += expectedConflicts * tt.batchSize
 			}
 
-			r := newRestorer(testSchema, d, c, tt.prefixFilter, tt.batchSize, tt.batchesPerTransaction, tt.skipOnConflicts, tt.touchOnConflicts, tt.disableRetryErrors, 0*time.Second)
+			r := newRestorer(testSchema, d, c, tt.prefixFilter, tt.batchSize, tt.batchesPerTransaction, tt.conflictStrategy, tt.disableRetryErrors, 0*time.Second)
 			err = r.restoreFromDecoder(context.Background())
-			if expectsError != nil || (expectedConflicts > 0 && !tt.skipOnConflicts && !tt.touchOnConflicts) {
+			if expectsError != nil || (expectedConflicts > 0 && tt.conflictStrategy == Fail) {
 				require.ErrorIs(t, err, expectsError)
 				return
 			}

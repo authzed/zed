@@ -20,6 +20,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/constraints"
+	"golang.org/x/exp/maps"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/commands"
@@ -110,8 +112,7 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 func registerBackupRestoreFlags(cmd *cobra.Command) {
 	cmd.Flags().Int("batch-size", 1_000, "restore relationship write batch size")
 	cmd.Flags().Uint("batches-per-transaction", 10, "number of batches per transaction")
-	cmd.Flags().Bool("skip-conflicts", false, "skips any batch found to be conflicting")
-	cmd.Flags().Bool("touch-conflicts", false, "retries writing conflicting batches with TOUCH semantics")
+	cmd.Flags().String("conflict-strategy", "fail", "strategy used when a conflicting relationship is found. Possible values: fail, skip, touch")
 	cmd.Flags().Bool("disable-retries", false, "retries when an errors is determined to be retryable (e.g. serialization errors)")
 	cmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
 	cmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
@@ -399,16 +400,28 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 
 	batchSize := cobrautil.MustGetInt(cmd, "batch-size")
 	batchesPerTransaction := cobrautil.MustGetUint(cmd, "batches-per-transaction")
-	skipConflicts := cobrautil.MustGetBool(cmd, "skip-conflicts")
-	touchConflicts := cobrautil.MustGetBool(cmd, "touch-conflicts")
+
+	strategy := MustGetEnum[ConflictStrategy](cmd, "conflict-strategy", conflictStrategyMapping)
 	disableRetries := cobrautil.MustGetBool(cmd, "disable-retries")
-	if touchConflicts && skipConflicts {
-		return errors.New("cannot use --skip-conflicts and --touch-conflicts together")
-	}
 	requestTimeout := cobrautil.MustGetDuration(cmd, "request-timeout")
 
-	return newRestorer(schema, decoder, c, prefixFilter, batchSize, batchesPerTransaction, skipConflicts, touchConflicts,
+	return newRestorer(schema, decoder, c, prefixFilter, batchSize, batchesPerTransaction, strategy,
 		disableRetries, requestTimeout).restoreFromDecoder(cmd.Context())
+}
+
+// MustGetEnum is a helper for getting an enum value from a string cobra flag.
+func MustGetEnum[E constraints.Integer](cmd *cobra.Command, name string, mapping map[string]E) E {
+	value, err := cmd.Flags().GetString(name)
+	if err != nil {
+		panic("failed to find cobra flag: " + name)
+	}
+
+	value = strings.TrimSpace(strings.ToLower(value))
+	if enum, ok := mapping[value]; ok {
+		return enum
+	}
+
+	panic(fmt.Sprintf("unexpected flag value %s: should be one of %v", value, maps.Keys(mapping)))
 }
 
 func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {

@@ -21,6 +21,20 @@ import (
 	"github.com/authzed/zed/pkg/backupformat"
 )
 
+type ConflictStrategy int
+
+const (
+	Fail ConflictStrategy = iota
+	Skip
+	Touch
+)
+
+var conflictStrategyMapping = map[string]ConflictStrategy{
+	"fail":  Fail,
+	"skip":  Skip,
+	"touch": Touch,
+}
+
 // Fallback for datastore implementations on SpiceDB < 1.29.0 not returning proper gRPC codes
 // Remove once https://github.com/authzed/spicedb/pull/1688 lands
 var (
@@ -41,8 +55,7 @@ type restorer struct {
 	prefixFilter          string
 	batchSize             int
 	batchesPerTransaction uint
-	skipOnConflicts       bool
-	touchOnConflicts      bool
+	conflictStrategy      ConflictStrategy
 	disableRetryErrors    bool
 	bar                   *progressbar.ProgressBar
 
@@ -59,7 +72,7 @@ type restorer struct {
 }
 
 func newRestorer(schema string, decoder *backupformat.Decoder, client client.Client, prefixFilter string, batchSize int,
-	batchesPerTransaction uint, skipOnConflicts bool, touchOnConflicts bool, disableRetryErrors bool,
+	batchesPerTransaction uint, conflictStrategy ConflictStrategy, disableRetryErrors bool,
 	requestTimeout time.Duration,
 ) *restorer {
 	return &restorer{
@@ -70,8 +83,7 @@ func newRestorer(schema string, decoder *backupformat.Decoder, client client.Cli
 		requestTimeout:        requestTimeout,
 		batchSize:             batchSize,
 		batchesPerTransaction: batchesPerTransaction,
-		skipOnConflicts:       skipOnConflicts,
-		touchOnConflicts:      touchOnConflicts,
+		conflictStrategy:      conflictStrategy,
 		disableRetryErrors:    disableRetryErrors,
 		bar:                   relProgressBar("restoring from backup"),
 	}
@@ -218,14 +230,14 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 		return fmt.Errorf("error finalizing write of %d batches: %w", len(batchesToBeCommitted), err)
 	case retryable && r.disableRetryErrors:
 		return err
-	case conflict && r.skipOnConflicts:
+	case conflict && r.conflictStrategy == Skip:
 		r.skippedRels += int64(expectedLoaded)
 		r.skippedBatches += int64(len(batchesToBeCommitted))
 		r.duplicateBatches += int64(len(batchesToBeCommitted))
 		r.duplicateRels += int64(expectedLoaded)
 		r.bar.Describe("skipping conflicting batch")
-	case conflict && r.touchOnConflicts:
-		r.bar.Describe("retrying conflicting batch")
+	case conflict && r.conflictStrategy == Touch:
+		r.bar.Describe("touching conflicting batch")
 		r.duplicateRels += int64(expectedLoaded)
 		r.duplicateBatches += int64(len(batchesToBeCommitted))
 		r.totalRetries++
@@ -237,7 +249,7 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 		retries++ // account for the initial attempt
 		r.writtenBatches += int64(len(batchesToBeCommitted))
 		r.writtenRels += int64(numLoaded)
-	case conflict && (!r.touchOnConflicts && !r.skipOnConflicts):
+	case conflict && r.conflictStrategy == Fail:
 		r.bar.Describe("conflict detected, aborting restore")
 		return fmt.Errorf("duplicate relationships found")
 	case retryable:
