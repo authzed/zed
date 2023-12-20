@@ -59,7 +59,8 @@ type restorer struct {
 
 func newRestorer(decoder *backupformat.Decoder, client client.Client, prefixFilter string, batchSize int,
 	batchesPerTransaction int64, skipOnConflicts bool, touchOnConflicts bool, disableRetryErrors bool,
-	requestTimeout time.Duration) *restorer {
+	requestTimeout time.Duration,
+) *restorer {
 	return &restorer{
 		decoder:               decoder,
 		client:                client,
@@ -195,12 +196,13 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 	// This lets us retry with TOUCH semantics in case of failure due to duplicates
 	retryable := isRetryableError(err)
 	conflict := isAlreadyExistsError(err)
-	unknown := !retryable && !conflict && err != nil
+	canceled, cancelErr := isCanceledError(ctx.Err(), err)
+	unknown := !retryable && !conflict && !canceled && err != nil
 
 	switch {
-	case errors.Is(ctx.Err(), context.Canceled):
+	case canceled:
 		r.bar.Describe("backup restore aborted")
-		return ctx.Err()
+		return cancelErr
 	case unknown:
 		r.bar.Describe("failed with unrecoverable error")
 		return fmt.Errorf("error finalizing write of %d batches: %w", len(batchesToBeCommitted), err)
@@ -322,19 +324,11 @@ func isAlreadyExistsError(err error) bool {
 		return false
 	}
 
-	if s, ok := status.FromError(err); ok {
-		if s.Code() == codes.AlreadyExists {
-			return true
-		}
+	if isGRPCCode(err, codes.AlreadyExists) {
+		return true
 	}
 
-	for _, code := range txConflictCodes {
-		if strings.Contains(err.Error(), code) {
-			return true
-		}
-	}
-
-	return false
+	return isContainsErrorString(err, txConflictCodes...)
 }
 
 func isRetryableError(err error) bool {
@@ -342,20 +336,60 @@ func isRetryableError(err error) bool {
 		return false
 	}
 
-	if s, ok := status.FromError(err); ok {
-		if s.Code() == codes.Unavailable || s.Code() == codes.DeadlineExceeded {
-			return true
-		}
-	}
-
-	for _, code := range retryableErrorCodes {
-		if strings.Contains(err.Error(), code) {
-			return true
-		}
-	}
-
-	if errors.Is(err, context.DeadlineExceeded) {
+	if isGRPCCode(err, codes.Unavailable, codes.DeadlineExceeded) {
 		return true
+	}
+
+	if isContainsErrorString(err, retryableErrorCodes...) {
+		return true
+	}
+
+	return errors.Is(err, context.DeadlineExceeded)
+}
+
+func isCanceledError(errs ...error) (bool, error) {
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+
+		if errors.Is(err, context.Canceled) {
+			return true, err
+		}
+
+		if isGRPCCode(err, codes.Canceled) {
+			return true, err
+		}
+	}
+
+	return false, nil
+}
+
+func isContainsErrorString(err error, errStrings ...string) bool {
+	if err == nil {
+		return false
+	}
+
+	for _, errString := range errStrings {
+		if strings.Contains(err.Error(), errString) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isGRPCCode(err error, codes ...codes.Code) bool {
+	if err == nil {
+		return false
+	}
+
+	if s, ok := status.FromError(err); ok {
+		for _, code := range codes {
+			if s.Code() == code {
+				return true
+			}
+		}
 	}
 
 	return false
