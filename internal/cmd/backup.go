@@ -401,7 +401,10 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 	batchSize := cobrautil.MustGetInt(cmd, "batch-size")
 	batchesPerTransaction := cobrautil.MustGetUint(cmd, "batches-per-transaction")
 
-	strategy := MustGetEnum[ConflictStrategy](cmd, "conflict-strategy", conflictStrategyMapping)
+	strategy, err := GetEnum[ConflictStrategy](cmd, "conflict-strategy", conflictStrategyMapping)
+	if err != nil {
+		return err
+	}
 	disableRetries := cobrautil.MustGetBool(cmd, "disable-retries")
 	requestTimeout := cobrautil.MustGetDuration(cmd, "request-timeout")
 
@@ -409,19 +412,16 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 		disableRetries, requestTimeout).restoreFromDecoder(cmd.Context())
 }
 
-// MustGetEnum is a helper for getting an enum value from a string cobra flag.
-func MustGetEnum[E constraints.Integer](cmd *cobra.Command, name string, mapping map[string]E) E {
-	value, err := cmd.Flags().GetString(name)
-	if err != nil {
-		panic("failed to find cobra flag: " + name)
-	}
-
+// GetEnum is a helper for getting an enum value from a string cobra flag.
+func GetEnum[E constraints.Integer](cmd *cobra.Command, name string, mapping map[string]E) (E, error) {
+	value := cobrautil.MustGetString(cmd, name)
 	value = strings.TrimSpace(strings.ToLower(value))
 	if enum, ok := mapping[value]; ok {
-		return enum
+		return enum, nil
 	}
 
-	panic(fmt.Sprintf("unexpected flag value %s: should be one of %v", value, maps.Keys(mapping)))
+	var zeroValueE E
+	return zeroValueE, fmt.Errorf("unexpected flag '%s' value '%s': should be one of %v", name, value, maps.Keys(mapping))
 }
 
 func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
