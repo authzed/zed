@@ -52,10 +52,26 @@ var contextRemoveCmd = &cobra.Command{
 }
 
 var contextUseCmd = &cobra.Command{
-	Use:   "use <system>",
-	Short: "set a context as the current context",
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  contextUseCmdFunc,
+	Use:               "use <system>",
+	Short:             "set a context as the current context",
+	Args:              cobra.MaximumNArgs(1),
+	RunE:              contextUseCmdFunc,
+	ValidArgsFunction: ContextGet,
+}
+
+func ContextGet(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	_, secretStore := client.DefaultStorage()
+	secrets, err := secretStore.Get()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	names := make([]string, 0, len(secrets.Tokens))
+	for _, token := range secrets.Tokens {
+		names = append(names, token.Name)
+	}
+
+	return names, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveKeepOrder
 }
 
 func contextListCmdFunc(cmd *cobra.Command, _ []string) error {
