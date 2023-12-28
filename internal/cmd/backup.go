@@ -17,6 +17,7 @@ import (
 	"github.com/authzed/spicedb/pkg/typesystem"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/mattn/go-isatty"
+	"github.com/rodaine/table"
 	"github.com/rs/zerolog/log"
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
@@ -77,6 +78,15 @@ var (
 			return backupParseRelsCmdFunc(cmd, os.Stdout, args)
 		},
 	}
+
+	backupRedactCmd = &cobra.Command{
+		Use:   "redact <filename>",
+		Short: "Redact a backup file to remove sensitive information",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return backupRedactCmdFunc(cmd, args)
+		},
+	}
 )
 
 func registerBackupCmd(rootCmd *cobra.Command) {
@@ -88,6 +98,11 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 
 	backupCmd.AddCommand(backupRestoreCmd)
 	registerBackupRestoreFlags(backupRestoreCmd)
+
+	backupCmd.AddCommand(backupRedactCmd)
+	backupRedactCmd.Flags().Bool("redact-definitions", true, "redact definitions")
+	backupRedactCmd.Flags().Bool("redact-relations", true, "redact relations")
+	backupRedactCmd.Flags().Bool("redact-object-ids", true, "redact object IDs")
 
 	// Restore used to be on the root, so add it there too, but hidden.
 	restoreCmd := &cobra.Command{
@@ -469,6 +484,87 @@ func backupParseRevisionCmdFunc(_ *cobra.Command, out io.Writer, args []string) 
 
 	_, err = fmt.Fprintln(out, loadedToken.Token)
 	return err
+}
+
+func backupRedactCmdFunc(cmd *cobra.Command, args []string) error {
+	decoder, closer, err := decoderFromArgs(args...)
+	if err != nil {
+		return fmt.Errorf("error creating restore file decoder: %w", err)
+	}
+
+	defer func(e *error) { *e = errors.Join(*e, closer.Close()) }(&err)
+	defer func(e *error) { *e = errors.Join(*e, decoder.Close()) }(&err)
+
+	filename := args[0] + ".redacted"
+	writer, err := createBackupFile(filename)
+	if err != nil {
+		return err
+	}
+
+	redactor, err := backupformat.NewRedactor(decoder, writer, backupformat.RedactionOptions{
+		RedactDefinitions: cobrautil.MustGetBool(cmd, "redact-definitions"),
+		RedactRelations:   cobrautil.MustGetBool(cmd, "redact-relations"),
+		RedactObjectIDs:   cobrautil.MustGetBool(cmd, "redact-object-ids"),
+	})
+	if err != nil {
+		return fmt.Errorf("error creating redactor: %w", err)
+	}
+
+	bar := relProgressBar("redacting backup")
+	var written int64
+	for {
+		if err := cmd.Context().Err(); err != nil {
+			return fmt.Errorf("aborted redaction: %w", err)
+		}
+
+		err := redactor.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return fmt.Errorf("error redacting: %w", err)
+		}
+
+		written++
+		if err := bar.Set64(written); err != nil {
+			return fmt.Errorf("error incrementing progress bar: %w", err)
+		}
+	}
+
+	if err := bar.Finish(); err != nil {
+		return fmt.Errorf("error finalizing progress bar: %w", err)
+	}
+
+	fmt.Println("Redaction map:")
+	fmt.Println("--------------")
+	fmt.Println()
+
+	// Draw a table of definitions, caveats and relations mapped.
+	tbl := table.New("Definition Name", "Redacted Name")
+	for k, v := range redactor.RedactionMap().Definitions {
+		tbl.AddRow(k, v)
+	}
+
+	tbl.Print()
+	fmt.Println()
+
+	if len(redactor.RedactionMap().Caveats) > 0 {
+		tbl = table.New("Caveat Name", "Redacted Name")
+		for k, v := range redactor.RedactionMap().Caveats {
+			tbl.AddRow(k, v)
+		}
+		tbl.Print()
+		fmt.Println()
+	}
+
+	tbl = table.New("Relation/Permission Name", "Redacted Name")
+	for k, v := range redactor.RedactionMap().Relations {
+		tbl.AddRow(k, v)
+	}
+	tbl.Print()
+	fmt.Println()
+
+	return nil
 }
 
 func backupParseRelsCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
