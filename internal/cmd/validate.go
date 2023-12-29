@@ -40,8 +40,8 @@ func registerValidateCmd(rootCmd *cobra.Command) {
 }
 
 var validateCmd = &cobra.Command{
-	Use:   "validate <validation_file>",
-	Short: "validate the given validation file",
+	Use:   "validate <validation_file_or_schema_file>",
+	Short: "validate the given validation or schema file",
 	Example: `
 	From a local file (with prefix):
 		zed validate file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
@@ -78,7 +78,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 
 	// Decode the validation document.
 	var parsed validationfile.ValidationFile
-	validateContents, err := decoder(&parsed)
+	validateContents, isOnlySchema, err := decoder(&parsed)
 	if err != nil {
 		var errWithSource spiceerrors.ErrorWithSource
 		if errors.As(err, &errWithSource) {
@@ -102,7 +102,12 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if devErrs != nil {
-		outputDeveloperErrorsWithLineOffset(validateContents, devErrs.InputErrors, 1 /* for the 'schema:' */)
+		schemaOffset := 1 /* for the 'schema:' */
+		if isOnlySchema {
+			schemaOffset = 0
+		}
+
+		outputDeveloperErrorsWithLineOffset(validateContents, devErrs.InputErrors, schemaOffset)
 	}
 
 	// Run assertions.
