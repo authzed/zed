@@ -110,10 +110,11 @@ var permissionCmd = &cobra.Command{
 }
 
 var checkCmd = &cobra.Command{
-	Use:   "check <resource:id> <permission> <subject:id>",
-	Short: "check that a Permission exists for a Subject",
-	Args:  cobra.ExactArgs(3),
-	RunE:  checkCmdFunc,
+	Use:               "check <resource:id> <permission> <subject:id>",
+	Short:             "check that a Permission exists for a Subject",
+	Args:              cobra.ExactArgs(3),
+	RunE:              checkCmdFunc,
+	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectID),
 }
 
 var expandCmd = &cobra.Command{
@@ -124,25 +125,28 @@ var expandCmd = &cobra.Command{
 }
 
 var lookupResourcesCmd = &cobra.Command{
-	Use:   "lookup-resources <type> <permission> <subject:id>",
-	Short: "looks up the Resources of a given type for which the Subject has Permission",
-	Args:  cobra.ExactArgs(3),
-	RunE:  lookupResourcesCmdFunc,
+	Use:               "lookup-resources <type> <permission> <subject:id>",
+	Short:             "looks up the Resources of a given type for which the Subject has Permission",
+	Args:              cobra.ExactArgs(3),
+	RunE:              lookupResourcesCmdFunc,
+	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
 }
 
 var lookupCmd = &cobra.Command{
-	Use:    "lookup <type> <permission> <subject:id>",
-	Short:  "lookup the Resources of a given type for which the Subject has Permission",
-	Args:   cobra.ExactArgs(3),
-	RunE:   lookupResourcesCmdFunc,
-	Hidden: true,
+	Use:               "lookup <type> <permission> <subject:id>",
+	Short:             "lookup the Resources of a given type for which the Subject has Permission",
+	Args:              cobra.ExactArgs(3),
+	RunE:              lookupResourcesCmdFunc,
+	Hidden:            true,
+	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
 }
 
 var lookupSubjectsCmd = &cobra.Command{
-	Use:   "lookup-subjects <resource:id> <permission> <subject_type#optional_subject_relation>",
-	Short: "lookup the Subjects of a given type for which the Subject has Permission on the Resource",
-	Args:  cobra.ExactArgs(3),
-	RunE:  lookupSubjectsCmdFunc,
+	Use:               "lookup-subjects <resource:id> <permission> <subject_type#optional_subject_relation>",
+	Short:             "lookup the Subjects of a given type for which the Subject has Permission on the Resource",
+	Args:              cobra.ExactArgs(3),
+	RunE:              lookupSubjectsCmdFunc,
+	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
 }
 
 func checkCmdFunc(cmd *cobra.Command, args []string) error {
