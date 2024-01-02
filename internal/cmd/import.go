@@ -77,7 +77,7 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	var p decode.SchemaRelationships
-	if _, err := decoder(&p); err != nil {
+	if _, _, err := decoder(&p); err != nil {
 		return err
 	}
 

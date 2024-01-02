@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/stretchr/testify/require"
 )
 
@@ -123,6 +124,52 @@ func TestRewriteURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rewriteURL(&tt.in)
 			require.EqualValues(t, tt.out, tt.in)
+		})
+	}
+}
+
+func TestUnmarshalAsYAMLOrSchema(t *testing.T) {
+	tests := []struct {
+		name         string
+		in           []byte
+		isOnlySchema bool
+		outSchema    string
+		wantErr      bool
+	}{
+		{
+			name: "valid yaml",
+			in: []byte(`
+schema:
+  definition user {}
+`),
+			outSchema:    `definition user {}`,
+			isOnlySchema: false,
+			wantErr:      false,
+		},
+		{
+			name:         "valid schema",
+			in:           []byte(`definition user {}`),
+			isOnlySchema: true,
+			outSchema:    `definition user {}`,
+			wantErr:      false,
+		},
+		{
+			name:         "invalid yaml",
+			in:           []byte(`invalid yaml`),
+			isOnlySchema: false,
+			outSchema:    "",
+			wantErr:      true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			block := validationfile.ValidationFile{}
+			isOnlySchema, err := unmarshalAsYAMLOrSchema(tt.in, &block)
+			require.Equal(t, tt.wantErr, err != nil)
+			require.Equal(t, tt.isOnlySchema, isOnlySchema)
+			if !tt.wantErr {
+				require.Equal(t, tt.outSchema, block.Schema.Schema)
+			}
 		})
 	}
 }
