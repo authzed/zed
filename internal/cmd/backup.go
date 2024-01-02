@@ -20,6 +20,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/constraints"
+	"golang.org/x/exp/maps"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/commands"
@@ -79,25 +81,24 @@ var (
 
 func registerBackupCmd(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(backupCmd)
+	registerBackupCreateFlags(backupCmd)
 
 	backupCmd.AddCommand(backupCreateCmd)
-	backupCreateCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
-	backupCreateCmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
+	registerBackupCreateFlags(backupCreateCmd)
 
 	backupCmd.AddCommand(backupRestoreCmd)
-	backupRestoreCmd.Flags().Int("batch-size", 1_000, "restore relationship write batch size")
-	backupRestoreCmd.Flags().Int64("batches-per-transaction", 10, "number of batches per transaction")
-	backupRestoreCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
-	backupRestoreCmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
+	registerBackupRestoreFlags(backupRestoreCmd)
 
 	// Restore used to be on the root, so add it there too, but hidden.
-	rootCmd.AddCommand(&cobra.Command{
+	restoreCmd := &cobra.Command{
 		Use:    "restore <filename>",
 		Short:  "Restore a permission system from a file",
 		Args:   cobra.MaximumNArgs(1),
 		RunE:   backupRestoreCmdFunc,
 		Hidden: true,
-	})
+	}
+	rootCmd.AddCommand(restoreCmd)
+	registerBackupRestoreFlags(restoreCmd)
 
 	backupCmd.AddCommand(backupParseSchemaCmd)
 	backupParseSchemaCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
@@ -106,6 +107,21 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	backupCmd.AddCommand(backupParseRevisionCmd)
 	backupCmd.AddCommand(backupParseRelsCmd)
 	backupParseRelsCmd.Flags().String("prefix-filter", "", "Include only relationships with a given prefix")
+}
+
+func registerBackupRestoreFlags(cmd *cobra.Command) {
+	cmd.Flags().Int("batch-size", 1_000, "restore relationship write batch size")
+	cmd.Flags().Uint("batches-per-transaction", 10, "number of batches per transaction")
+	cmd.Flags().String("conflict-strategy", "fail", "strategy used when a conflicting relationship is found. Possible values: fail, skip, touch")
+	cmd.Flags().Bool("disable-retries", false, "retries when an errors is determined to be retryable (e.g. serialization errors)")
+	cmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
+	cmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
+	cmd.Flags().Duration("request-timeout", 30*time.Second, "timeout for each request performed during restore")
+}
+
+func registerBackupCreateFlags(cmd *cobra.Command) {
+	cmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
+	cmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
 }
 
 func createBackupFile(filename string) (*os.File, error) {
@@ -347,7 +363,7 @@ func openRestoreFile(filename string) (*os.File, int64, error) {
 }
 
 func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
-	decoder, closer, err := decoderFromArgs(cmd, args)
+	decoder, closer, err := decoderFromArgs(args...)
 	if err != nil {
 		return err
 	}
@@ -377,122 +393,39 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Debug().Str("schema", schema).Bool("filtered", prefixFilter != "").Msg("parsed schema")
 
-	client, err := client.NewClient(cmd)
+	c, err := client.NewClient(cmd)
 	if err != nil {
 		return fmt.Errorf("unable to initialize client: %w", err)
 	}
 
-	ctx := cmd.Context()
-	if _, err := client.WriteSchema(ctx, &v1.WriteSchemaRequest{
-		Schema: schema,
-	}); err != nil {
-		return fmt.Errorf("unable to write schema: %w", err)
-	}
-
-	relationshipWriteStart := time.Now()
-
-	relationshipWriter, err := client.BulkImportRelationships(ctx)
-	if err != nil {
-		return fmt.Errorf("error creating writer stream: %w", err)
-	}
-
 	batchSize := cobrautil.MustGetInt(cmd, "batch-size")
-	batchesPerTransaction := cobrautil.MustGetInt64(cmd, "batches-per-transaction")
+	batchesPerTransaction := cobrautil.MustGetUint(cmd, "batches-per-transaction")
 
-	batch := make([]*v1.Relationship, 0, batchSize)
-	var written, batchesWritten int64
-	bar := relProgressBar("restoring from backup")
-	for rel, err := decoder.Next(); rel != nil && err == nil; rel, err = decoder.Next() {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("aborted restore: %w", err)
-		}
-
-		if !hasRelPrefix(rel, prefixFilter) {
-			continue
-		}
-
-		batch = append(batch, rel)
-
-		if len(batch)%batchSize == 0 {
-			if err := relationshipWriter.Send(&v1.BulkImportRelationshipsRequest{
-				Relationships: batch,
-			}); err != nil {
-				_, closeErr := relationshipWriter.CloseAndRecv()
-				return fmt.Errorf("error sending batch to server: %w", errors.Join(err, closeErr))
-			}
-
-			// Reset the relationships in the batch
-			batch = batch[:0]
-			batchesWritten++
-
-			if batchesWritten%batchesPerTransaction == 0 {
-				resp, err := relationshipWriter.CloseAndRecv()
-				if err != nil {
-					return fmt.Errorf("error finalizing write of %d batches: %w", batchesPerTransaction, err)
-				}
-				written += int64(resp.NumLoaded)
-				if err := bar.Set64(written); err != nil {
-					return fmt.Errorf("error incrementing progress bar: %w", err)
-				}
-
-				if !isatty.IsTerminal(os.Stderr.Fd()) {
-					log.Trace().
-						Int64("batches", batchesWritten).
-						Int64("relationships", written).
-						Msg("restore progress")
-				}
-
-				relationshipWriter, err = client.BulkImportRelationships(ctx)
-				if err != nil {
-					return fmt.Errorf("error creating new writer stream: %w", err)
-				}
-			}
-		}
-	}
-
-	// Write the last batch
-	if err := relationshipWriter.Send(&v1.BulkImportRelationshipsRequest{
-		Relationships: batch,
-	}); err != nil {
-		return fmt.Errorf("error sending last batch to server: %w", err)
-	}
-
-	// Finish the stream
-	resp, err := relationshipWriter.CloseAndRecv()
+	strategy, err := GetEnum[ConflictStrategy](cmd, "conflict-strategy", conflictStrategyMapping)
 	if err != nil {
-		return fmt.Errorf("error finalizing last write: %w", err)
+		return err
 	}
-	batchesWritten++
-	written += int64(resp.NumLoaded)
-	if err := bar.Set64(written); err != nil {
-		return fmt.Errorf("error incrementing progress bar: %w", err)
-	}
-	totalTime := time.Since(relationshipWriteStart)
+	disableRetries := cobrautil.MustGetBool(cmd, "disable-retries")
+	requestTimeout := cobrautil.MustGetDuration(cmd, "request-timeout")
 
-	if err := bar.Finish(); err != nil {
-		return fmt.Errorf("error finalizing progress bar: %w", err)
-	}
-
-	log.Info().
-		Int64("batches", batchesWritten).
-		Int64("relationships", written).
-		Uint64("perSecond", perSec(uint64(written), totalTime)).
-		Stringer("duration", totalTime).
-		Msg("finished restore")
-
-	return nil
+	return newRestorer(schema, decoder, c, prefixFilter, batchSize, batchesPerTransaction, strategy,
+		disableRetries, requestTimeout).restoreFromDecoder(cmd.Context())
 }
 
-func perSec(i uint64, d time.Duration) uint64 {
-	secs := uint64(d.Seconds())
-	if secs == 0 {
-		return i
+// GetEnum is a helper for getting an enum value from a string cobra flag.
+func GetEnum[E constraints.Integer](cmd *cobra.Command, name string, mapping map[string]E) (E, error) {
+	value := cobrautil.MustGetString(cmd, name)
+	value = strings.TrimSpace(strings.ToLower(value))
+	if enum, ok := mapping[value]; ok {
+		return enum, nil
 	}
-	return i / secs
+
+	var zeroValueE E
+	return zeroValueE, fmt.Errorf("unexpected flag '%s' value '%s': should be one of %v", name, value, maps.Keys(mapping))
 }
 
 func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
-	decoder, closer, err := decoderFromArgs(cmd, args)
+	decoder, closer, err := decoderFromArgs(args...)
 	if err != nil {
 		return err
 	}
@@ -520,8 +453,8 @@ func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) 
 	return err
 }
 
-func backupParseRevisionCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
-	decoder, closer, err := decoderFromArgs(cmd, args)
+func backupParseRevisionCmdFunc(_ *cobra.Command, out io.Writer, args []string) error {
+	decoder, closer, err := decoderFromArgs(args...)
 	if err != nil {
 		return err
 	}
@@ -540,7 +473,7 @@ func backupParseRevisionCmdFunc(cmd *cobra.Command, out io.Writer, args []string
 
 func backupParseRelsCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
 	prefix := cobrautil.MustGetString(cmd, "prefix-filter")
-	decoder, closer, err := decoderFromArgs(cmd, args)
+	decoder, closer, err := decoderFromArgs(args...)
 	if err != nil {
 		return err
 	}
@@ -566,7 +499,7 @@ func backupParseRelsCmdFunc(cmd *cobra.Command, out io.Writer, args []string) er
 	return nil
 }
 
-func decoderFromArgs(_ *cobra.Command, args []string) (*backupformat.Decoder, io.Closer, error) {
+func decoderFromArgs(args ...string) (*backupformat.Decoder, io.Closer, error) {
 	filename := "" // Default to stdin.
 	if len(args) > 0 {
 		filename = args[0]

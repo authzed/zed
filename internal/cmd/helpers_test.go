@@ -64,9 +64,9 @@ type intFlag struct {
 	flagValue int
 }
 
-type int64Flag struct {
+type uintFlag struct {
 	flagName  string
-	flagValue int64
+	flagValue uint
 }
 
 func createTestCobraCommandWithFlagValue(t *testing.T, flagAndValues ...any) *cobra.Command {
@@ -81,8 +81,10 @@ func createTestCobraCommandWithFlagValue(t *testing.T, flagAndValues ...any) *co
 			c.Flags().Bool(f.flagName, f.flagValue, "")
 		case intFlag:
 			c.Flags().Int(f.flagName, f.flagValue, "")
-		case int64Flag:
-			c.Flags().Int64(f.flagName, f.flagValue, "")
+		case uintFlag:
+			c.Flags().Uint(f.flagName, f.flagValue, "")
+		case durationFlag:
+			c.Flags().Duration(f.flagName, f.flagValue, "")
 		default:
 			t.Fatalf("unknown flag type: %T", f)
 		}

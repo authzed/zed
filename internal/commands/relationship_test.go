@@ -10,12 +10,17 @@ import (
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
+
+func init() {
+	zerolog.SetGlobalLevel(zerolog.Disabled)
+}
 
 func TestRelationshipToString(t *testing.T) {
 	for _, tt := range []struct {
@@ -130,7 +135,6 @@ func TestArgsToRelationship(t *testing.T) {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
 			rel, err := argsToRelationship(tt.args)
 			require.NoError(t, err)
-			t.Log(rel)
 			require.True(t, proto.Equal(rel, tt.expected))
 		})
 	}

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/authzed/zed/internal/client"
 
@@ -309,7 +310,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 	err = backupCreateCmdFunc(cmd, []string{f})
 	require.NoError(t, err)
 
-	d, closer, err := decoderFromArgs(cmd, []string{f})
+	d, closer, err := decoderFromArgs(f)
 	require.NoError(t, err)
 	defer func() {
 		_ = d.Close()
@@ -323,12 +324,20 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 	require.Equal(t, resp.WrittenAt.Token, d.ZedToken().Token)
 }
 
+type durationFlag struct {
+	flagName  string
+	flagValue time.Duration
+}
+
 func TestBackupRestoreCmdFunc(t *testing.T) {
 	cmd := createTestCobraCommandWithFlagValue(t,
 		stringFlag{"prefix-filter", "test"},
 		boolFlag{"rewrite-legacy", false},
+		stringFlag{"conflict-strategy", "fail"},
+		boolFlag{"disable-retries", false},
 		intFlag{"batch-size", 100},
-		int64Flag{"batches-per-transaction", 10},
+		uintFlag{"batches-per-transaction", 10},
+		durationFlag{"request-timeout", 0},
 	)
 	backupName := createTestBackup(t, testSchema, testRelationships)
 
