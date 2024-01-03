@@ -24,7 +24,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/rodaine/table v1.1.0
 	github.com/rs/zerolog v1.31.0
-	github.com/samber/lo v1.38.1
+	github.com/samber/lo v1.39.0
 	github.com/schollz/progressbar/v3 v3.14.1
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
