@@ -64,10 +64,11 @@ func Run() {
 
 	// Register root-level aliases
 	rootCmd.AddCommand(&cobra.Command{
-		Use:   "use <context>",
-		Short: "an alias for `zed context use`",
-		Args:  cobra.MaximumNArgs(1),
-		RunE:  contextUseCmdFunc,
+		Use:               "use <context>",
+		Short:             "an alias for `zed context use`",
+		Args:              cobra.MaximumNArgs(1),
+		RunE:              contextUseCmdFunc,
+		ValidArgsFunction: ContextGet,
 	})
 
 	// Register CLI-only commands.
