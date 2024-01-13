@@ -46,7 +46,7 @@ func Run() {
 	rootCmd.PersistentFlags().String("endpoint", "", "spicedb gRPC API endpoint")
 	rootCmd.PersistentFlags().String("permissions-system", "", "permissions system to query")
 	rootCmd.PersistentFlags().String("token", "", "token used to authenticate to SpiceDB")
-	rootCmd.PersistentFlags().String("certificate-path", "", "path to certificate authoriy used to verify secure connections")
+	rootCmd.PersistentFlags().String("certificate-path", "", "path to certificate authority used to verify secure connections")
 	rootCmd.PersistentFlags().Bool("insecure", false, "connect over a plaintext connection")
 	rootCmd.PersistentFlags().Bool("skip-version-check", false, "if true, no version check is performed against the server")
 	rootCmd.PersistentFlags().Bool("no-verify-ca", false, "do not attempt to verify the server's certificate chain and host name")
