@@ -45,10 +45,11 @@ var contextSetCmd = &cobra.Command{
 }
 
 var contextRemoveCmd = &cobra.Command{
-	Use:   "remove <system>",
-	Short: "remove a context",
-	Args:  cobra.ExactArgs(1),
-	RunE:  contextRemoveCmdFunc,
+	Use:               "remove <system>",
+	Short:             "remove a context",
+	Args:              cobra.ExactArgs(1),
+	RunE:              contextRemoveCmdFunc,
+	ValidArgsFunction: ContextGet,
 }
 
 var contextUseCmd = &cobra.Command{
