@@ -501,6 +501,8 @@ func backupRedactCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	defer func(e *error) { *e = errors.Join(*e, writer.Close()) }(&err)
+
 	redactor, err := backupformat.NewRedactor(decoder, writer, backupformat.RedactionOptions{
 		RedactDefinitions: cobrautil.MustGetBool(cmd, "redact-definitions"),
 		RedactRelations:   cobrautil.MustGetBool(cmd, "redact-relations"),
@@ -510,6 +512,7 @@ func backupRedactCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error creating redactor: %w", err)
 	}
 
+	defer func(e *error) { *e = errors.Join(*e, redactor.Close()) }(&err)
 	bar := relProgressBar("redacting backup")
 	var written int64
 	for {
