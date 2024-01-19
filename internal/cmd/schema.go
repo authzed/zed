@@ -38,14 +38,14 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 var schemaWriteCmd = &cobra.Command{
 	Use:               "write <file?>",
 	Args:              cobra.MaximumNArgs(1),
-	Short:             "write a schema file (.zed or stdin) to the current permissions system",
+	Short:             "Write a schema file (.zed or stdin) to the current permissions system",
 	ValidArgsFunction: commands.FileExtensionCompletions("zed"),
 	RunE:              schemaWriteCmdFunc,
 }
 
 var schemaCopyCmd = &cobra.Command{
 	Use:               "copy <src context> <dest context>",
-	Short:             "copy a schema from one context into another",
+	Short:             "Copy a schema from one context into another",
 	Args:              cobra.ExactArgs(2),
 	ValidArgsFunction: ContextGet,
 	RunE:              schemaCopyCmdFunc,

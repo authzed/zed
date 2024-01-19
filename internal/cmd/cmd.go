@@ -55,7 +55,7 @@ func Run() {
 
 	versionCmd := &cobra.Command{
 		Use:   "version",
-		Short: "display zed version information",
+		Short: "Display zed and SpiceDB version information",
 		RunE:  versionCmdFunc,
 	}
 	cobrautil.RegisterVersionFlags(versionCmd.Flags())
@@ -65,7 +65,7 @@ func Run() {
 	// Register root-level aliases
 	rootCmd.AddCommand(&cobra.Command{
 		Use:               "use <context>",
-		Short:             "an alias for `zed context use`",
+		Short:             "Alias for `zed context use`",
 		Args:              cobra.MaximumNArgs(1),
 		RunE:              contextUseCmdFunc,
 		ValidArgsFunction: ContextGet,

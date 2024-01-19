@@ -31,7 +31,7 @@ func RegisterWatchCmd(rootCmd *cobra.Command) *cobra.Command {
 
 var watchCmd = &cobra.Command{
 	Use:   "watch [object_types, ...] [start_cursor]",
-	Short: "watches the stream of relationship updates from the server",
+	Short: "Watches the stream of relationship updates from the server",
 	Args:  cobra.RangeArgs(0, 2),
 	RunE:  watchCmdFunc,
 }

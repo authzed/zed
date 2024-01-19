@@ -29,7 +29,7 @@ func registerImportCmd(rootCmd *cobra.Command) {
 
 var importCmd = &cobra.Command{
 	Use:   "import <url>",
-	Short: "import schema and relationships from a file or url",
+	Short: "Imports schema and relationships from a file or url",
 	Example: `
 	From a gist:
 		zed import https://gist.github.com/ecordell/8e3b613a677e3c844742cf24421c08b6

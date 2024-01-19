@@ -27,12 +27,12 @@ func RegisterSchemaCmd(rootCmd *cobra.Command) *cobra.Command {
 var (
 	schemaCmd = &cobra.Command{
 		Use:   "schema <subcommand>",
-		Short: "manages Schema for a Permissions System",
+		Short: "Manage schema for a permissions system",
 	}
 
 	schemaReadCmd = &cobra.Command{
 		Use:               "read",
-		Short:             "read the Schema of current Permissions System",
+		Short:             "Read the schema of a permissions system",
 		Args:              cobra.ExactArgs(0),
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE:              schemaReadCmdFunc,
