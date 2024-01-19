@@ -113,40 +113,41 @@ var checkCmd = &cobra.Command{
 	Use:               "check <resource:id> <permission> <subject:id>",
 	Short:             "check that a Permission exists for a Subject",
 	Args:              cobra.ExactArgs(3),
-	RunE:              checkCmdFunc,
 	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectID),
+	RunE:              checkCmdFunc,
 }
 
 var expandCmd = &cobra.Command{
-	Use:   "expand <permission> <resource:id>",
-	Short: "expand the structure of a Permission",
-	Args:  cobra.ExactArgs(2),
-	RunE:  expandCmdFunc,
+	Use:               "expand <permission> <resource:id>",
+	Short:             "expand the structure of a Permission",
+	Args:              cobra.ExactArgs(2),
+	ValidArgsFunction: cobra.NoFileCompletions,
+	RunE:              expandCmdFunc,
 }
 
 var lookupResourcesCmd = &cobra.Command{
 	Use:               "lookup-resources <type> <permission> <subject:id>",
 	Short:             "looks up the Resources of a given type for which the Subject has Permission",
 	Args:              cobra.ExactArgs(3),
-	RunE:              lookupResourcesCmdFunc,
 	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
+	RunE:              lookupResourcesCmdFunc,
 }
 
 var lookupCmd = &cobra.Command{
 	Use:               "lookup <type> <permission> <subject:id>",
 	Short:             "lookup the Resources of a given type for which the Subject has Permission",
 	Args:              cobra.ExactArgs(3),
+	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
 	RunE:              lookupResourcesCmdFunc,
 	Hidden:            true,
-	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
 }
 
 var lookupSubjectsCmd = &cobra.Command{
 	Use:               "lookup-subjects <resource:id> <permission> <subject_type#optional_subject_relation>",
 	Short:             "lookup the Subjects of a given type for which the Subject has Permission on the Resource",
 	Args:              cobra.ExactArgs(3),
-	RunE:              lookupSubjectsCmdFunc,
 	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
+	RunE:              lookupSubjectsCmdFunc,
 }
 
 func checkCmdFunc(cmd *cobra.Command, args []string) error {

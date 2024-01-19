@@ -63,40 +63,40 @@ var createCmd = &cobra.Command{
 	Use:               "create <resource:id> <relation> <subject:id#optional_subject_relation>",
 	Short:             "create a Relationship for a Subject",
 	Args:              StdinOrExactArgs(3),
-	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE, os.Stdin),
 	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
+	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE, os.Stdin),
 }
 
 var touchCmd = &cobra.Command{
 	Use:               "touch <resource:id> <relation> <subject:id#optional_subject_relation>",
 	Short:             "idempotently update a Relationship for a Subject",
 	Args:              StdinOrExactArgs(3),
-	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, os.Stdin),
 	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
+	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, os.Stdin),
 }
 
 var deleteCmd = &cobra.Command{
 	Use:               "delete <resource:id> <relation> <subject:id#optional_subject_relation>",
 	Short:             "delete a Relationship",
 	Args:              StdinOrExactArgs(3),
-	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE, os.Stdin),
 	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
+	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE, os.Stdin),
 }
 
 var readCmd = &cobra.Command{
 	Use:               "read <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
 	Short:             "reads Relationships",
 	Args:              cobra.RangeArgs(1, 3),
-	RunE:              readRelationships,
 	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
+	RunE:              readRelationships,
 }
 
 var bulkDeleteCmd = &cobra.Command{
 	Use:               "bulk-delete <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
 	Short:             "bulk delete Relationships",
 	Args:              cobra.RangeArgs(1, 3),
-	RunE:              bulkDeleteRelationships,
 	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
+	RunE:              bulkDeleteRelationships,
 }
 
 func StdinOrExactArgs(n int) cobra.PositionalArgs {

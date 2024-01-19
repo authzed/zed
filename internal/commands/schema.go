@@ -31,10 +31,11 @@ var (
 	}
 
 	schemaReadCmd = &cobra.Command{
-		Use:   "read",
-		Args:  cobra.ExactArgs(0),
-		Short: "read the Schema of current Permissions System",
-		RunE:  schemaReadCmdFunc,
+		Use:               "read",
+		Short:             "read the Schema of current Permissions System",
+		Args:              cobra.ExactArgs(0),
+		ValidArgsFunction: cobra.NoFileCompletions,
+		RunE:              schemaReadCmdFunc,
 	}
 )
 
