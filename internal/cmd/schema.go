@@ -36,17 +36,19 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 }
 
 var schemaWriteCmd = &cobra.Command{
-	Use:   "write <file?>",
-	Args:  cobra.MaximumNArgs(1),
-	Short: "write a Schema file (or stdin) to the current Permissions System",
-	RunE:  schemaWriteCmdFunc,
+	Use:               "write <file?>",
+	Args:              cobra.MaximumNArgs(1),
+	Short:             "Write a schema file (.zed or stdin) to the current permissions system",
+	ValidArgsFunction: commands.FileExtensionCompletions("zed"),
+	RunE:              schemaWriteCmdFunc,
 }
 
 var schemaCopyCmd = &cobra.Command{
-	Use:   "copy <src context> <dest context>",
-	Args:  cobra.ExactArgs(2),
-	Short: "copy a Schema from one context into another",
-	RunE:  schemaCopyCmdFunc,
+	Use:               "copy <src context> <dest context>",
+	Short:             "Copy a schema from one context into another",
+	Args:              cobra.ExactArgs(2),
+	ValidArgsFunction: ContextGet,
+	RunE:              schemaCopyCmdFunc,
 }
 
 // TODO(jschorr): support this in the client package

@@ -22,6 +22,12 @@ const (
 	SubjectTypeWithOptionalRelation
 )
 
+func FileExtensionCompletions(extension ...string) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return extension, cobra.ShellCompDirectiveFilterFileExt
+	}
+}
+
 func GetArgs(fields ...CompletionArgumentType) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		// Read the current schema, if any.

@@ -18,6 +18,7 @@ import (
 	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/authzed/zed/internal/commands"
 	"github.com/authzed/zed/internal/console"
 	"github.com/authzed/zed/internal/decode"
 	"github.com/authzed/zed/internal/printers"
@@ -41,7 +42,7 @@ func registerValidateCmd(rootCmd *cobra.Command) {
 
 var validateCmd = &cobra.Command{
 	Use:   "validate <validation_file_or_schema_file>",
-	Short: "validate the given validation or schema file",
+	Short: "Validates the given validation file (.yaml, .zaml) or schema file (.zed)",
 	Example: `
 	From a local file (with prefix):
 		zed validate file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
@@ -60,8 +61,9 @@ var validateCmd = &cobra.Command{
 
 	From a devtools instance:
 		zed validate https://localhost:8443/download`,
-	Args: cobra.ExactArgs(1),
-	RunE: validateCmdFunc,
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: commands.FileExtensionCompletions("zed", "yaml", "zaml"),
+	RunE:              validateCmdFunc,
 }
 
 func validateCmdFunc(cmd *cobra.Command, args []string) error {

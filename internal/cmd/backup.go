@@ -32,7 +32,7 @@ import (
 var (
 	backupCmd = &cobra.Command{
 		Use:   "backup <filename>",
-		Short: "Create, restore, and inspect Permissions System backups",
+		Short: "Create, restore, and inspect permissions system backups",
 		Args:  cobra.ExactArgs(1),
 		// Create used to be on the root, so add it here for back-compat.
 		RunE: backupCreateCmdFunc,
@@ -107,7 +107,7 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	// Restore used to be on the root, so add it there too, but hidden.
 	restoreCmd := &cobra.Command{
 		Use:    "restore <filename>",
-		Short:  "Restore a permission system from a file",
+		Short:  "Restore a permission system from a backup file",
 		Args:   cobra.MaximumNArgs(1),
 		RunE:   backupRestoreCmdFunc,
 		Hidden: true,
