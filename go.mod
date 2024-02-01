@@ -14,7 +14,7 @@ require (
 	github.com/brianvoe/gofakeit/v6 v6.26.3
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/charmbracelet/lipgloss v0.9.1
-	github.com/google/uuid v1.5.0
+	github.com/google/uuid v1.6.0
 	github.com/gookit/color v1.5.4
 	github.com/hamba/avro/v2 v2.18.0
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20231016191810-9f8a4f6d038a
