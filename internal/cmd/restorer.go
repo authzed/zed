@@ -200,7 +200,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 		Int64("duplicate_relationships", r.duplicateRels).
 		Int64("relationships_filtered_out", r.filteredOutRels).
 		Int64("retried_errors", r.totalRetries).
-		Uint64("perSecond", perSec(uint64(r.writtenRels+r.skippedRels), totalTime)).
+		Uint64("per_second", perSec(uint64(r.writtenRels+r.skippedRels), totalTime)).
 		Stringer("duration", totalTime).
 		Msg("finished restore")
 	return nil

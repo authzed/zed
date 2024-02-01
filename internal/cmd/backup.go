@@ -349,7 +349,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	log.Info().
 		Uint("encoded", relsEncoded).
 		Uint("processed", relsProcessed).
-		Uint64("perSecond", perSec(uint64(relsProcessed), totalTime)).
+		Uint64("per_second", perSec(uint64(relsProcessed), totalTime)).
 		Stringer("duration", totalTime).
 		Msg("finished backup")
 
