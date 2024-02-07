@@ -8,7 +8,7 @@ require (
 	github.com/99designs/keyring v1.2.2
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
-	github.com/authzed/authzed-go v0.10.1
+	github.com/authzed/authzed-go v0.10.2-0.20240206183056-781a5f5d1b3c
 	github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b
 	github.com/authzed/spicedb v1.29.1
 	github.com/brianvoe/gofakeit/v6 v6.28.0

@@ -119,10 +119,12 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	request, err := buildReadRequest(cmd, args)
+	filter, err := buildRelationshipsFilter(cmd, args)
 	if err != nil {
 		return err
 	}
+
+	request := &v1.ReadRelationshipsRequest{RelationshipFilter: filter}
 
 	counter := -1
 	if cobrautil.MustGetBool(cmd, "estimate-count") {
@@ -175,18 +177,25 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func buildReadRequest(cmd *cobra.Command, args []string) (*v1.ReadRelationshipsRequest, error) {
-	readFilter := &v1.RelationshipFilter{ResourceType: args[0]}
+func buildRelationshipsFilter(cmd *cobra.Command, args []string) (*v1.RelationshipFilter, error) {
+	filter := &v1.RelationshipFilter{ResourceType: args[0]}
 
 	if strings.Contains(args[0], ":") {
-		err := stringz.SplitExact(args[0], ":", &readFilter.ResourceType, &readFilter.OptionalResourceId)
+		resourceID := ""
+		if strings.HasSuffix(resourceID, "%") {
+			filter.OptionalResourceIdPrefix = strings.TrimSuffix(resourceID, "%")
+		} else {
+			filter.OptionalResourceId = resourceID
+		}
+
+		err := stringz.SplitExact(args[0], ":", &filter.ResourceType, &resourceID)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if len(args) > 1 {
-		readFilter.OptionalRelation = args[1]
+		filter.OptionalRelation = args[1]
 	}
 
 	subjectFilter := cobrautil.MustGetString(cmd, "subject-filter")
@@ -204,7 +213,7 @@ func buildReadRequest(cmd *cobra.Command, args []string) (*v1.ReadRelationshipsR
 				return nil, err
 			}
 
-			readFilter.OptionalSubjectFilter = &v1.SubjectFilter{
+			filter.OptionalSubjectFilter = &v1.SubjectFilter{
 				SubjectType:       subjectNS,
 				OptionalSubjectId: subjectID,
 				OptionalRelation: &v1.SubjectFilter_RelationFilter{
@@ -212,15 +221,13 @@ func buildReadRequest(cmd *cobra.Command, args []string) (*v1.ReadRelationshipsR
 				},
 			}
 		} else {
-			readFilter.OptionalSubjectFilter = &v1.SubjectFilter{
+			filter.OptionalSubjectFilter = &v1.SubjectFilter{
 				SubjectType: subjectFilter,
 			}
 		}
 	}
 
-	return &v1.ReadRelationshipsRequest{
-		RelationshipFilter: readFilter,
-	}, nil
+	return filter, nil
 }
 
 func readRelationships(cmd *cobra.Command, args []string) error {
@@ -229,15 +236,15 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	request, err := buildReadRequest(cmd, args)
+	filter, err := buildRelationshipsFilter(cmd, args)
 	if err != nil {
 		return err
 	}
 
+	request := &v1.ReadRelationshipsRequest{RelationshipFilter: filter}
+
 	limit := cobrautil.MustGetUint32(cmd, "page-limit")
-
 	request.OptionalLimit = limit
-
 	request.Consistency, err = consistencyFromCmd(cmd)
 	if err != nil {
 		return err

@@ -79,8 +79,8 @@ github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d/go.mod h1:rBZYJk5
 github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137/go.mod h1:OMCwj8VM1Kc9e19TLln2VL61YJF0x1XFtfdL4JdbSyE=
 github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230512164433-5d1fd1a340c9 h1:goHVqTbFX3AIo0tzGr14pgfAW2ZfPChKO21Z9MGf/gk=
 github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230512164433-5d1fd1a340c9/go.mod h1:pSwJ0fSY5KhvocuWSx4fz3BA8OrA1bQn+K1Eli3BRwM=
-github.com/authzed/authzed-go v0.10.1 h1:0aX2Ox9PPPknID92kLs/FnmhCmfl6Ni16v3ZTLsds5M=
-github.com/authzed/authzed-go v0.10.1/go.mod h1:ZsaFPCiMjwT0jLW0gCyYzh3elHqhKDDGGRySyykXwqc=
+github.com/authzed/authzed-go v0.10.2-0.20240206183056-781a5f5d1b3c h1:w71KppS/+mCDkNXR8vmwXGVt/1dLt+axcIq+qK7f7To=
+github.com/authzed/authzed-go v0.10.2-0.20240206183056-781a5f5d1b3c/go.mod h1:bS4eeTw/ZpCunZHePrt1MAcvOggAwL8Djh8cx+CR33g=
 github.com/authzed/cel-go v0.17.5 h1:lfpkNrR99B5QRHg5qdG9oLu/kguVlZC68VJuMk8tH9Y=
 github.com/authzed/cel-go v0.17.5/go.mod h1:XL/zEq5hKGVF8aOdMbG7w+BQPihLjY2W8N+UIygDA2I=
 github.com/authzed/consistent v0.1.0 h1:tlh1wvKoRbjRhMm2P+X5WQQyR54SRoS4MyjLOg17Mp8=
