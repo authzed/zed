@@ -79,8 +79,11 @@ func Run() {
 
 	// Register shared commands.
 	commands.RegisterPermissionCmd(rootCmd)
-	commands.RegisterRelationshipCmd(rootCmd)
+
+	relCmd := commands.RegisterRelationshipCmd(rootCmd)
+
 	commands.RegisterWatchCmd(rootCmd)
+	commands.RegisterWatchRelationshipCmd(relCmd)
 
 	schemaCmd := commands.RegisterSchemaCmd(rootCmd)
 	registerAdditionalSchemaCmds(schemaCmd)
