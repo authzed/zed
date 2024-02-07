@@ -1,0 +1,67 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - README.md
+      - .gitignore
+      - .bdp-asm
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - README.md
+      - .gitignore
+      - .bdp-asm
+
+resources:
+  repositories:
+    - repository: templates
+      type: github
+      name: spscommerce/azure-pipelines-templates
+      endpoint: vsts-infrastructure-network-access
+
+extends:
+  # https://github.com/SPSCommerce/azure-pipelines-templates/tree/main/core
+  template: core/bdp.base.v1.yml@templates
+  parameters:
+    bdpFile: .bdp
+    variables:
+      - group: team-settings
+    stages:
+      - stage: COMPILE
+        jobs:
+          - job: BUILD
+            pool: BUILD-LINUX
+            steps:
+              - checkout: self
+                clean: true
+
+              - task: DockerCmd@7
+                displayName: 'golangci-lint'
+                inputs:
+                  imageSource: PublicRepo
+                  dockerImage: 'golangci/golangci-lint:v1.56.0'
+                  dockerRunStartCmd: golangci-lint
+                  dockerRunArgs: run -v
+
+              - task: BdpEcrPush@2
+                displayName: 'publish binary'
+                condition: eq(variables.isDefault, true)
+                inputs:
+                  dockerfile: Dockerfile
+                  component: cli
+
+      - template: core/deploy.stage.v1.yml@templates
+        parameters:
+          environment: prod
+          agentPool: BUILD-LINUX
+          requireApproval: true
+          deploySteps:
+            - task: BdpEcrPromote@1
+              displayName: 'Promote image to prod'
+              inputs:
+                components: cli
