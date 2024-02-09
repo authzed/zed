@@ -50,7 +50,7 @@ brew install authzed/tap/zed
 ```command
 sudo apt update && sudo apt install -y curl ca-certificates gpg
 curl https://apt.fury.io/authzed/gpg.key | sudo apt-key add -
-echo "deb https://apt.fury.io/authzed/ * *" > /etc/apt/sources.list.d/fury.list
+sudo sh -c 'echo "deb https://apt.fury.io/authzed/ * *" > /etc/apt/sources.list.d/fury.list'
 sudo apt update && sudo apt install -y zed
 ```
 
