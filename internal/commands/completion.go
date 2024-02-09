@@ -151,7 +151,11 @@ func readSchema(cmd *cobra.Command) (*compiler.CompiledSchema, error) {
 		return nil, errors.New("no schema defined")
 	}
 
-	compiledSchema, err := compiler.Compile(compiler.InputSchema{Source: "schema", SchemaString: schemaText}, compiler.SkipValidation())
+	compiledSchema, err := compiler.Compile(
+		compiler.InputSchema{Source: "schema", SchemaString: schemaText},
+		compiler.AllowUnprefixedObjectType(),
+		compiler.SkipValidation(),
+	)
 	if err != nil {
 		return nil, err
 	}

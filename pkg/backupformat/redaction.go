@@ -132,8 +132,9 @@ func (r *Redactor) Close() error {
 func redactSchema(schema string, opts RedactionOptions) (string, RedactionMap, error) {
 	// Parse the schema.
 	compiled, err := compiler.Compile(compiler.InputSchema{
-		Source: input.Source("schema"), SchemaString: schema,
-	})
+		Source:       input.Source("schema"),
+		SchemaString: schema,
+	}, compiler.AllowUnprefixedObjectType())
 	if err != nil {
 		return "", RedactionMap{}, err
 	}

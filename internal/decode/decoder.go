@@ -109,8 +109,9 @@ func unmarshalAsYAMLOrSchema(data []byte, out interface{}) (bool, error) {
 	// Check for indications of a schema-only file.
 	if !strings.Contains(string(data), "schema:") {
 		compiled, serr := compiler.Compile(compiler.InputSchema{
-			Source: input.Source("schema"), SchemaString: string(data),
-		})
+			Source:       input.Source("schema"),
+			SchemaString: string(data),
+		}, compiler.AllowUnprefixedObjectType())
 		if serr != nil {
 			return false, serr
 		}
