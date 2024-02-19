@@ -16,7 +16,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.9.1
 	github.com/google/uuid v1.6.0
 	github.com/gookit/color v1.5.4
-	github.com/hamba/avro/v2 v2.19.0
+	github.com/hamba/avro/v2 v2.20.0
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20231016191810-9f8a4f6d038a
 	github.com/jzelinskie/stringz v0.0.3
 	github.com/mattn/go-isatty v0.0.20
