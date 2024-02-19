@@ -173,7 +173,11 @@ func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) 
 		return schema, nil
 	}
 
-	compiledSchema, err := compiler.Compile(compiler.InputSchema{Source: "schema", SchemaString: schema}, compiler.SkipValidation())
+	compiledSchema, err := compiler.Compile(
+		compiler.InputSchema{Source: "schema", SchemaString: schema},
+		compiler.AllowUnprefixedObjectType(),
+		compiler.SkipValidation(),
+	)
 	if err != nil {
 		return "", fmt.Errorf("error reading schema: %w", err)
 	}
@@ -200,7 +204,10 @@ func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) 
 	}
 
 	// Validate that the type system for the generated schema is comprehensive.
-	compiledFilteredSchema, err := compiler.Compile(compiler.InputSchema{Source: "generated-schema", SchemaString: filteredSchema})
+	compiledFilteredSchema, err := compiler.Compile(
+		compiler.InputSchema{Source: "generated-schema", SchemaString: filteredSchema},
+		compiler.AllowUnprefixedObjectType(),
+	)
 	if err != nil {
 		return "", fmt.Errorf("generated invalid schema: %w", err)
 	}
