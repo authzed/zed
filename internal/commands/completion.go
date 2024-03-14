@@ -23,7 +23,7 @@ const (
 )
 
 func FileExtensionCompletions(extension ...string) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return extension, cobra.ShellCompDirectiveFilterFileExt
 	}
 }

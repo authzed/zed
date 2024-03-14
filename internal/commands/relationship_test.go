@@ -206,7 +206,7 @@ func TestWriteRelationshipsArgs(t *testing.T) {
 
 	isTerm := false
 	originalFunc := isFileTerminal
-	isFileTerminal = func(f *os.File) bool {
+	isFileTerminal = func(_ *os.File) bool {
 		return isTerm
 	}
 	defer func() {
@@ -238,7 +238,7 @@ func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
 	}
 
 	originalFunc := isFileTerminal
-	isFileTerminal = func(f *os.File) bool {
+	isFileTerminal = func(_ *os.File) bool {
 		return true
 	}
 	defer func() {
@@ -281,7 +281,7 @@ func TestWriteRelationshipCmdFuncArgsTakePrecedence(t *testing.T) {
 	}
 
 	originalFunc := isFileTerminal
-	isFileTerminal = func(f *os.File) bool {
+	isFileTerminal = func(_ *os.File) bool {
 		return false
 	}
 	defer func() {

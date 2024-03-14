@@ -120,7 +120,7 @@ func createTestBackup(t *testing.T, schema string, relationships []string) strin
 }
 
 func clientFromConn(conn *grpc.ClientConn) func(cmd *cobra.Command) (client.Client, error) {
-	return func(cmd *cobra.Command) (client.Client, error) {
+	return func(_ *cobra.Command) (client.Client, error) {
 		return &authzed.ClientWithExperimental{
 			Client: authzed.Client{
 				SchemaServiceClient:      v1.NewSchemaServiceClient(conn),

@@ -62,7 +62,7 @@ func TestConcurrentBatchOrdering(t *testing.T) {
 			require := require.New(t)
 
 			gotCh := make(chan batch, len(tt.items))
-			fn := func(ctx context.Context, no, start, end int) error {
+			fn := func(_ context.Context, no, start, end int) error {
 				gotCh <- batch{no, start, end}
 				return nil
 			}
@@ -129,7 +129,7 @@ func TestConcurrentBatch(t *testing.T) {
 			require := require.New(t)
 
 			var calls int64
-			fn := func(ctx context.Context, no, start, end int) error {
+			fn := func(_ context.Context, _, _, _ int) error {
 				atomic.AddInt64(&calls, 1)
 				return nil
 			}
