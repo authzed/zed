@@ -309,7 +309,7 @@ func (r *restorer) writeBatchesWithRetry(ctx context.Context, batches [][]*v1.Re
 
 	var currentRetries, totalRetries, loadedRels uint64
 	for _, batch := range batches {
-		updates := lo.Map[*v1.Relationship, *v1.RelationshipUpdate](batch, func(item *v1.Relationship, index int) *v1.RelationshipUpdate {
+		updates := lo.Map[*v1.Relationship, *v1.RelationshipUpdate](batch, func(item *v1.Relationship, _ int) *v1.RelationshipUpdate {
 			return &v1.RelationshipUpdate{
 				Relationship: item,
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
