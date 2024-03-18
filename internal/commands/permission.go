@@ -474,7 +474,7 @@ func displayDebugInformationIfRequested(cmd *cobra.Command, debug *v1.DebugInfor
 			}
 
 			if found == nil {
-				log.Warn().Msg("No debuging information returned for the check")
+				log.Warn().Msg("No debugging information returned for the check")
 				return nil
 			}
 
