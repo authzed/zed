@@ -4,8 +4,7 @@ on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
-env:
-  GO_VERSION: "~1.21.3"
+
 jobs:
   github:
     runs-on: "macos-latest"
@@ -19,8 +18,6 @@ jobs:
           brew install x86_64-unknown-linux-gnu x86_64-unknown-linux-musl aarch64-unknown-linux-gnu aarch64-unknown-linux-musl mingw-w64
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> $GITHUB_ENV
       - uses: "authzed/actions/setup-go@main"
-        with:
-          go-version: "${{ env.GO_VERSION }}"
       - uses: "goreleaser/goreleaser-action@v3"
         with:
           distribution: "goreleaser-pro"
@@ -46,8 +43,6 @@ jobs:
       - name: "Install linux cross-compilers"
         run: "sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu gcc-mingw-w64-x86-64"
       - uses: "authzed/actions/setup-go@main"
-        with:
-          go-version: "${{ env.GO_VERSION }}"
       - uses: "goreleaser/goreleaser-action@v3"
         with:
           distribution: "goreleaser-pro"
