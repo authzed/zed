@@ -206,7 +206,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	var trailerMD metadata.MD
 	resp, err := client.CheckPermission(ctx, request, grpc.Trailer(&trailerMD))
 	if err != nil {
-		derr := displayDebugInformationIfRequested(cmd, trailerMD, true)
+		derr := displayDebugInformationIfRequested(cmd, resp.DebugTrace, trailerMD, true)
 		if derr != nil {
 			return derr
 		}
@@ -239,7 +239,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unknown permission response: %v", resp.Permissionship)
 	}
 
-	err = displayDebugInformationIfRequested(cmd, trailerMD, false)
+	err = displayDebugInformationIfRequested(cmd, resp.DebugTrace, trailerMD, false)
 	if err != nil {
 		return err
 	}
@@ -463,22 +463,27 @@ func prettyLookupPermissionship(objectID string, p v1.LookupPermissionship, info
 	return b.String()
 }
 
-func displayDebugInformationIfRequested(cmd *cobra.Command, trailerMD metadata.MD, hasError bool) error {
+func displayDebugInformationIfRequested(cmd *cobra.Command, debug *v1.DebugInformation, trailerMD metadata.MD, hasError bool) error {
 	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") {
-		found, err := responsemeta.GetResponseTrailerMetadataOrNil(trailerMD, responsemeta.DebugInformation)
-		if err != nil {
-			return err
-		}
-
-		if found == nil {
-			log.Warn().Msg("No debuging information returned for the check")
-			return nil
-		}
-
 		debugInfo := &v1.DebugInformation{}
-		err = protojson.Unmarshal([]byte(*found), debugInfo)
-		if err != nil {
-			return err
+		// DebugInformation comes in trailer < 1.30, and in response payload >= 1.30
+		if debug == nil {
+			found, err := responsemeta.GetResponseTrailerMetadataOrNil(trailerMD, responsemeta.DebugInformation)
+			if err != nil {
+				return err
+			}
+
+			if found == nil {
+				log.Warn().Msg("No debuging information returned for the check")
+				return nil
+			}
+
+			err = protojson.Unmarshal([]byte(*found), debugInfo)
+			if err != nil {
+				return err
+			}
+		} else {
+			debugInfo = debug
 		}
 
 		if debugInfo.Check == nil {
