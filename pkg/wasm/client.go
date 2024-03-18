@@ -42,6 +42,11 @@ func (wc wasmClient) CheckPermission(ctx context.Context, in *v1.CheckPermission
 	return client.CheckPermission(ctx, in, opts...)
 }
 
+func (wc wasmClient) CheckBulkPermissions(ctx context.Context, in *v1.CheckBulkPermissionsRequest, opts ...grpc.CallOption) (*v1.CheckBulkPermissionsResponse, error) {
+	client := v1.NewPermissionsServiceClient(wc.conn)
+	return client.CheckBulkPermissions(ctx, in, opts...)
+}
+
 func (wc wasmClient) ExpandPermissionTree(ctx context.Context, in *v1.ExpandPermissionTreeRequest, opts ...grpc.CallOption) (*v1.ExpandPermissionTreeResponse, error) {
 	client := v1.NewPermissionsServiceClient(wc.conn)
 	return client.ExpandPermissionTree(ctx, in, opts...)
