@@ -31,6 +31,7 @@ func Run() {
 		PersistentPreRunE: cobrautil.CommandStack(
 			zl.RunE(),
 			SyncFlagsCmdFunc,
+			commands.InjectRequestID,
 		),
 		SilenceErrors: true,
 		SilenceUsage:  true,
@@ -52,6 +53,7 @@ func Run() {
 	rootCmd.PersistentFlags().Bool("skip-version-check", false, "if true, no version check is performed against the server")
 	rootCmd.PersistentFlags().Bool("no-verify-ca", false, "do not attempt to verify the server's certificate chain and host name")
 	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
+	rootCmd.PersistentFlags().String("request-id", "", "optional id to send along with SpiceDB requests for tracing")
 	_ = rootCmd.PersistentFlags().MarkHidden("debug") // This cannot return its error.
 
 	versionCmd := &cobra.Command{

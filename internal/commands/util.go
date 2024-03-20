@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/TylerBrock/colorjson"
+	"github.com/authzed/authzed-go/pkg/requestmeta"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
@@ -81,4 +82,16 @@ func PrettyProto(m proto.Message) ([]byte, error) {
 	}
 
 	return pretty, nil
+}
+
+// InjectRequestID adds the value of the --request-id flag to the
+// context of the given command.
+func InjectRequestID(cmd *cobra.Command, _ []string) error {
+	ctx := cmd.Context()
+	requestID := cobrautil.MustGetString(cmd, "request-id")
+	if ctx != nil && requestID != "" {
+		cmd.SetContext(requestmeta.WithRequestID(ctx, requestID))
+	}
+
+	return nil
 }
