@@ -466,6 +466,70 @@ func fileFromStrings(t *testing.T, strings []string) *os.File {
 	return file
 }
 
+func TestBuildRelationshipsFilter(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected *v1.RelationshipFilter
+	}{
+		{
+			name:     "resource type",
+			args:     []string{"res"},
+			expected: &v1.RelationshipFilter{ResourceType: "res"},
+		},
+		{
+			name:     "resource type, resource ID",
+			args:     []string{"res:123"},
+			expected: &v1.RelationshipFilter{ResourceType: "res", OptionalResourceId: "123"},
+		},
+		{
+			name:     "resource type, resource ID, relation",
+			args:     []string{"res:123", "view"},
+			expected: &v1.RelationshipFilter{ResourceType: "res", OptionalResourceId: "123", OptionalRelation: "view"},
+		},
+		{
+			name: "resource type, resource ID, relation, subject type",
+			args: []string{"res:123", "view", "sub"},
+			expected: &v1.RelationshipFilter{
+				ResourceType:          "res",
+				OptionalResourceId:    "123",
+				OptionalRelation:      "view",
+				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub"},
+			},
+		},
+		{
+			name: "resource type, resource ID, relation, subject type, subject ID",
+			args: []string{"res:123", "view", "sub:321"},
+			expected: &v1.RelationshipFilter{
+				ResourceType:          "res",
+				OptionalResourceId:    "123",
+				OptionalRelation:      "view",
+				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub", OptionalSubjectId: "321"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cmd := &cobra.Command{}
+			cmd.Flags().String("subject-filter", "", "")
+
+			filter, err := buildRelationshipsFilter(cmd, tt.args)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected.ResourceType, filter.ResourceType, "resource types do not match")
+			require.Equal(t, tt.expected.OptionalResourceId, filter.OptionalResourceId, "resource IDs do not match")
+			require.Equal(t, tt.expected.OptionalRelation, filter.OptionalRelation, "relations do not match")
+
+			if tt.expected.OptionalSubjectFilter != nil {
+				require.Equal(t, tt.expected.OptionalSubjectFilter.SubjectType, filter.OptionalSubjectFilter.SubjectType, "subject types do not match")
+				require.Equal(t, tt.expected.OptionalSubjectFilter.OptionalSubjectId, filter.OptionalSubjectFilter.OptionalSubjectId, "subject IDs do not match")
+			}
+		})
+	}
+}
+
 type mockClient struct {
 	v1.SchemaServiceClient
 	v1.PermissionsServiceClient
