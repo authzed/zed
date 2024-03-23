@@ -206,7 +206,12 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	var trailerMD metadata.MD
 	resp, err := client.CheckPermission(ctx, request, grpc.Trailer(&trailerMD))
 	if err != nil {
-		derr := displayDebugInformationIfRequested(cmd, resp.DebugTrace, trailerMD, true)
+		var debugInfo *v1.DebugInformation
+		if resp != nil {
+			debugInfo = resp.DebugTrace
+		}
+
+		derr := displayDebugInformationIfRequested(cmd, debugInfo, trailerMD, true)
 		if derr != nil {
 			return derr
 		}
