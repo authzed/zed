@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/authzed/spicedb/pkg/tuple"
+
 	"github.com/authzed/authzed-go/pkg/requestmeta"
 	"github.com/authzed/authzed-go/pkg/responsemeta"
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -78,6 +80,11 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	checkCmd.Flags().String("caveat-context", "", "the caveat context to send along with the check, in JSON form")
 	registerConsistencyFlags(checkCmd.Flags())
 
+	permissionCmd.AddCommand(checkBulkCmd)
+	registerConsistencyFlags(checkBulkCmd.Flags())
+	checkBulkCmd.Flags().String("revision", "", "optional revision at which to check")
+	checkBulkCmd.Flags().Bool("json", false, "output as JSON")
+
 	permissionCmd.AddCommand(expandCmd)
 	expandCmd.Flags().Bool("json", false, "output as JSON")
 	expandCmd.Flags().String("revision", "", "optional revision at which to check")
@@ -107,6 +114,14 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 var permissionCmd = &cobra.Command{
 	Use:   "permission <subcommand>",
 	Short: "Query the permissions in a permissions system",
+}
+
+var checkBulkCmd = &cobra.Command{
+	Use:               "bulk <resource:id> <permission> <subject:id>",
+	Short:             "Check a permissions in bulk exists for a resource-subject pairs",
+	Args:              cobra.MinimumNArgs(2),
+	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectID),
+	RunE:              checkBulkCmdFunc,
 }
 
 var checkCmd = &cobra.Command{
@@ -252,6 +267,86 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	if cobrautil.MustGetBool(cmd, "error-on-no-permission") {
 		if resp.Permissionship != v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION {
 			os.Exit(1)
+		}
+	}
+
+	return nil
+}
+
+func checkBulkCmdFunc(cmd *cobra.Command, args []string) error {
+	items := make([]*v1.CheckBulkPermissionsRequestItem, 0, len(args))
+	for _, arg := range args {
+		rel := tuple.ParseRel(arg)
+		item := &v1.CheckBulkPermissionsRequestItem{
+			Resource: &v1.ObjectReference{
+				ObjectType: rel.Resource.ObjectType,
+				ObjectId:   rel.Resource.ObjectId,
+			},
+			Permission: rel.Relation,
+			Subject: &v1.SubjectReference{
+				Object: &v1.ObjectReference{
+					ObjectType: rel.Subject.Object.ObjectType,
+					ObjectId:   rel.Subject.Object.ObjectId,
+				},
+			},
+		}
+		if rel.OptionalCaveat != nil {
+			item.Context = rel.OptionalCaveat.Context
+		}
+		items = append(items, item)
+	}
+
+	consistency, err := consistencyFromCmd(cmd)
+	if err != nil {
+		return err
+	}
+
+	bulk := &v1.CheckBulkPermissionsRequest{
+		Consistency: consistency,
+		Items:       items,
+	}
+
+	log.Trace().Interface("request", bulk).Send()
+
+	ctx := cmd.Context()
+	c, err := client.NewClient(cmd)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.CheckBulkPermissions(ctx, bulk)
+	if err != nil {
+		return err
+	}
+
+	if cobrautil.MustGetBool(cmd, "json") {
+		prettyProto, err := PrettyProto(resp)
+		if err != nil {
+			return err
+		}
+
+		console.Println(string(prettyProto))
+		return nil
+	}
+
+	for _, item := range resp.Pairs {
+		console.Printf("%s:%s#%s@%s:%s => ",
+			item.Request.Resource.ObjectType, item.Request.Resource.ObjectId, item.Request.Permission, item.Request.Subject.Object.ObjectId, item.Request.Subject.Object.ObjectType)
+
+		switch responseType := item.Response.(type) {
+		case *v1.CheckBulkPermissionsPair_Item:
+			switch responseType.Item.Permissionship {
+			case v1.CheckPermissionResponse_PERMISSIONSHIP_CONDITIONAL_PERMISSION:
+				console.Println("caveated")
+
+			case v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION:
+				console.Println("true")
+
+			case v1.CheckPermissionResponse_PERMISSIONSHIP_NO_PERMISSION:
+				console.Println("false")
+			}
+		case *v1.CheckBulkPermissionsPair_Error:
+			console.Println(fmt.Sprintf("error: %s", responseType.Error))
 		}
 	}
 
