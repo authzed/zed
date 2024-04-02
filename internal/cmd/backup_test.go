@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/authzed/zed/internal/client"
+	zedtesting "github.com/authzed/zed/internal/testing"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
@@ -162,7 +162,7 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 			tt := tt
 			t.Parallel()
 
-			cmd := createTestCobraCommandWithFlagValue(t, stringFlag{"prefix-filter", tt.filter})
+			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t, zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: tt.filter})
 			backupName := createTestBackup(t, tt.schema, tt.relationships)
 			f, err := os.CreateTemp("", "parse-output")
 			require.NoError(t, err)
@@ -183,7 +183,7 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 }
 
 func TestBackupParseRevisionCmdFunc(t *testing.T) {
-	cmd := createTestCobraCommandWithFlagValue(t, stringFlag{"prefix-filter", "test"})
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t, zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: "test"})
 	backupName := createTestBackup(t, testSchema, testRelationships)
 	f, err := os.CreateTemp("", "parse-output")
 	require.NoError(t, err)
@@ -241,9 +241,9 @@ func TestBackupParseSchemaCmdFunc(t *testing.T) {
 			tt := tt
 			t.Parallel()
 
-			cmd := createTestCobraCommandWithFlagValue(t,
-				stringFlag{"prefix-filter", tt.filter},
-				boolFlag{"rewrite-legacy", tt.rewriteLegacy})
+			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+				zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: tt.filter},
+				zedtesting.BoolFlag{FlagName: "rewrite-legacy", FlagValue: tt.rewriteLegacy})
 			backupName := createTestBackup(t, tt.schema, nil)
 			f, err := os.CreateTemp("", "parse-output")
 			require.NoError(t, err)
@@ -264,9 +264,9 @@ func TestBackupParseSchemaCmdFunc(t *testing.T) {
 }
 
 func TestBackupCreateCmdFunc(t *testing.T) {
-	cmd := createTestCobraCommandWithFlagValue(t,
-		stringFlag{"prefix-filter", ""},
-		boolFlag{"rewrite-legacy", false})
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "prefix-filter"},
+		zedtesting.BoolFlag{FlagName: "rewrite-legacy"})
 	f := filepath.Join(os.TempDir(), uuid.NewString())
 	_, err := os.Stat(f)
 	require.Error(t, err)
@@ -276,7 +276,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	srv := newServer(ctx, t)
+	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		require.NoError(t, srv.Run(ctx))
 	}()
@@ -288,9 +288,9 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		client.NewClient = originalClient
 	}()
 
-	client.NewClient = clientFromConn(conn)
+	client.NewClient = zedtesting.ClientFromConn(conn)
 
-	c, err := clientFromConn(conn)(cmd)
+	c, err := zedtesting.ClientFromConn(conn)(cmd)
 	require.NoError(t, err)
 
 	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: testSchema})
@@ -324,26 +324,21 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 	require.Equal(t, resp.WrittenAt.Token, d.ZedToken().Token)
 }
 
-type durationFlag struct {
-	flagName  string
-	flagValue time.Duration
-}
-
 func TestBackupRestoreCmdFunc(t *testing.T) {
-	cmd := createTestCobraCommandWithFlagValue(t,
-		stringFlag{"prefix-filter", "test"},
-		boolFlag{"rewrite-legacy", false},
-		stringFlag{"conflict-strategy", "fail"},
-		boolFlag{"disable-retries", false},
-		intFlag{"batch-size", 100},
-		uintFlag{"batches-per-transaction", 10},
-		durationFlag{"request-timeout", 0},
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: "test"},
+		zedtesting.BoolFlag{FlagName: "rewrite-legacy"},
+		zedtesting.StringFlag{FlagName: "conflict-strategy", FlagValue: "fail"},
+		zedtesting.BoolFlag{FlagName: "disable-retries"},
+		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
+		zedtesting.UintFlag{FlagName: "batches-per-transaction", FlagValue: 10},
+		zedtesting.DurationFlag{FlagName: "request-timeout"},
 	)
 	backupName := createTestBackup(t, testSchema, testRelationships)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	srv := newServer(ctx, t)
+	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		require.NoError(t, srv.Run(ctx))
 	}()
@@ -355,9 +350,9 @@ func TestBackupRestoreCmdFunc(t *testing.T) {
 		client.NewClient = originalClient
 	}()
 
-	client.NewClient = clientFromConn(conn)
+	client.NewClient = zedtesting.ClientFromConn(conn)
 
-	c, err := clientFromConn(conn)(cmd)
+	c, err := zedtesting.ClientFromConn(conn)(cmd)
 	require.NoError(t, err)
 	err = backupRestoreCmdFunc(cmd, []string{backupName})
 	require.NoError(t, err)

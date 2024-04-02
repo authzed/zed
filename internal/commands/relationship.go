@@ -19,6 +19,8 @@ import (
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/status"
 )
 
 func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
@@ -47,10 +49,11 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	registerConsistencyFlags(readCmd.Flags())
 
 	relationshipCmd.AddCommand(bulkDeleteCmd)
-	bulkDeleteCmd.Flags().Bool("force", false, "force deletion immediately without confirmation")
+	bulkDeleteCmd.Flags().Bool("force", false, "force deletion of all elements in batches defined by <optional-limit>")
 	bulkDeleteCmd.Flags().String("subject-filter", "", "optional subject filter")
+	bulkDeleteCmd.Flags().Uint("optional-limit", 1000, "the max amount of elements to delete. If you want to delete all in batches of size <optional-limit>, set --force to true")
 	bulkDeleteCmd.Flags().Bool("estimate-count", true, "estimate the count of relationships to be deleted")
-
+	_ = bulkDeleteCmd.Flags().MarkDeprecated("estimate-count", "no longer used, make use of --optional-limit instead")
 	return relationshipCmd
 }
 
@@ -124,57 +127,67 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	request := &v1.ReadRelationshipsRequest{RelationshipFilter: filter}
+	bar := console.CreateProgressBar("deleting relationships")
+	defer func() {
+		_ = bar.Finish()
+	}()
 
-	counter := -1
-	if cobrautil.MustGetBool(cmd, "estimate-count") {
-		request.Consistency = &v1.Consistency{Requirement: &v1.Consistency_FullyConsistent{FullyConsistent: true}}
+	allowPartialDeletions := cobrautil.MustGetBool(cmd, "force")
+	optionalLimit := cobrautil.MustGetUint(cmd, "optional-limit")
+	var resp *v1.DeleteRelationshipsResponse
+	for {
+		delRequest := &v1.DeleteRelationshipsRequest{
+			RelationshipFilter:            filter,
+			OptionalLimit:                 uint32(optionalLimit),
+			OptionalAllowPartialDeletions: allowPartialDeletions,
+		}
+		log.Trace().Interface("request", delRequest).Msg("deleting relationships")
 
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
+		resp, err = spicedbClient.DeleteRelationships(cmd.Context(), delRequest)
+		if errorInfo, ok := grpcErrorInfoFrom(err); ok {
+			if errorInfo.GetReason() == v1.ErrorReason_ERROR_REASON_TOO_MANY_RELATIONSHIPS_FOR_TRANSACTIONAL_DELETE.String() {
+				resourceType := "relationships"
+				if returnedResourceType, ok := errorInfo.GetMetadata()["filter_resource_type"]; ok {
+					resourceType = returnedResourceType
+				}
 
-		log.Trace().Interface("request", request).Send()
-		resp, err := spicedbClient.ReadRelationships(ctx, request)
+				return fmt.Errorf("could not delete %s, as more than %s relationships were found. Consider increasing --optional-limit or deleting all relationships using --force",
+					resourceType,
+					errorInfo.GetMetadata()["limit"])
+			}
+		}
 		if err != nil {
 			return err
 		}
 
-		counter = 0
-		for {
-			_, err := resp.Recv()
-			if errors.Is(err, io.EOF) {
-				break
-			}
-
-			if err != nil {
-				return err
-			}
-
-			counter++
-			if counter > 1000 {
-				cancel()
-				break
-			}
+		if resp.DeletionProgress == v1.DeleteRelationshipsResponse_DELETION_PROGRESS_COMPLETE {
+			break
 		}
-	}
 
-	if !cobrautil.MustGetBool(cmd, "force") {
-		err := performBulkDeletionConfirmation(counter)
-		if err != nil {
+		if err := bar.Add(int(optionalLimit)); err != nil {
 			return err
 		}
 	}
 
-	delRequest := &v1.DeleteRelationshipsRequest{RelationshipFilter: request.RelationshipFilter}
-	log.Trace().Interface("request", delRequest).Msg("deleting relationships")
-
-	resp, err := spicedbClient.DeleteRelationships(cmd.Context(), delRequest)
-	if err != nil {
-		return err
-	}
-
+	_ = bar.Finish()
 	console.Println(resp.DeletedAt.GetToken())
 	return nil
+}
+
+func grpcErrorInfoFrom(err error) (*errdetails.ErrorInfo, bool) {
+	if err == nil {
+		return nil, false
+	}
+
+	if s, ok := status.FromError(err); ok {
+		for _, d := range s.Details() {
+			if errInfo, ok := d.(*errdetails.ErrorInfo); ok {
+				return errInfo, true
+			}
+		}
+	}
+
+	return nil, false
 }
 
 func buildRelationshipsFilter(cmd *cobra.Command, args []string) (*v1.RelationshipFilter, error) {

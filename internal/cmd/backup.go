@@ -19,13 +19,13 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/rodaine/table"
 	"github.com/rs/zerolog/log"
-	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/constraints"
 	"golang.org/x/exp/maps"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/commands"
+	"github.com/authzed/zed/internal/console"
 	"github.com/authzed/zed/pkg/backupformat"
 )
 
@@ -231,30 +231,6 @@ func hasRelPrefix(rel *v1.Relationship, prefix string) bool {
 		strings.HasPrefix(rel.Subject.Object.ObjectType, prefix)
 }
 
-func relProgressBar(description string) *progressbar.ProgressBar {
-	bar := progressbar.NewOptions(-1,
-		progressbar.OptionSetWidth(10),
-		progressbar.OptionSetRenderBlankState(true),
-		progressbar.OptionSetVisibility(false),
-	)
-	if isatty.IsTerminal(os.Stderr.Fd()) {
-		bar = progressbar.NewOptions64(-1,
-			progressbar.OptionSetDescription(description),
-			progressbar.OptionSetWriter(os.Stderr),
-			progressbar.OptionSetWidth(10),
-			progressbar.OptionThrottle(65*time.Millisecond),
-			progressbar.OptionShowCount(),
-			progressbar.OptionShowIts(),
-			progressbar.OptionSetItsString("relationship"),
-			progressbar.OptionOnCompletion(func() { _, _ = fmt.Fprint(os.Stderr, "\n") }),
-			progressbar.OptionSpinnerType(14),
-			progressbar.OptionFullWidth(),
-			progressbar.OptionSetRenderBlankState(true),
-		)
-	}
-	return bar
-}
-
 func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	f, err := createBackupFile(args[0])
 	if err != nil {
@@ -264,13 +240,13 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	defer func(e *error) { *e = errors.Join(*e, f.Close()) }(&err)
 	defer func(e *error) { *e = errors.Join(*e, f.Sync()) }(&err)
 
-	client, err := client.NewClient(cmd)
+	c, err := client.NewClient(cmd)
 	if err != nil {
 		return fmt.Errorf("unable to initialize client: %w", err)
 	}
 
 	ctx := cmd.Context()
-	schemaResp, err := client.ReadSchema(ctx, &v1.ReadSchemaRequest{})
+	schemaResp, err := c.ReadSchema(ctx, &v1.ReadSchemaRequest{})
 	if err != nil {
 		return fmt.Errorf("error reading schema: %w", err)
 	} else if schemaResp.ReadAt == nil {
@@ -299,7 +275,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	}
 	defer func(e *error) { *e = errors.Join(*e, encoder.Close()) }(&err)
 
-	relationshipStream, err := client.BulkExportRelationships(ctx, &v1.BulkExportRelationshipsRequest{
+	relationshipStream, err := c.BulkExportRelationships(ctx, &v1.BulkExportRelationshipsRequest{
 		Consistency: &v1.Consistency{
 			Requirement: &v1.Consistency_AtExactSnapshot{
 				AtExactSnapshot: schemaResp.ReadAt,
@@ -312,7 +288,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 
 	relationshipReadStart := time.Now()
 
-	bar := relProgressBar("processing backup")
+	bar := console.CreateProgressBar("processing backup")
 	var relsEncoded, relsProcessed uint
 	for {
 		if err := ctx.Err(); err != nil {
@@ -520,7 +496,7 @@ func backupRedactCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	defer func(e *error) { *e = errors.Join(*e, redactor.Close()) }(&err)
-	bar := relProgressBar("redacting backup")
+	bar := console.CreateProgressBar("redacting backup")
 	var written int64
 	for {
 		if err := cmd.Context().Err(); err != nil {
