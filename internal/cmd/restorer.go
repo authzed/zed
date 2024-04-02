@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/console"
 	"github.com/authzed/zed/pkg/backupformat"
 )
 
@@ -88,7 +89,7 @@ func newRestorer(schema string, decoder *backupformat.Decoder, client client.Cli
 		batchesPerTransaction: batchesPerTransaction,
 		conflictStrategy:      conflictStrategy,
 		disableRetryErrors:    disableRetryErrors,
-		bar:                   relProgressBar("restoring from backup"),
+		bar:                   console.CreateProgressBar("restoring from backup"),
 	}
 }
 
