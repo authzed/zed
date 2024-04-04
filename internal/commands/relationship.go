@@ -95,7 +95,7 @@ var readCmd = &cobra.Command{
 }
 
 var bulkDeleteCmd = &cobra.Command{
-	Use:               "bulk-delete <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
+	Use:               "bulk-delete <optional_resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
 	Short:             "Deletes relationships matching the provided pattern en masse",
 	Args:              cobra.RangeArgs(1, 3),
 	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
@@ -146,8 +146,13 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 		resp, err = spicedbClient.DeleteRelationships(cmd.Context(), delRequest)
 		if errorInfo, ok := grpcErrorInfoFrom(err); ok {
 			if errorInfo.GetReason() == v1.ErrorReason_ERROR_REASON_TOO_MANY_RELATIONSHIPS_FOR_TRANSACTIONAL_DELETE.String() {
+				resourceType := "relationships"
+				if returnedResourceType, ok := errorInfo.GetMetadata()["filter_resource_type"]; ok {
+					resourceType = returnedResourceType
+				}
+
 				return fmt.Errorf("could not delete %s, as more than %s relationships were found. Consider increasing --optional-limit or deleting all relationships using --force",
-					errorInfo.GetMetadata()["filter_resource_type"],
+					resourceType,
 					errorInfo.GetMetadata()["limit"])
 			}
 		}
@@ -186,32 +191,39 @@ func grpcErrorInfoFrom(err error) (*errdetails.ErrorInfo, bool) {
 }
 
 func buildRelationshipsFilter(cmd *cobra.Command, args []string) (*v1.RelationshipFilter, error) {
-	filter := &v1.RelationshipFilter{ResourceType: args[0]}
+	filter := &v1.RelationshipFilter{}
 
-	if strings.Contains(args[0], ":") {
-		var resourceID string
-		err := stringz.SplitExact(args[0], ":", &filter.ResourceType, &resourceID)
-		if err != nil {
-			return nil, err
-		}
+	expectedSubjectIndex := 3
+	if len(args) > 0 {
+		if strings.Contains(args[0], ":") {
+			var resourceID string
+			err := stringz.SplitExact(args[0], ":", &filter.ResourceType, &resourceID)
+			if err != nil {
+				return nil, err
+			}
 
-		if strings.HasSuffix(resourceID, "%") {
-			filter.OptionalResourceIdPrefix = strings.TrimSuffix(resourceID, "%")
+			if strings.HasSuffix(resourceID, "%") {
+				filter.OptionalResourceIdPrefix = strings.TrimSuffix(resourceID, "%")
+			} else {
+				filter.OptionalResourceId = resourceID
+			}
+
+			if len(args) > 1 {
+				filter.OptionalRelation = args[1]
+			}
 		} else {
-			filter.OptionalResourceId = resourceID
+			// if the first argument does not contain :, we assume the resource_type/resource_id has been omitted
+			filter.OptionalRelation = args[0]
+			expectedSubjectIndex = 2
 		}
-	}
-
-	if len(args) > 1 {
-		filter.OptionalRelation = args[1]
 	}
 
 	subjectFilter := cobrautil.MustGetString(cmd, "subject-filter")
-	if len(args) == 3 {
+	if len(args) == expectedSubjectIndex {
 		if subjectFilter != "" {
 			return nil, errors.New("cannot specify subject filter both positionally and via --subject-filter")
 		}
-		subjectFilter = args[2]
+		subjectFilter = args[expectedSubjectIndex-1]
 	}
 
 	if subjectFilter != "" {
