@@ -21,12 +21,16 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-const testSchema = `definition test/resource {
-	relation reader: test/user
-	relation writer: test/user
+const testSchema = `definition resource {
+	relation reader: user
+	relation writer: user
 }
 
-definition test/user {}`
+definition folder {
+	relation parent: folder
+}
+
+definition user {}`
 
 func init() {
 	zerolog.SetGlobalLevel(zerolog.Disabled)
@@ -478,13 +482,14 @@ func fileFromStrings(t *testing.T, strings []string) *os.File {
 
 func TestBuildRelationshipsFilter(t *testing.T) {
 	tests := []struct {
-		name     string
-		args     []string
-		expected *v1.RelationshipFilter
+		name        string
+		args        []string
+		subjectFlag string
+		expected    *v1.RelationshipFilter
 	}{
 		{
 			name:     "resource type",
-			args:     []string{"res"},
+			args:     []string{"res:"},
 			expected: &v1.RelationshipFilter{ResourceType: "res"},
 		},
 		{
@@ -517,6 +522,121 @@ func TestBuildRelationshipsFilter(t *testing.T) {
 				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub", OptionalSubjectId: "321"},
 			},
 		},
+		{
+			name: "resource ID",
+			args: []string{":123"},
+			expected: &v1.RelationshipFilter{
+				OptionalResourceId: "123",
+			},
+		},
+		{
+			name: "resource ID prefix",
+			args: []string{":123%"},
+			expected: &v1.RelationshipFilter{
+				OptionalResourceIdPrefix: "123",
+			},
+		},
+		{
+			name: "resource ID, relation",
+			args: []string{":123", "view"},
+			expected: &v1.RelationshipFilter{
+				OptionalResourceId: "123",
+				OptionalRelation:   "view",
+			},
+		},
+		{
+			name: "resource ID, relation, subject type",
+			args: []string{":123", "view", "sub"},
+			expected: &v1.RelationshipFilter{
+				OptionalResourceId:    "123",
+				OptionalRelation:      "view",
+				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub"},
+			},
+		},
+		{
+			name: "resource ID, relation, subject type, subject ID",
+			args: []string{":123", "view", "sub:321"},
+			expected: &v1.RelationshipFilter{
+				OptionalResourceId:    "123",
+				OptionalRelation:      "view",
+				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub", OptionalSubjectId: "321"},
+			},
+		},
+		{
+			name: "relation",
+			args: []string{"view"},
+			expected: &v1.RelationshipFilter{
+				OptionalRelation: "view",
+			},
+		},
+		{
+			name: "relation, subject type",
+			args: []string{"view", "sub"},
+			expected: &v1.RelationshipFilter{
+				OptionalRelation:      "view",
+				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub"},
+			},
+		},
+		{
+			name: "relation, subject type, subject id",
+			args: []string{"view", "sub:321"},
+			expected: &v1.RelationshipFilter{
+				OptionalRelation:      "view",
+				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub", OptionalSubjectId: "321"},
+			},
+		},
+		{
+			name:        "resource type, subject type",
+			args:        []string{"res:"},
+			subjectFlag: "sub",
+			expected: &v1.RelationshipFilter{
+				ResourceType:          "res",
+				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub"},
+			},
+		},
+		{
+			name:        "resource type, subject type, subject id",
+			args:        []string{"res:"},
+			subjectFlag: "sub:321",
+			expected: &v1.RelationshipFilter{
+				ResourceType:          "res",
+				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub", OptionalSubjectId: "321"},
+			},
+		},
+		{
+			name:        "resource type, resource id, subject type",
+			args:        []string{"res:123"},
+			subjectFlag: "sub",
+			expected: &v1.RelationshipFilter{
+				ResourceType:          "res",
+				OptionalResourceId:    "123",
+				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub"},
+			},
+		},
+		{
+			name:        "resource type, resource id, subject type, subject id",
+			args:        []string{"res:123"},
+			subjectFlag: "sub:321",
+			expected: &v1.RelationshipFilter{
+				ResourceType:          "res",
+				OptionalResourceId:    "123",
+				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub", OptionalSubjectId: "321"},
+			},
+		},
+		{
+			name:        "subject type",
+			subjectFlag: "sub",
+			expected: &v1.RelationshipFilter{
+				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub"},
+			},
+		},
+		{
+			name:        "subject type, subject id",
+			subjectFlag: "sub:321",
+			expected: &v1.RelationshipFilter{
+				OptionalSubjectFilter: &v1.SubjectFilter{SubjectType: "sub", OptionalSubjectId: "321"},
+			},
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -524,7 +644,7 @@ func TestBuildRelationshipsFilter(t *testing.T) {
 			t.Parallel()
 
 			cmd := &cobra.Command{}
-			cmd.Flags().String("subject-filter", "", "")
+			cmd.Flags().String("subject-filter", tt.subjectFlag, "")
 
 			filter, err := buildRelationshipsFilter(cmd, tt.args)
 			require.NoError(t, err)
@@ -533,6 +653,7 @@ func TestBuildRelationshipsFilter(t *testing.T) {
 			require.Equal(t, tt.expected.OptionalRelation, filter.OptionalRelation, "relations do not match")
 
 			if tt.expected.OptionalSubjectFilter != nil {
+				require.NotNil(t, filter.OptionalSubjectFilter, "subject filter is nil")
 				require.Equal(t, tt.expected.OptionalSubjectFilter.SubjectType, filter.OptionalSubjectFilter.SubjectType, "subject types do not match")
 				require.Equal(t, tt.expected.OptionalSubjectFilter.OptionalSubjectId, filter.OptionalSubjectFilter.OptionalSubjectId, "subject IDs do not match")
 			}
@@ -590,24 +711,24 @@ func TestBulkDeleteForcing(t *testing.T) {
 		Updates: []*v1.RelationshipUpdate{
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel("test/resource:1#reader@test/user:1"),
+				Relationship: tuple.ParseRel("resource:1#reader@user:1"),
 			},
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel("test/resource:1#writer@test/user:2"),
+				Relationship: tuple.ParseRel("resource:1#writer@user:2"),
 			},
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel("test/resource:1#writer@test/user:3"),
+				Relationship: tuple.ParseRel("folder:1#parent@folder:2"),
 			},
 		},
 	})
 	require.NoError(t, err)
 
-	err = bulkDeleteRelationships(testCmd, []string{"test/resource:1"})
+	err = bulkDeleteRelationships(testCmd, []string{":1"})
 	require.NoError(t, err)
 
-	assertRelationshipsEmpty(ctx, t, c, &v1.RelationshipFilter{ResourceType: "test/resource"})
+	assertRelationshipsEmpty(ctx, t, c, &v1.RelationshipFilter{OptionalResourceId: "1"})
 }
 
 func TestBulkDeleteNotForcing(t *testing.T) {
@@ -640,23 +761,23 @@ func TestBulkDeleteNotForcing(t *testing.T) {
 		Updates: []*v1.RelationshipUpdate{
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel("test/resource:1#reader@test/user:1"),
+				Relationship: tuple.ParseRel("resource:1#reader@user:1"),
 			},
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel("test/resource:1#writer@test/user:2"),
+				Relationship: tuple.ParseRel("resource:1#writer@user:2"),
 			},
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel("test/resource:1#writer@test/user:3"),
+				Relationship: tuple.ParseRel("resource:1#writer@user:3"),
 			},
 		},
 	})
 	require.NoError(t, err)
 
-	err = bulkDeleteRelationships(testCmd, []string{"test/resource:1"})
-	require.ErrorContains(t, err, "could not delete test/resource")
-	assertRelationshipCount(ctx, t, c, &v1.RelationshipFilter{ResourceType: "test/resource"}, 3)
+	err = bulkDeleteRelationships(testCmd, []string{"resource:1"})
+	require.ErrorContains(t, err, "could not delete resource")
+	assertRelationshipCount(ctx, t, c, &v1.RelationshipFilter{ResourceType: "resource"}, 3)
 }
 
 func assertRelationshipsEmpty(ctx context.Context, t *testing.T, c client.Client, filter *v1.RelationshipFilter) {
