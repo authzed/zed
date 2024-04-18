@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -605,6 +606,48 @@ func TestBulkDeleteForcing(t *testing.T) {
 	require.NoError(t, err)
 
 	err = bulkDeleteRelationships(testCmd, []string{"test/resource:1"})
+	require.NoError(t, err)
+
+	assertRelationshipsEmpty(ctx, t, c, &v1.RelationshipFilter{ResourceType: "test/resource"})
+}
+
+func TestBulkDeleteManyForcing(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv := zedtesting.NewTestServer(ctx, t)
+	go func() {
+		require.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(t, err)
+
+	originalClient := client.NewClient
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	client.NewClient = zedtesting.ClientFromConn(conn)
+	testCmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "subject-filter"},
+		zedtesting.UintFlag{FlagName: "optional-limit", FlagValue: 1},
+		zedtesting.BoolFlag{FlagName: "force", FlagValue: true})
+	c, err := client.NewClient(testCmd)
+	require.NoError(t, err)
+
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: testSchema})
+	require.NoError(t, err)
+
+	var updates []*v1.RelationshipUpdate
+	for i := 0; i < 200; i++ {
+		updates = append(updates, &v1.RelationshipUpdate{
+			Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+			Relationship: tuple.ParseRel(fmt.Sprintf("test/resource:%d#reader@test/user:1", i)),
+		})
+	}
+	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{Updates: updates})
+	require.NoError(t, err)
+
+	err = bulkDeleteRelationships(testCmd, []string{"test/resource"})
 	require.NoError(t, err)
 
 	assertRelationshipsEmpty(ctx, t, c, &v1.RelationshipFilter{ResourceType: "test/resource"})
