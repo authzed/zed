@@ -15,7 +15,7 @@ jobs:
     name: "Lint Go"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "actions/checkout@v3"
+      - uses: "actions/checkout@v4"
       - uses: "authzed/actions/setup-go@main"
       - uses: "authzed/actions/gofumpt@main"
       - uses: "authzed/actions/go-mod-tidy@main"
@@ -26,7 +26,7 @@ jobs:
     name: "Lint YAML & Markdown"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "actions/checkout@v3"
+      - uses: "actions/checkout@v4"
       - uses: "authzed/actions/yaml-lint@main"
       - uses: "authzed/actions/markdown-lint@main"
 
@@ -42,7 +42,7 @@ jobs:
       matrix:
         language: ["go"]
     steps:
-      - uses: "actions/checkout@v3"
+      - uses: "actions/checkout@v4"
       - uses: "authzed/actions/setup-go@main"
       - uses: "authzed/actions/codeql@main"
 
@@ -50,7 +50,7 @@ jobs:
     name: "Analyze FS with Trivy"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "actions/checkout@v3"
+      - uses: "actions/checkout@v4"
       - uses: "aquasecurity/trivy-action@master"
         with:
           scan-type: "fs"
@@ -63,7 +63,7 @@ jobs:
     name: "Analyze Release Image with Trivy"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "actions/checkout@v3"
+      - uses: "actions/checkout@v4"
       - uses: "authzed/actions/setup-go@main"
       # Workaround until goreleaser release supports --single-target
       # makes the build faster by not building everything
@@ -71,7 +71,7 @@ jobs:
         run: |
           echo "partial:
             by: target" >> .goreleaser.docker.yml
-      - uses: "goreleaser/goreleaser-action@v4"
+      - uses: "goreleaser/goreleaser-action@v5"
         id: "goreleaser"
         with:
           distribution: "goreleaser-pro"

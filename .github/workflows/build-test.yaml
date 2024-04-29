@@ -16,7 +16,7 @@ jobs:
     name: "Build Binary"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "actions/checkout@v3"
+      - uses: "actions/checkout@v4"
       - uses: "authzed/actions/setup-go@main"
       - uses: "authzed/actions/go-build@main"
 
@@ -24,14 +24,14 @@ jobs:
     name: "Build Container Image"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "actions/checkout@v3"
+      - uses: "actions/checkout@v4"
       - uses: "authzed/actions/docker-build@main"
 
   unit:
     name: "Run Unit Tests"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "actions/checkout@v3"
+      - uses: "actions/checkout@v4"
       - uses: "authzed/actions/setup-go@main"
       - uses: "authzed/action-spicedb@v1"
       - uses: "authzed/actions/go-test@main"
@@ -40,7 +40,7 @@ jobs:
     name: "WASM Tests"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "actions/checkout@v3"
+      - uses: "actions/checkout@v4"
       - uses: "authzed/actions/setup-go@main"
         with:
           cache: "false" # do not cache to prevent cache poisoning
