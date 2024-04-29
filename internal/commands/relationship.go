@@ -51,7 +51,7 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	relationshipCmd.AddCommand(bulkDeleteCmd)
 	bulkDeleteCmd.Flags().Bool("force", false, "force deletion of all elements in batches defined by <optional-limit>")
 	bulkDeleteCmd.Flags().String("subject-filter", "", "optional subject filter")
-	bulkDeleteCmd.Flags().Uint("optional-limit", 1000, "the max amount of elements to delete. If you want to delete all in batches of size <optional-limit>, set --force to true")
+	bulkDeleteCmd.Flags().Uint32("optional-limit", 1000, "the max amount of elements to delete. If you want to delete all in batches of size <optional-limit>, set --force to true")
 	bulkDeleteCmd.Flags().Bool("estimate-count", true, "estimate the count of relationships to be deleted")
 	_ = bulkDeleteCmd.Flags().MarkDeprecated("estimate-count", "no longer used, make use of --optional-limit instead")
 	return relationshipCmd
@@ -133,12 +133,13 @@ func bulkDeleteRelationships(cmd *cobra.Command, args []string) error {
 	}()
 
 	allowPartialDeletions := cobrautil.MustGetBool(cmd, "force")
-	optionalLimit := cobrautil.MustGetUint(cmd, "optional-limit")
+	optionalLimit := cobrautil.MustGetUint32(cmd, "optional-limit")
+
 	var resp *v1.DeleteRelationshipsResponse
 	for {
 		delRequest := &v1.DeleteRelationshipsRequest{
 			RelationshipFilter:            filter,
-			OptionalLimit:                 uint32(optionalLimit),
+			OptionalLimit:                 optionalLimit,
 			OptionalAllowPartialDeletions: allowPartialDeletions,
 		}
 		log.Trace().Interface("request", delRequest).Msg("deleting relationships")

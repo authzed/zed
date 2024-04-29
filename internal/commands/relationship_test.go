@@ -579,7 +579,7 @@ func TestBulkDeleteForcing(t *testing.T) {
 	client.NewClient = zedtesting.ClientFromConn(conn)
 	testCmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
 		zedtesting.StringFlag{FlagName: "subject-filter"},
-		zedtesting.UintFlag{FlagName: "optional-limit", FlagValue: 1},
+		zedtesting.UintFlag32{FlagName: "optional-limit", FlagValue: 1},
 		zedtesting.BoolFlag{FlagName: "force", FlagValue: true})
 	c, err := client.NewClient(testCmd)
 	require.NoError(t, err)
@@ -629,7 +629,7 @@ func TestBulkDeleteManyForcing(t *testing.T) {
 	client.NewClient = zedtesting.ClientFromConn(conn)
 	testCmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
 		zedtesting.StringFlag{FlagName: "subject-filter"},
-		zedtesting.UintFlag{FlagName: "optional-limit", FlagValue: 1},
+		zedtesting.UintFlag32{FlagName: "optional-limit", FlagValue: 1},
 		zedtesting.BoolFlag{FlagName: "force", FlagValue: true})
 	c, err := client.NewClient(testCmd)
 	require.NoError(t, err)
@@ -671,7 +671,7 @@ func TestBulkDeleteNotForcing(t *testing.T) {
 	client.NewClient = zedtesting.ClientFromConn(conn)
 	testCmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
 		zedtesting.StringFlag{FlagName: "subject-filter"},
-		zedtesting.UintFlag{FlagName: "optional-limit", FlagValue: 1},
+		zedtesting.UintFlag32{FlagName: "optional-limit", FlagValue: 1},
 		zedtesting.BoolFlag{FlagName: "force", FlagValue: false})
 	c, err := client.NewClient(testCmd)
 	require.NoError(t, err)

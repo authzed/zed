@@ -81,6 +81,11 @@ type UintFlag struct {
 	FlagValue uint
 }
 
+type UintFlag32 struct {
+	FlagName  string
+	FlagValue uint32
+}
+
 type DurationFlag struct {
 	FlagName  string
 	FlagValue time.Duration
@@ -100,6 +105,8 @@ func CreateTestCobraCommandWithFlagValue(t *testing.T, flagAndValues ...any) *co
 			c.Flags().Int(f.FlagName, f.FlagValue, "")
 		case UintFlag:
 			c.Flags().Uint(f.FlagName, f.FlagValue, "")
+		case UintFlag32:
+			c.Flags().Uint32(f.FlagName, f.FlagValue, "")
 		case DurationFlag:
 			c.Flags().Duration(f.FlagName, f.FlagValue, "")
 		default:
