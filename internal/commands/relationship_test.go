@@ -2,11 +2,15 @@ package commands
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/authzed/zed/internal/client"
+	zedtesting "github.com/authzed/zed/internal/testing"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
@@ -17,6 +21,13 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
+
+const testSchema = `definition test/resource {
+	relation reader: test/user
+	relation writer: test/user
+}
+
+definition test/user {}`
 
 func init() {
 	zerolog.SetGlobalLevel(zerolog.Disabled)
@@ -548,4 +559,179 @@ func (m *mockClient) WriteRelationships(_ context.Context, in *v1.WriteRelations
 	m.expectedWrites = m.expectedWrites[1:]
 	require.True(m.t, proto.Equal(expectedWrite, in))
 	return &v1.WriteRelationshipsResponse{WrittenAt: &v1.ZedToken{Token: "test"}}, nil
+}
+
+func TestBulkDeleteForcing(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv := zedtesting.NewTestServer(ctx, t)
+	go func() {
+		require.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(t, err)
+
+	originalClient := client.NewClient
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	client.NewClient = zedtesting.ClientFromConn(conn)
+	testCmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "subject-filter"},
+		zedtesting.UintFlag32{FlagName: "optional-limit", FlagValue: 1},
+		zedtesting.BoolFlag{FlagName: "force", FlagValue: true})
+	c, err := client.NewClient(testCmd)
+	require.NoError(t, err)
+
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: testSchema})
+	require.NoError(t, err)
+
+	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{
+		Updates: []*v1.RelationshipUpdate{
+			{
+				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+				Relationship: tuple.ParseRel("test/resource:1#reader@test/user:1"),
+			},
+			{
+				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+				Relationship: tuple.ParseRel("test/resource:1#writer@test/user:2"),
+			},
+			{
+				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+				Relationship: tuple.ParseRel("test/resource:1#writer@test/user:3"),
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	err = bulkDeleteRelationships(testCmd, []string{"test/resource:1"})
+	require.NoError(t, err)
+
+	assertRelationshipsEmpty(ctx, t, c, &v1.RelationshipFilter{ResourceType: "test/resource"})
+}
+
+func TestBulkDeleteManyForcing(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv := zedtesting.NewTestServer(ctx, t)
+	go func() {
+		require.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(t, err)
+
+	originalClient := client.NewClient
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	client.NewClient = zedtesting.ClientFromConn(conn)
+	testCmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "subject-filter"},
+		zedtesting.UintFlag32{FlagName: "optional-limit", FlagValue: 1},
+		zedtesting.BoolFlag{FlagName: "force", FlagValue: true})
+	c, err := client.NewClient(testCmd)
+	require.NoError(t, err)
+
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: testSchema})
+	require.NoError(t, err)
+
+	var updates []*v1.RelationshipUpdate
+	for i := 0; i < 200; i++ {
+		updates = append(updates, &v1.RelationshipUpdate{
+			Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+			Relationship: tuple.ParseRel(fmt.Sprintf("test/resource:%d#reader@test/user:1", i)),
+		})
+	}
+	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{Updates: updates})
+	require.NoError(t, err)
+
+	err = bulkDeleteRelationships(testCmd, []string{"test/resource"})
+	require.NoError(t, err)
+
+	assertRelationshipsEmpty(ctx, t, c, &v1.RelationshipFilter{ResourceType: "test/resource"})
+}
+
+func TestBulkDeleteNotForcing(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv := zedtesting.NewTestServer(ctx, t)
+	go func() {
+		require.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(t, err)
+
+	originalClient := client.NewClient
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	client.NewClient = zedtesting.ClientFromConn(conn)
+	testCmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "subject-filter"},
+		zedtesting.UintFlag32{FlagName: "optional-limit", FlagValue: 1},
+		zedtesting.BoolFlag{FlagName: "force", FlagValue: false})
+	c, err := client.NewClient(testCmd)
+	require.NoError(t, err)
+
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: testSchema})
+	require.NoError(t, err)
+
+	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{
+		Updates: []*v1.RelationshipUpdate{
+			{
+				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+				Relationship: tuple.ParseRel("test/resource:1#reader@test/user:1"),
+			},
+			{
+				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+				Relationship: tuple.ParseRel("test/resource:1#writer@test/user:2"),
+			},
+			{
+				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+				Relationship: tuple.ParseRel("test/resource:1#writer@test/user:3"),
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	err = bulkDeleteRelationships(testCmd, []string{"test/resource:1"})
+	require.ErrorContains(t, err, "could not delete test/resource")
+	assertRelationshipCount(ctx, t, c, &v1.RelationshipFilter{ResourceType: "test/resource"}, 3)
+}
+
+func assertRelationshipsEmpty(ctx context.Context, t *testing.T, c client.Client, filter *v1.RelationshipFilter) {
+	t.Helper()
+
+	assertRelationshipCount(ctx, t, c, filter, 0)
+}
+
+func assertRelationshipCount(ctx context.Context, t *testing.T, c client.Client, filter *v1.RelationshipFilter, count int) {
+	t.Helper()
+
+	rrCli, err := c.ReadRelationships(ctx, &v1.ReadRelationshipsRequest{
+		Consistency: &v1.Consistency{
+			Requirement: &v1.Consistency_FullyConsistent{
+				FullyConsistent: true,
+			},
+		},
+		RelationshipFilter: filter,
+	})
+	require.NoError(t, err)
+
+	relCount := 0
+	for {
+		_, err = rrCli.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+
+		require.NoError(t, err)
+		relCount++
+	}
+
+	require.NoError(t, rrCli.CloseSend())
+	require.Equal(t, count, relCount)
 }

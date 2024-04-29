@@ -173,7 +173,7 @@ func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringPara
 	}
 
 	for _, nsDef := range nsDefs {
-		it, err := reader.QueryRelationships(ctx, datastore.RelationshipsFilter{ResourceType: nsDef.Definition.Name})
+		it, err := reader.QueryRelationships(ctx, datastore.RelationshipsFilter{OptionalResourceType: nsDef.Definition.Name})
 		if err != nil {
 			return zedCommandResult{Error: err.Error()}
 		}
