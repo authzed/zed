@@ -29,6 +29,7 @@ func Println(values ...any) {
 	}
 }
 
+// CreateProgressBar creates a new progress bar with the given description and defaults adjusted to zed's UX experience
 func CreateProgressBar(description string) *progressbar.ProgressBar {
 	bar := progressbar.NewOptions(-1,
 		progressbar.OptionSetWidth(10),
