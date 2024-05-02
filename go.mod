@@ -13,7 +13,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.10.0
 	github.com/google/uuid v1.6.0
 	github.com/gookit/color v1.5.4
-	github.com/hamba/avro/v2 v2.21.0
+	github.com/hamba/avro/v2 v2.21.1
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20231016191810-9f8a4f6d038a
 	github.com/jzelinskie/stringz v0.0.3
 	github.com/mattn/go-isatty v0.0.20
@@ -33,7 +33,7 @@ require (
 	golang.org/x/term v0.19.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237
 	google.golang.org/grpc v1.63.2
-	google.golang.org/protobuf v1.33.0
+	google.golang.org/protobuf v1.34.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
