@@ -117,11 +117,10 @@ var permissionCmd = &cobra.Command{
 }
 
 var checkBulkCmd = &cobra.Command{
-	Use:               "bulk <resource:id> <permission> <subject:id>",
-	Short:             "Check a permissions in bulk exists for a resource-subject pairs",
-	Args:              cobra.MinimumNArgs(2),
-	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectID),
-	RunE:              checkBulkCmdFunc,
+	Use:   "bulk <resource:id#permission@subject:id> <resource:id#permission@subject:id> ...",
+	Short: "Check a permissions in bulk exists for a resource-subject pairs",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  checkBulkCmdFunc,
 }
 
 var checkCmd = &cobra.Command{
@@ -277,6 +276,10 @@ func checkBulkCmdFunc(cmd *cobra.Command, args []string) error {
 	items := make([]*v1.CheckBulkPermissionsRequestItem, 0, len(args))
 	for _, arg := range args {
 		rel := tuple.ParseRel(arg)
+		if rel == nil {
+			return fmt.Errorf("unable to parse relation: %s", arg)
+		}
+
 		item := &v1.CheckBulkPermissionsRequestItem{
 			Resource: &v1.ObjectReference{
 				ObjectType: rel.Resource.ObjectType,
