@@ -25,6 +25,9 @@ import (
 const testSchema = `definition test/resource {
 	relation reader: test/user
 	relation writer: test/user
+
+	permission read  = reader + write
+	permission write = writer
 }
 
 definition test/user {}`

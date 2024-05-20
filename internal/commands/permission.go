@@ -106,6 +106,7 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	lookupSubjectsCmd.Flags().Bool("json", false, "output as JSON")
 	lookupSubjectsCmd.Flags().String("revision", "", "optional revision at which to check")
 	lookupSubjectsCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
+	lookupSubjectsCmd.Flags().Uint32("page-limit", 100, "limit of subject returned per page")
 	registerConsistencyFlags(lookupSubjectsCmd.Flags())
 
 	return permissionCmd
@@ -188,7 +189,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := client.NewClient(cmd)
+	c, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
@@ -218,7 +219,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	var trailerMD metadata.MD
-	resp, err := client.CheckPermission(ctx, request, grpc.Trailer(&trailerMD))
+	resp, err := c.CheckPermission(ctx, request, grpc.Trailer(&trailerMD))
 	if err != nil {
 		var debugInfo *v1.DebugInformation
 		if resp != nil {
@@ -370,7 +371,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := client.NewClient(cmd)
+	c, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
@@ -385,7 +386,7 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("request", request).Send()
 
-	resp, err := client.ExpandPermissionTree(cmd.Context(), request)
+	resp, err := c.ExpandPermissionTree(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -425,7 +426,7 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := client.NewClient(cmd)
+	c, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
@@ -444,7 +445,7 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("request", request).Send()
 
-	respStream, err := client.LookupResources(cmd.Context(), request)
+	respStream, err := c.LookupResources(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -492,7 +493,7 @@ func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := client.NewClient(cmd)
+	c, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
@@ -507,21 +508,37 @@ func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
 		Context:                 caveatContext,
 		Consistency:             consistency,
 	}
+
+	limit := cobrautil.MustGetUint32(cmd, "page-limit")
+	request.OptionalConcreteLimit = limit
 	log.Trace().Interface("request", request).Send()
-
-	respStream, err := client.LookupSubjects(cmd.Context(), request)
-	if err != nil {
-		return err
-	}
-
+	lastCursor := request.OptionalCursor
 	for {
-		resp, err := respStream.Recv()
-		switch {
-		case errors.Is(err, io.EOF):
-			return nil
-		case err != nil:
+		request.OptionalCursor = lastCursor
+		respStream, err := c.LookupSubjects(cmd.Context(), request)
+		if err != nil {
 			return err
-		default:
+		}
+
+		var cursorToken string
+		if lastCursor != nil {
+			cursorToken = lastCursor.Token
+		}
+
+		log.Trace().Interface("request", request).Str("cursor", cursorToken).Msg("reading subjects page")
+		var relCount uint32
+		for {
+			resp, err := respStream.Recv()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				return err
+			}
+
+			lastCursor = resp.AfterResultCursor
+			relCount++
+
 			if cobrautil.MustGetBool(cmd, "json") {
 				prettyProto, err := PrettyProto(resp)
 				if err != nil {
@@ -533,8 +550,16 @@ func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
 			console.Printf("%s:%s%s\n",
 				subjectType,
 				prettyLookupPermissionship(resp.Subject.SubjectObjectId, resp.Subject.Permissionship, resp.Subject.PartialCaveatInfo),
-				excludedSubjectsString(resp.ExcludedSubjects),
-			)
+				excludedSubjectsString(resp.ExcludedSubjects))
+		}
+
+		if relCount < limit || limit == 0 {
+			return nil
+		}
+
+		if relCount > limit {
+			log.Warn().Uint32("limit-specified", limit).Uint32("relationships-received", relCount).Msg("page limit ignored, pagination may not be supported by the server, consider updating SpiceDB")
+			return nil
 		}
 	}
 }
