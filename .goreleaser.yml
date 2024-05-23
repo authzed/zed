@@ -123,36 +123,36 @@ furies:
     skip: "{{ gt (len .Prerelease) 0 }}"
 
 brews:
-  - tap:
+  - description: "command-line client for managing SpiceDB"
+    homepage: "https://github.com/authzed/zed"
+    license: "Apache-2.0"
+    dependencies:
+      - name: "go"
+        type: "build"
+    custom_block: |
+      head "https://github.com/authzed/zed.git", :branch => "main"
+    url_template: "https://github.com/authzed/zed/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    install: |
+      if build.head?
+          versionVar = "github.com/jzelinskie/cobrautil/v2.Version"
+          versionCmd = "$(git describe --always --abbrev=7 --dirty --tags)"
+          system "go build --ldflags '-s -w -X #{versionVar}=#{versionCmd}' ./cmd/zed"
+      end
+      bin.install "zed"
+      generate_completions_from_executable(bin/"zed", "completion", shells: [:bash, :zsh, :fish])
+    test: |
+      system "#{bin}/zed version"
+    repository:
       owner: "authzed"
       name: "homebrew-tap"
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     ids: ["gnu", "other"]
-    url_template: "https://github.com/authzed/zed/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    download_strategy: "CurlDownloadStrategy"
     commit_author:
       name: "authzedbot"
       email: "infrastructure@authzed.com"
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-    homepage: "https://authzed.com/"
-    description: "manage Authzed from your command line."
-    license: "Apache-2.0"
-    folder: "Formula"
-    custom_block: |
-      head "https://github.com/authzed/zed.git", :branch => "main"
-    dependencies:
-      - name: "go"
-        type: "build"
-    test: |
-      system "#{bin}/zed version"
-    install: |
-      if !File.exists? "zed"
-        system "go build --ldflags \"-s -w -X github.com/jzelinskie/cobrautil/v2.Version=$(git describe --always --abbrev=7 --dirty)\" ./cmd/zed"
-      end
-      bin.install "zed"
-      (bash_completion/"zed").write Utils.safe_popen_read("#{bin}/zed", "completion", "bash")
-      (zsh_completion/"_zed").write Utils.safe_popen_read("#{bin}/zed", "completion", "zsh")
-      (fish_completion/"zed.fish").write Utils.safe_popen_read("#{bin}/zed", "completion", "fish")
+    directory: "Formula"
+    skip_upload: "auto"
 
 checksum:
   name_template: "checksums.txt"
