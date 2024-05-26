@@ -112,8 +112,9 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 }
 
 var permissionCmd = &cobra.Command{
-	Use:   "permission <subcommand>",
-	Short: "Query the permissions in a permissions system",
+	Use:     "permission <subcommand>",
+	Short:   "Query the permissions in a permissions system",
+	Aliases: []string{"perm"},
 }
 
 var checkBulkCmd = &cobra.Command{
