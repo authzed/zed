@@ -26,13 +26,15 @@ func registerContextCmd(rootCmd *cobra.Command) {
 }
 
 var contextCmd = &cobra.Command{
-	Use:   "context <subcommand>",
-	Short: "Manage configurations for connecting to SpiceDB deployments",
+	Use:     "context <subcommand>",
+	Short:   "Manage configurations for connecting to SpiceDB deployments",
+	Aliases: []string{"ctx"},
 }
 
 var contextListCmd = &cobra.Command{
 	Use:               "list",
 	Short:             "Lists all available contexts",
+	Aliases:           []string{"ls"},
 	Args:              cobra.ExactArgs(0),
 	ValidArgsFunction: cobra.NoFileCompletions,
 	RunE:              contextListCmdFunc,
@@ -49,6 +51,7 @@ var contextSetCmd = &cobra.Command{
 var contextRemoveCmd = &cobra.Command{
 	Use:               "remove <system>",
 	Short:             "Removes a context",
+	Aliases:           []string{"rm"},
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: ContextGet,
 	RunE:              contextRemoveCmdFunc,
