@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/encoding/prototext"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/console"
@@ -222,8 +223,15 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	resp, err := client.CheckPermission(ctx, request, grpc.Trailer(&trailerMD))
 	if err != nil {
 		var debugInfo *v1.DebugInformation
-		if resp != nil {
-			debugInfo = resp.DebugTrace
+
+		// Check for the debug trace contained in the error details.
+		if errInfo, ok := grpcErrorInfoFrom(err); ok {
+			if encodedDebugInfo, ok := errInfo.Metadata["debug_trace_proto_text"]; ok {
+				debugInfo = &v1.DebugInformation{}
+				if uerr := prototext.Unmarshal([]byte(encodedDebugInfo), debugInfo); uerr != nil {
+					return uerr
+				}
+			}
 		}
 
 		derr := displayDebugInformationIfRequested(cmd, debugInfo, trailerMD, true)
