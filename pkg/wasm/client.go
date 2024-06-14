@@ -82,6 +82,41 @@ func (wc wasmClient) BulkCheckPermission(ctx context.Context, in *v1.BulkCheckPe
 	return client.BulkCheckPermission(ctx, in, opts...)
 }
 
+func (wc wasmClient) ExperimentalRegisterRelationshipCounter(ctx context.Context, in *v1.ExperimentalRegisterRelationshipCounterRequest, opts ...grpc.CallOption) (*v1.ExperimentalRegisterRelationshipCounterResponse, error) {
+	client := v1.NewExperimentalServiceClient(wc.conn)
+	return client.ExperimentalRegisterRelationshipCounter(ctx, in, opts...)
+}
+
+func (wc wasmClient) ExperimentalUnregisterRelationshipCounter(ctx context.Context, in *v1.ExperimentalUnregisterRelationshipCounterRequest, opts ...grpc.CallOption) (*v1.ExperimentalUnregisterRelationshipCounterResponse, error) {
+	client := v1.NewExperimentalServiceClient(wc.conn)
+	return client.ExperimentalUnregisterRelationshipCounter(ctx, in, opts...)
+}
+
+func (wc wasmClient) ExperimentalCountRelationships(ctx context.Context, in *v1.ExperimentalCountRelationshipsRequest, opts ...grpc.CallOption) (*v1.ExperimentalCountRelationshipsResponse, error) {
+	client := v1.NewExperimentalServiceClient(wc.conn)
+	return client.ExperimentalCountRelationships(ctx, in, opts...)
+}
+
+func (wc wasmClient) ExperimentalReflectSchema(ctx context.Context, in *v1.ExperimentalReflectSchemaRequest, opts ...grpc.CallOption) (*v1.ExperimentalReflectSchemaResponse, error) {
+	client := v1.NewExperimentalServiceClient(wc.conn)
+	return client.ExperimentalReflectSchema(ctx, in, opts...)
+}
+
+func (wc wasmClient) ExperimentalDiffSchema(ctx context.Context, in *v1.ExperimentalDiffSchemaRequest, opts ...grpc.CallOption) (*v1.ExperimentalDiffSchemaResponse, error) {
+	client := v1.NewExperimentalServiceClient(wc.conn)
+	return client.ExperimentalDiffSchema(ctx, in, opts...)
+}
+
+func (wc wasmClient) ExperimentalDependentRelations(ctx context.Context, in *v1.ExperimentalDependentRelationsRequest, opts ...grpc.CallOption) (*v1.ExperimentalDependentRelationsResponse, error) {
+	client := v1.NewExperimentalServiceClient(wc.conn)
+	return client.ExperimentalDependentRelations(ctx, in, opts...)
+}
+
+func (wc wasmClient) ExperimentalComputablePermissions(ctx context.Context, in *v1.ExperimentalComputablePermissionsRequest, opts ...grpc.CallOption) (*v1.ExperimentalComputablePermissionsResponse, error) {
+	client := v1.NewExperimentalServiceClient(wc.conn)
+	return client.ExperimentalComputablePermissions(ctx, in, opts...)
+}
+
 func (wc wasmClient) Watch(ctx context.Context, in *v1.WatchRequest, opts ...grpc.CallOption) (v1.WatchService_WatchClient, error) {
 	client := v1.NewWatchServiceClient(wc.conn)
 	return client.Watch(ctx, in, opts...)
