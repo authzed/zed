@@ -10,10 +10,10 @@ require (
 	github.com/authzed/spicedb v1.33.1-0.20240614071926-819f4244a410
 	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/charmbracelet/lipgloss v0.10.0
+	github.com/charmbracelet/lipgloss v0.11.0
 	github.com/google/uuid v1.6.0
 	github.com/gookit/color v1.5.4
-	github.com/hamba/avro/v2 v2.21.1
+	github.com/hamba/avro/v2 v2.22.1
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20240506193431-cec803903353
 	github.com/jzelinskie/stringz v0.0.3
 	github.com/mattn/go-isatty v0.0.20
@@ -22,18 +22,18 @@ require (
 	github.com/rodaine/table v1.2.0
 	github.com/rs/zerolog v1.33.0
 	github.com/samber/lo v1.39.0
-	github.com/schollz/progressbar/v3 v3.14.3
+	github.com/schollz/progressbar/v3 v3.14.4
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
 	github.com/xlab/treeprint v1.2.0
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
-	golang.org/x/mod v0.17.0
+	golang.org/x/mod v0.18.0
 	golang.org/x/sync v0.7.0
-	golang.org/x/term v0.20.0
+	golang.org/x/term v0.21.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240520151616-dc85e6b867a5
 	google.golang.org/grpc v1.64.0
-	google.golang.org/protobuf v1.34.1
+	google.golang.org/protobuf v1.34.2
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -78,6 +78,7 @@ require (
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/charmbracelet/x/ansi v0.1.1 // indirect
 	github.com/cloudspannerecosystem/spanner-change-streams-tail v0.3.1 // indirect
 	github.com/cncf/xds/go v0.0.0-20240318125728-8a4994d93e50 // indirect
 	github.com/creasty/defaults v1.7.0 // indirect
@@ -157,7 +158,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mostynb/go-grpc-compression v1.2.3 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
-	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79 // indirect
@@ -208,7 +208,7 @@ require (
 	golang.org/x/crypto v0.23.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/oauth2 v0.20.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
