@@ -7,7 +7,7 @@ require (
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
 	github.com/authzed/authzed-go v0.12.1-0.20240607163830-a28f71a1b0e5
 	github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b
-	github.com/authzed/spicedb v1.33.1-0.20240614071926-819f4244a410
+	github.com/authzed/spicedb v1.33.1-0.20240615003920-ebe0417c815b
 	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/charmbracelet/lipgloss v0.11.0
