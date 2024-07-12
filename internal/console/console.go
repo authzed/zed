@@ -23,7 +23,7 @@ var Errorf = func(format string, a ...any) {
 }
 
 // Println prints a line with optional values to the console.
-func Println(values ...any) {
+var Println = func(values ...any) {
 	for _, value := range values {
 		Printf("%v\n", value)
 	}
