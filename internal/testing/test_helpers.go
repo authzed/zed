@@ -17,7 +17,7 @@ import (
 	"github.com/authzed/zed/internal/client"
 )
 
-func ClientFromConn(conn *grpc.ClientConn) func(cmd *cobra.Command) (client.Client, error) {
+func ClientFromConn(conn *grpc.ClientConn) func(_ *cobra.Command) (client.Client, error) {
 	return func(_ *cobra.Command) (client.Client, error) {
 		return &authzed.ClientWithExperimental{
 			Client: authzed.Client{

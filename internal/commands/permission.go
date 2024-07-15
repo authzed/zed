@@ -101,6 +101,7 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	lookupResourcesCmd.Flags().Bool("json", false, "output as JSON")
 	lookupResourcesCmd.Flags().String("revision", "", "optional revision at which to check")
 	lookupResourcesCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
+	lookupResourcesCmd.Flags().Uint32("page-limit", 0, "limit of relations returned per page")
 	registerConsistencyFlags(lookupResourcesCmd.Flags())
 
 	permissionCmd.AddCommand(lookupSubjectsCmd)
@@ -416,6 +417,8 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var newLookupResourcesPageCallbackForTests func(readByPage uint)
+
 func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 	objectNS := args[0]
 	relation := args[1]
@@ -424,6 +427,7 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	pageLimit := cobrautil.MustGetUint32(cmd, "page-limit")
 	caveatContext, err := GetCaveatContext(cmd)
 	if err != nil {
 		return err
@@ -438,46 +442,69 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	request := &v1.LookupResourcesRequest{
-		ResourceObjectType: objectNS,
-		Permission:         relation,
-		Subject: &v1.SubjectReference{
-			Object: &v1.ObjectReference{
-				ObjectType: subjectNS,
-				ObjectId:   subjectID,
-			},
-			OptionalRelation: subjectRel,
-		},
-		Context:     caveatContext,
-		Consistency: consistency,
-	}
-	log.Trace().Interface("request", request).Send()
 
-	respStream, err := client.LookupResources(cmd.Context(), request)
-	if err != nil {
-		return err
-	}
-
+	var cursor *v1.Cursor
+	var totalCount uint
 	for {
-		resp, err := respStream.Recv()
-		switch {
-		case errors.Is(err, io.EOF):
-			return nil
-		case err != nil:
+		request := &v1.LookupResourcesRequest{
+			ResourceObjectType: objectNS,
+			Permission:         relation,
+			Subject: &v1.SubjectReference{
+				Object: &v1.ObjectReference{
+					ObjectType: subjectNS,
+					ObjectId:   subjectID,
+				},
+				OptionalRelation: subjectRel,
+			},
+			Context:        caveatContext,
+			Consistency:    consistency,
+			OptionalLimit:  pageLimit,
+			OptionalCursor: cursor,
+		}
+		log.Trace().Interface("request", request).Uint32("page-limit", pageLimit).Send()
+
+		respStream, err := client.LookupResources(cmd.Context(), request)
+		if err != nil {
 			return err
-		default:
-			if cobrautil.MustGetBool(cmd, "json") {
-				prettyProto, err := PrettyProto(resp)
-				if err != nil {
-					return err
+		}
+
+		var count uint
+
+	stream:
+		for {
+			resp, err := respStream.Recv()
+			switch {
+			case errors.Is(err, io.EOF):
+				break stream
+			case err != nil:
+				return err
+			default:
+				count++
+				totalCount++
+				if cobrautil.MustGetBool(cmd, "json") {
+					prettyProto, err := PrettyProto(resp)
+					if err != nil {
+						return err
+					}
+
+					console.Println(string(prettyProto))
 				}
 
-				console.Println(string(prettyProto))
+				console.Println(prettyLookupPermissionship(resp.ResourceObjectId, resp.Permissionship, resp.PartialCaveatInfo))
+				cursor = resp.AfterResultCursor
 			}
+		}
 
-			console.Println(prettyLookupPermissionship(resp.ResourceObjectId, resp.Permissionship, resp.PartialCaveatInfo))
+		if newLookupResourcesPageCallbackForTests != nil {
+			newLookupResourcesPageCallbackForTests(count)
+		}
+		if count == 0 || pageLimit == 0 || count < uint(pageLimit) {
+			log.Trace().Interface("request", request).Uint32("page-limit", pageLimit).Uint("count", totalCount).Send()
+			break
 		}
 	}
+
+	return nil
 }
 
 func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
