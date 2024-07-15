@@ -22,7 +22,7 @@ jobs:
         with:
           distribution: "goreleaser-pro"
           version: "latest"
-          args: "release --rm-dist"
+          args: "release --clean"
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           HOMEBREW_TAP_GITHUB_TOKEN: "${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}"
@@ -47,7 +47,7 @@ jobs:
         with:
           distribution: "goreleaser-pro"
           version: "latest"
-          args: "release --config=.goreleaser.docker.yml --rm-dist"
+          args: "release --config=.goreleaser.docker.yml --clean"
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           GORELEASER_KEY: "${{ secrets.GORELEASER_KEY }}"
