@@ -138,6 +138,7 @@ func TestLookupResourcesCommand(t *testing.T) {
 	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{Updates: updates})
 	require.NoError(t, err)
 
+	// we override this to obtain the results being printed and validate them
 	previous := console.Println
 	defer func() {
 		console.Println = previous
@@ -147,25 +148,39 @@ func TestLookupResourcesCommand(t *testing.T) {
 		count += len(values)
 	}
 
+	// use test callback to make sure pagination is correct
+	var receivedPageSizes []uint
+	newLookupResourcesPageCallbackForTests = func(readPageSize uint) {
+		receivedPageSizes = append(receivedPageSizes, readPageSize)
+	}
+	defer func() {
+		newLookupResourcesPageCallbackForTests = nil
+	}()
+
 	// test no page size, server computes returns all resources in one go
 	cmd := testLookupResourcesCommand(t, 0)
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
 	require.Equal(t, 10, count)
+	require.EqualValues(t, []uint{10}, receivedPageSizes)
 
 	// use page size same as number of elements
 	count = 0
+	receivedPageSizes = nil
 	cmd = testLookupResourcesCommand(t, 10)
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
 	require.Equal(t, 10, count)
+	require.EqualValues(t, []uint{10, 0}, receivedPageSizes)
 
 	// use odd page size
 	count = 0
+	receivedPageSizes = nil
 	cmd = testLookupResourcesCommand(t, 3)
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
 	require.Equal(t, 10, count)
+	require.EqualValues(t, []uint{3, 3, 3, 1}, receivedPageSizes)
 }
 
 func testLookupResourcesCommand(t *testing.T, limit uint32) *cobra.Command {

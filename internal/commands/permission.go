@@ -417,6 +417,8 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var newLookupResourcesPageCallbackForTests func(readByPage uint)
+
 func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 	objectNS := args[0]
 	relation := args[1]
@@ -493,7 +495,10 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		if count == 0 || pageLimit == 0 {
+		if newLookupResourcesPageCallbackForTests != nil {
+			newLookupResourcesPageCallbackForTests(count)
+		}
+		if count == 0 || pageLimit == 0 || count < uint(pageLimit) {
 			log.Trace().Interface("request", request).Uint32("page-limit", pageLimit).Uint("count", totalCount).Send()
 			break
 		}
