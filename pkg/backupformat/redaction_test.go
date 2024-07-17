@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
 )
@@ -266,7 +267,7 @@ func TestRedactBackup(t *testing.T) {
 	}
 
 	definition resource {
-		relation viewer: user
+		relation viewer: user | user:*
 		permission view = viewer
 	}`
 
@@ -323,6 +324,19 @@ func TestRedactBackup(t *testing.T) {
 				},
 			},
 		},
+		{
+			Resource: &v1.ObjectReference{
+				ObjectType: "resource",
+				ObjectId:   "resource3",
+			},
+			Relation: "viewer",
+			Subject: &v1.SubjectReference{
+				Object: &v1.ObjectReference{
+					ObjectType: "user",
+					ObjectId:   tuple.PublicWildcard,
+				},
+			},
+		},
 	}
 
 	// Write some data.
@@ -367,7 +381,7 @@ func TestRedactBackup(t *testing.T) {
 	redactedDecoder, err := NewDecoder(bytes.NewReader(redactedBuf.Bytes()))
 	require.NoError(t, err)
 
-	require.Equal(t, "definition def0 {}\n\ndefinition def1 {\n\trelation rel3: def0\n}\n\ndefinition def2 {\n\trelation rel4: def0\n\tpermission rel5 = rel4\n}", redactedDecoder.Schema())
+	require.Equal(t, "definition def0 {}\n\ndefinition def1 {\n\trelation rel3: def0\n}\n\ndefinition def2 {\n\trelation rel4: def0 | def0:*\n\tpermission rel5 = rel4\n}", redactedDecoder.Schema())
 	require.Equal(t, decoder.ZedToken(), redactedDecoder.ZedToken())
 
 	for _, expected := range exampleRelationships {
@@ -379,7 +393,11 @@ func TestRedactBackup(t *testing.T) {
 		require.Equal(t, expected.Resource.ObjectId, redactionMap.ObjectIDs[rel.Resource.ObjectId])
 		require.Equal(t, expected.Relation, redactionMap.Relations[rel.Relation])
 		require.Equal(t, expected.Subject.Object.ObjectType, redactionMap.Definitions[rel.Subject.Object.ObjectType])
-		require.Equal(t, expected.Subject.Object.ObjectId, redactionMap.ObjectIDs[rel.Subject.Object.ObjectId])
+		if expected.Subject.Object.ObjectId == tuple.PublicWildcard {
+			require.Equal(t, tuple.PublicWildcard, rel.Subject.Object.ObjectId)
+		} else {
+			require.Equal(t, expected.Subject.Object.ObjectId, redactionMap.ObjectIDs[rel.Subject.Object.ObjectId])
+		}
 		require.Equal(t, expected.Subject.OptionalRelation, redactionMap.Relations[rel.Subject.OptionalRelation])
 	}
 }

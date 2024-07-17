@@ -12,6 +12,7 @@ import (
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/authzed/spicedb/pkg/schemadsl/input"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
+	"github.com/authzed/spicedb/pkg/tuple"
 )
 
 // RedactionOptions are the options to use when redacting data.
@@ -308,8 +309,11 @@ func redactRelationship(rel *v1.Relationship, redactionMap *RedactionMap, opts R
 
 	// Redact the object IDs.
 	if opts.RedactObjectIDs {
+		redactionMap.ObjectIDs[tuple.PublicWildcard] = tuple.PublicWildcard // wilcards are not redacted
 		if _, ok := redactionMap.ObjectIDs[redactedRel.Resource.ObjectId]; !ok {
-			redactionMap.ObjectIDs[redactedRel.Resource.ObjectId] = "obj" + strconv.Itoa(len(redactionMap.ObjectIDs))
+			if redactedRel.Resource.ObjectId != tuple.PublicWildcard {
+				redactionMap.ObjectIDs[redactedRel.Resource.ObjectId] = "obj" + strconv.Itoa(len(redactionMap.ObjectIDs))
+			}
 		}
 
 		redactedRel.Resource.ObjectId = redactionMap.ObjectIDs[redactedRel.Resource.ObjectId]
