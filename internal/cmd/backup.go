@@ -103,6 +103,7 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	backupRedactCmd.Flags().Bool("redact-definitions", true, "redact definitions")
 	backupRedactCmd.Flags().Bool("redact-relations", true, "redact relations")
 	backupRedactCmd.Flags().Bool("redact-object-ids", true, "redact object IDs")
+	backupRedactCmd.Flags().Bool("print-redacted-object-ids", false, "prints the redacted object IDs")
 
 	// Restore used to be on the root, so add it there too, but hidden.
 	restoreCmd := &cobra.Command{
@@ -549,6 +550,15 @@ func backupRedactCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	tbl.Print()
 	fmt.Println()
+
+	if len(redactor.RedactionMap().ObjectIDs) > 0 && cobrautil.MustGetBool(cmd, "print-redacted-object-ids") {
+		tbl = table.New("Object ID", "Redacted Object ID")
+		for k, v := range redactor.RedactionMap().ObjectIDs {
+			tbl.AddRow(k, v)
+		}
+		tbl.Print()
+		fmt.Println()
+	}
 
 	return nil
 }
