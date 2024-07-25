@@ -73,8 +73,15 @@ func DefaultToken(
 		APIToken:   stringz.DefaultEmpty(overrideAPIToken, token.APIToken),
 		Insecure:   token.Insecure,
 		NoVerifyCA: token.NoVerifyCA,
-		CACert:     []byte(stringz.DefaultEmpty(string(overrideCACert), string(token.CACert))),
+		CACert:     bytesDefaultEmpty(overrideCACert, token.CACert),
 	}, nil
+}
+
+func bytesDefaultEmpty(val, fallback []byte) []byte {
+	if len(val) == 0 {
+		return fallback
+	}
+	return val
 }
 
 // CurrentToken is convenient way to obtain the CurrentToken field from the
