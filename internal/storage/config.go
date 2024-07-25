@@ -37,18 +37,18 @@ func DefaultToken(
 	cs ConfigStore,
 	ss SecretStore,
 ) (Token, error) {
-	if overrideEndpoint != "" && overrideAPIToken != "" {
-		var overrideCACert []byte
-		if overrideCACertPath != "" {
-			caCert, err := os.ReadFile(overrideCACertPath)
-			if err != nil {
-				log.Error().
-					Str("certificate-path", overrideCACertPath).
-					Msg("failed to read CA certificate bundle")
-			}
-			overrideCACert = caCert
+	var overrideCACert []byte
+	if overrideCACertPath != "" {
+		caCert, err := os.ReadFile(overrideCACertPath)
+		if err != nil {
+			log.Error().
+				Str("certificate-path", overrideCACertPath).
+				Msg("failed to read CA certificate bundle")
 		}
+		overrideCACert = caCert
+	}
 
+	if overrideEndpoint != "" && overrideAPIToken != "" {
 		return Token{
 			Name:     "env",
 			Endpoint: overrideEndpoint,
@@ -73,7 +73,7 @@ func DefaultToken(
 		APIToken:   stringz.DefaultEmpty(overrideAPIToken, token.APIToken),
 		Insecure:   token.Insecure,
 		NoVerifyCA: token.NoVerifyCA,
-		CACert:     token.CACert,
+		CACert:     []byte(stringz.DefaultEmpty(string(overrideCACert), string(token.CACert))),
 	}, nil
 }
 
