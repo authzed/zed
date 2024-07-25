@@ -8,6 +8,7 @@ import (
 	"runtime"
 
 	"github.com/jzelinskie/stringz"
+	"github.com/rs/zerolog/log"
 )
 
 const configFileName = "config.json"
@@ -31,19 +32,37 @@ var ErrMissingToken = errors.New("could not find token")
 
 // DefaultToken creates a Token from input, filling any missing values in
 // with the current context's defaults.
-func DefaultToken(overrideEndpoint, overrideAPIToken string, cs ConfigStore, ss SecretStore) (Token, error) {
+func DefaultToken(
+	overrideEndpoint, overrideAPIToken, overrideCACertPath string,
+	cs ConfigStore,
+	ss SecretStore,
+) (Token, error) {
 	if overrideEndpoint != "" && overrideAPIToken != "" {
+		var overrideCACert []byte
+		if overrideCACertPath != "" {
+			caCert, err := os.ReadFile(overrideCACertPath)
+			if err != nil {
+				log.Error().
+					Str("certificate-path", overrideCACertPath).
+					Msg("failed to read CA certificate bundle")
+			}
+			overrideCACert = caCert
+		}
+
 		return Token{
 			Name:     "env",
 			Endpoint: overrideEndpoint,
 			APIToken: overrideAPIToken,
+			CACert:   overrideCACert,
 		}, nil
 	}
 
 	token, err := CurrentToken(cs, ss)
 	if err != nil {
 		if errors.Is(err, ErrConfigNotFound) {
-			return Token{}, errors.New("no context found: see `zed context set --help` to setup a context or make sure to specifiy *all* context flags (--endpoint, --token and --insecure if necessary) to run without context")
+			return Token{}, errors.New(
+				"no context found: see `zed context set --help` to setup a context or make sure to specifiy *all* context flags (--endpoint, --token and --insecure if necessary) to run without context",
+			)
 		}
 		return Token{}, err
 	}

@@ -31,6 +31,7 @@ func versionCmdFunc(cmd *cobra.Command, _ []string) error {
 		_, err := storage.DefaultToken(
 			cobrautil.MustGetString(cmd, "endpoint"),
 			cobrautil.MustGetString(cmd, "token"),
+			cobrautil.MustGetStringExpanded(cmd, "certificate-path"),
 			configStore,
 			secretStore,
 		)
@@ -48,6 +49,7 @@ func versionCmdFunc(cmd *cobra.Command, _ []string) error {
 		token, err := storage.DefaultToken(
 			cobrautil.MustGetString(cmd, "endpoint"),
 			cobrautil.MustGetString(cmd, "token"),
+			cobrautil.MustGetStringExpanded(cmd, "certificate-path"),
 			configStore,
 			secretStore,
 		)
