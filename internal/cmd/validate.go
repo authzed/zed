@@ -26,7 +26,9 @@ import (
 
 var (
 	success                = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("Success!")
+	complete               = lipgloss.NewStyle().Bold(true).Render("complete")
 	errorPrefix            = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("9")).Render("error: ")
+	warningPrefix          = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("3")).Render("warning: ")
 	errorMessageStyle      = lipgloss.NewStyle().Bold(true).Width(80)
 	linePrefixStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
 	highlightedSourceStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
@@ -130,7 +132,24 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 		outputDeveloperErrors(validateContents, erDevErrs)
 	}
 
-	fmt.Print(success)
+	// Print out any warnings.
+	warnings, err := development.GetWarnings(ctx, devCtx)
+	if err != nil {
+		return err
+	}
+
+	if len(warnings) > 0 {
+		for _, warning := range warnings {
+			console.Printf("%s%s\n", warningPrefix, warning.Message)
+			outputForLine(validateContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
+			console.Printf("\n")
+		}
+
+		console.Print(complete)
+	} else {
+		console.Print(success)
+	}
+
 	console.Printf(" - %d relationships loaded, %d assertions run, %d expected relations validated\n",
 		len(tuples),
 		len(parsed.Assertions.AssertTrue)+len(parsed.Assertions.AssertFalse),
@@ -140,18 +159,21 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func ouputErrorWithSource(validateContents []byte, errWithSource spiceerrors.ErrorWithSource) {
-	lines := strings.Split(string(validateContents), "\n")
-
 	console.Printf("%s%s\n", errorPrefix, errorMessageStyle.Render(errWithSource.Error()))
-	errorLineNumber := int(errWithSource.LineNumber) - 1 // errWithSource.LineNumber is 1-indexed
+	outputForLine(validateContents, errWithSource.LineNumber, errWithSource.SourceCodeString, 0) // errWithSource.LineNumber is 1-indexed
+	os.Exit(1)
+}
+
+func outputForLine(validateContents []byte, oneIndexedLineNumber uint64, sourceCodeString string, oneIndexedColumnPosition uint64) {
+	lines := strings.Split(string(validateContents), "\n")
+	errorLineNumber := int(oneIndexedLineNumber) - 1
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
-			renderLine(lines, i, errWithSource.SourceCodeString, errorLineNumber)
+			renderLine(lines, i, sourceCodeString, errorLineNumber, int(oneIndexedColumnPosition)-1)
 		} else {
-			renderLine(lines, i, "", errorLineNumber)
+			renderLine(lines, i, "", errorLineNumber, -1)
 		}
 	}
-	os.Exit(1)
 }
 
 func outputDeveloperErrors(validateContents []byte, devErrors []*devinterface.DeveloperError) {
@@ -173,9 +195,9 @@ func outputDeveloperError(devError *devinterface.DeveloperError, lines []string,
 	errorLineNumber := int(devError.Line) - 1 + lineOffset // devError.Line is 1-indexed
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
-			renderLine(lines, i, devError.Context, errorLineNumber)
+			renderLine(lines, i, devError.Context, errorLineNumber, -1)
 		} else {
-			renderLine(lines, i, "", errorLineNumber)
+			renderLine(lines, i, "", errorLineNumber, -1)
 		}
 	}
 
@@ -189,17 +211,42 @@ func outputDeveloperError(devError *devinterface.DeveloperError, lines []string,
 	console.Printf("\n\n")
 }
 
-func renderLine(lines []string, index int, highlight string, highlightLineIndex int) {
+func renderLine(lines []string, index int, highlight string, highlightLineIndex int, highlightStartingColumnIndex int) {
 	if index < 0 || index >= len(lines) {
 		return
 	}
 
 	lineNumberLength := len(fmt.Sprintf("%d", len(lines)))
-	lineContents := lines[index]
+	lineContents := strings.ReplaceAll(lines[index], "\t", " ")
 	lineDelimiter := "|"
-	highlightIndex := strings.Index(lineContents, highlight)
+
+	highlightLength := max(0, len(highlight)-1)
+	highlightColumnIndex := -1
+
+	// If the highlight string was provided, then we need to find the index of the highlight
+	// string in the line contents to determine where to place the caret.
+	if len(highlight) > 0 {
+		offset := 0
+		for {
+			foundRelativeIndex := strings.Index(lineContents[offset:], highlight)
+			foundIndex := foundRelativeIndex + offset
+			if foundIndex >= highlightStartingColumnIndex {
+				highlightColumnIndex = foundIndex
+				break
+			}
+
+			offset = foundIndex + 1
+			if foundRelativeIndex < 0 || foundIndex > len(lineContents) {
+				break
+			}
+		}
+	} else if highlightStartingColumnIndex >= 0 {
+		// Otherwise, just show a caret at the specified starting column, if any.
+		highlightColumnIndex = highlightStartingColumnIndex
+	}
+
 	lineNumberStr := fmt.Sprintf("%d", index+1)
-	spacer := strings.Repeat(" ", lineNumberLength)
+	noNumberSpaces := strings.Repeat(" ", lineNumberLength)
 
 	lineNumberStyle := linePrefixStyle
 	lineContentsStyle := codeStyle
@@ -209,22 +256,26 @@ func renderLine(lines []string, index int, highlight string, highlightLineIndex 
 		lineDelimiter = ">"
 	}
 
-	if highlightIndex < 0 || len(highlight) == 0 {
-		console.Printf(" %s %s %s\n", lineNumberStyle.Render(lineNumberStr), lineDelimiter, lineContentsStyle.Render(lineContents))
+	lineNumberSpacer := strings.Repeat(" ", lineNumberLength-len(lineNumberStr))
+
+	if highlightColumnIndex < 0 {
+		console.Printf(" %s%s %s %s\n", lineNumberSpacer, lineNumberStyle.Render(lineNumberStr), lineDelimiter, lineContentsStyle.Render(lineContents))
 	} else {
-		console.Printf(" %s %s %s%s%s\n",
+		console.Printf(" %s%s %s %s%s%s\n",
+			lineNumberSpacer,
 			lineNumberStyle.Render(lineNumberStr),
 			lineDelimiter,
-			lineContentsStyle.Render(lineContents[0:highlightIndex]),
+			lineContentsStyle.Render(lineContents[0:highlightColumnIndex]),
 			highlightedSourceStyle.Render(highlight),
-			lineContentsStyle.Render(lineContents[highlightIndex+len(highlight):]),
+			lineContentsStyle.Render(lineContents[highlightColumnIndex+len(highlight):]),
 		)
+
 		console.Printf(" %s %s %s%s%s\n",
-			lineNumberStyle.Render(spacer),
+			noNumberSpaces,
 			lineDelimiter,
-			strings.Repeat(" ", highlightIndex),
+			strings.Repeat(" ", highlightColumnIndex),
 			highlightedSourceStyle.Render("^"),
-			highlightedSourceStyle.Render(strings.Repeat("~", len(highlight)-1)),
+			highlightedSourceStyle.Render(strings.Repeat("~", highlightLength)),
 		)
 	}
 }

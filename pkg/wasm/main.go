@@ -143,6 +143,9 @@ func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringPara
 	console.Printf = func(format string, a ...any) {
 		fmt.Fprintf(&buf, format, a...)
 	}
+	console.Print = func(a ...any) {
+		fmt.Fprint(&buf, a...)
+	}
 
 	log.Logger = zerolog.New(&buf).With().Bool("is-log", true).Timestamp().Logger()
 
