@@ -14,6 +14,10 @@ var Printf = func(format string, a ...any) {
 	fmt.Printf(format, a...)
 }
 
+var Print = func(a ...any) {
+	fmt.Print(a...)
+}
+
 // Errorf defines an (overridable) function for printing to the console via stderr.
 var Errorf = func(format string, a ...any) {
 	_, err := fmt.Fprintf(os.Stderr, format, a...)
