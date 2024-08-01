@@ -7,7 +7,7 @@ toolchain go1.22.5
 require (
 	github.com/99designs/keyring v1.2.2
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
-	github.com/authzed/authzed-go v0.13.0
+	github.com/authzed/authzed-go v0.14.0
 	github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b
 	github.com/authzed/spicedb v1.35.2-0.20240731085809-d52dfd0adbd0
 	github.com/brianvoe/gofakeit/v6 v6.28.0
@@ -15,7 +15,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.12.1
 	github.com/google/uuid v1.6.0
 	github.com/gookit/color v1.5.4
-	github.com/hamba/avro/v2 v2.22.1
+	github.com/hamba/avro/v2 v2.23.0
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20240506193431-cec803903353
 	github.com/jzelinskie/stringz v0.0.3
 	github.com/mattn/go-isatty v0.0.20
@@ -23,8 +23,8 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/rodaine/table v1.2.0
 	github.com/rs/zerolog v1.33.0
-	github.com/samber/lo v1.45.0
-	github.com/schollz/progressbar/v3 v3.14.4
+	github.com/samber/lo v1.46.0
+	github.com/schollz/progressbar/v3 v3.14.5
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
@@ -33,7 +33,7 @@ require (
 	golang.org/x/mod v0.19.0
 	golang.org/x/sync v0.7.0
 	golang.org/x/term v0.22.0
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240617180043-68d350f18fd4
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240723171418-e6d459c13d2a
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/yaml.v3 v3.0.1
@@ -129,7 +129,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.21.0 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
@@ -149,7 +149,7 @@ require (
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.17.8 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
@@ -216,8 +216,8 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.24.0 // indirect
-	golang.org/x/net v0.26.0 // indirect
+	golang.org/x/crypto v0.25.0 // indirect
+	golang.org/x/net v0.27.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
@@ -225,7 +225,7 @@ require (
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/api v0.186.0 // indirect
 	google.golang.org/genproto v0.0.0-20240617180043-68d350f18fd4 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240617180043-68d350f18fd4 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240723171418-e6d459c13d2a // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
