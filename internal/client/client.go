@@ -35,6 +35,7 @@ func newGRPCClient(cmd *cobra.Command) (Client, error) {
 	token, err := storage.DefaultToken(
 		cobrautil.MustGetString(cmd, "endpoint"),
 		cobrautil.MustGetString(cmd, "token"),
+		cobrautil.MustGetStringExpanded(cmd, "certificate-path"),
 		configStore,
 		secretStore,
 	)
