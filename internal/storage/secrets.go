@@ -126,7 +126,7 @@ var _ SecretStore = (*KeychainSecretStore)(nil)
 const (
 	svcName                   = "zed"
 	keyringEntryName          = svcName + " secrets"
-	envRecommendation         = "Setting the environment variable `ZED_KEYRING_PASSWORD` to your password will skip prompts\n"
+	envRecommendation         = "Setting the environment variable `ZED_KEYRING_PASSWORD` to your password will skip prompts.\n"
 	keyringDoesNotExistPrompt = "Keyring file does not already exist.\nEnter a new non-empty passphrase for the new keyring file: "
 	keyringPrompt             = "Enter passphrase to unlock zed keyring: "
 	emptyKeyringPasswordError = "Your passphrase must not be empty."
@@ -144,6 +144,16 @@ func fileExists(path string) (bool, error) {
 	}
 }
 
+func promptPassword(prompt string) (string, error) {
+	console.Printf(prompt)
+	b, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		return "", err
+	}
+	console.Printf("\n") // Clear the line after a prompt
+	return string(b), err
+}
+
 func (k *KeychainSecretStore) keyring() (keyring.Keyring, error) {
 	if k.ring != nil {
 		return k.ring, nil
@@ -159,8 +169,6 @@ func (k *KeychainSecretStore) keyring() (keyring.Keyring, error) {
 				return password, nil
 			}
 
-			prompt := keyringPrompt
-
 			// Check if this is the first run where the keyring is created.
 			keyringExists, err := fileExists(filepath.Join(keyringPath, keyringEntryName))
 			if err != nil {
@@ -168,22 +176,24 @@ func (k *KeychainSecretStore) keyring() (keyring.Keyring, error) {
 			}
 			if !keyringExists {
 				// This is the first run and we're creating a password.
-				prompt = keyringDoesNotExistPrompt
+				passwordString, err := promptPassword(envRecommendation + keyringDoesNotExistPrompt)
+				if err != nil {
+					return "", err
+				}
+
+				if len(passwordString) == 0 {
+					// NOTE: we enforce a non-empty keyring password to prevent
+					// user frustration around accidentally setting an empty
+					// passphrase and then not knowing what it might be.
+					return "", errors.New(emptyKeyringPasswordError)
+				}
+
+				return passwordString, nil
 			}
 
-			console.Printf(envRecommendation + prompt)
-			b, err := term.ReadPassword(int(os.Stdin.Fd()))
+			passwordString, err := promptPassword(envRecommendation + keyringPrompt)
 			if err != nil {
 				return "", err
-			}
-			console.Printf("\n") // Clear the line after a prompt
-
-			passwordString := string(b)
-			if len(passwordString) == 0 {
-				// NOTE: we enforce a non-empty keyring password to prevent
-				// user frustration around accidentally setting an empty
-				// passphrase and then not knowing what it might be.
-				return "", errors.New(emptyKeyringPasswordError)
 			}
 
 			return passwordString, nil
