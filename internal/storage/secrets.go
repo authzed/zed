@@ -129,7 +129,7 @@ const (
 	envRecommendation         = "Setting the environment variable `ZED_KEYRING_PASSWORD` to your password will skip prompts.\n"
 	keyringDoesNotExistPrompt = "Keyring file does not already exist.\nEnter a new non-empty passphrase for the new keyring file: "
 	keyringPrompt             = "Enter passphrase to unlock zed keyring: "
-	emptyKeyringPasswordError = "Your passphrase must not be empty."
+	emptyKeyringPasswordError = "your passphrase must not be empty"
 )
 
 func fileExists(path string) (bool, error) {
