@@ -127,8 +127,9 @@ const (
 	svcName                   = "zed"
 	keyringEntryName          = svcName + " secrets"
 	envRecommendation         = "Setting the environment variable `ZED_KEYRING_PASSWORD` to your password will skip prompts\n"
-	keyringDoesNotExistPrompt = "Keyring file does not already exist\nEnter a new passphrase: "
+	keyringDoesNotExistPrompt = "Keyring file does not already exist.\nEnter a new non-empty passphrase for the new keyring file: "
 	keyringPrompt             = "Enter passphrase to unlock zed keyring: "
+	emptyKeyringPasswordError = "Your passphrase must not be empty."
 )
 
 func fileExists(path string) (bool, error) {
@@ -177,7 +178,15 @@ func (k *KeychainSecretStore) keyring() (keyring.Keyring, error) {
 			}
 			console.Printf("\n") // Clear the line after a prompt
 
-			return string(b), nil
+			passwordString := string(b)
+			if len(passwordString) == 0 {
+				// NOTE: we enforce a non-empty keyring password to prevent
+				// user frustration around accidentally setting an empty
+				// passphrase and then not knowing what it might be.
+				return "", errors.New(emptyKeyringPasswordError)
+			}
+
+			return passwordString, nil
 		},
 	})
 	if err != nil {
