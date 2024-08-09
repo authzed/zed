@@ -3,12 +3,14 @@ package cmd
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/cobrautil/v2/cobrazerolog"
+	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -20,6 +22,25 @@ var (
 	SyncFlagsCmdFunc = cobrautil.SyncViperPreRunE("ZED")
 	errParsing       = errors.New("parsing error")
 )
+
+func init() {
+	// NOTE: this is mostly to set up logging in the case where
+	// the command doesn't exist or the construction of the command
+	// errors out before the PersistentPreRunE setup in the below function.
+	// It helps keep log output visually consistent for a user even in
+	// exceptional cases.
+	var output io.Writer
+
+	if isatty.IsTerminal(os.Stdout.Fd()) {
+		output = zerolog.ConsoleWriter{Out: os.Stderr}
+	} else {
+		output = os.Stderr
+	}
+
+	l := zerolog.New(output).With().Timestamp().Logger()
+
+	log.Logger = l
+}
 
 func Run() {
 	zl := cobrazerolog.New(cobrazerolog.WithPreRunLevel(zerolog.DebugLevel))
