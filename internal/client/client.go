@@ -30,17 +30,6 @@ type Client interface {
 // NewClient defines an (overridable) means of creating a new client.
 var NewClient = newGRPCClient
 
-const oneGb = 1 * 1024 * 1024 * 1024
-
-var defaultCallOptions = grpc.WithDefaultCallOptions(
-	// The default max client message size is 4mb.
-	// It's conceivable that a sufficiently complex
-	// schema will easily surpass this, so we set the
-	// limit higher here.
-	grpc.MaxCallRecvMsgSize(oneGb),
-	grpc.MaxCallSendMsgSize(oneGb),
-)
-
 func newGRPCClient(cmd *cobra.Command) (Client, error) {
 	configStore, secretStore := DefaultStorage()
 	token, err := storage.DefaultToken(
@@ -54,14 +43,10 @@ func newGRPCClient(cmd *cobra.Command) (Client, error) {
 	}
 	log.Trace().Interface("token", token).Send()
 
-	flagDialOpts, err := DialOptsFromFlags(cmd, token)
+	dialOpts, err := DialOptsFromFlags(cmd, token)
 	if err != nil {
 		return nil, err
 	}
-
-	// NOTE: this works as long as we don't have CallOptions
-	// defined in flags. We'll have to modify this logic then.
-	dialOpts := append(flagDialOpts, defaultCallOptions)
 
 	client, err := authzed.NewClientWithExperimentalAPIs(token.Endpoint, dialOpts...)
 	if err != nil {
@@ -106,9 +91,19 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 		interceptors = append(interceptors, zgrpcutil.CheckServerVersion)
 	}
 
+	maxMessageSize := cobrautil.MustGetInt(cmd, "max-message-size")
+
 	opts := []grpc.DialOption{
 		grpc.WithChainUnaryInterceptor(interceptors...),
 		grpc.WithChainStreamInterceptor(zgrpcutil.StreamLogDispatchTrailers),
+		grpc.WithDefaultCallOptions(
+			// The default max client message size is 4mb.
+			// It's conceivable that a sufficiently complex
+			// schema will easily surpass this, so we set the
+			// limit higher here.
+			grpc.MaxCallRecvMsgSize(maxMessageSize),
+			grpc.MaxCallSendMsgSize(maxMessageSize),
+		),
 	}
 
 	if cobrautil.MustGetBool(cmd, "insecure") || (token.IsInsecure()) {
