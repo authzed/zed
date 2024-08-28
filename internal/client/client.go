@@ -91,19 +91,9 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 		interceptors = append(interceptors, zgrpcutil.CheckServerVersion)
 	}
 
-	maxMessageSize := cobrautil.MustGetInt(cmd, "max-message-size")
-
 	opts := []grpc.DialOption{
 		grpc.WithChainUnaryInterceptor(interceptors...),
 		grpc.WithChainStreamInterceptor(zgrpcutil.StreamLogDispatchTrailers),
-		grpc.WithDefaultCallOptions(
-			// The default max client message size is 4mb.
-			// It's conceivable that a sufficiently complex
-			// schema will easily surpass this, so we set the
-			// limit higher here.
-			grpc.MaxCallRecvMsgSize(maxMessageSize),
-			grpc.MaxCallSendMsgSize(maxMessageSize),
-		),
 	}
 
 	if cobrautil.MustGetBool(cmd, "insecure") || (token.IsInsecure()) {
@@ -121,6 +111,18 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 	hostnameOverride := cobrautil.MustGetString(cmd, "hostname-override")
 	if hostnameOverride != "" {
 		opts = append(opts, grpc.WithAuthority(hostnameOverride))
+	}
+
+	maxMessageSize := cobrautil.MustGetInt(cmd, "max-message-size")
+	if maxMessageSize != 0 {
+		opts = append(opts, grpc.WithDefaultCallOptions(
+			// The default max client message size is 4mb.
+			// It's conceivable that a sufficiently complex
+			// schema will easily surpass this, so we set the
+			// limit higher here.
+			grpc.MaxCallRecvMsgSize(maxMessageSize),
+			grpc.MaxCallSendMsgSize(maxMessageSize),
+		))
 	}
 
 	return opts, nil

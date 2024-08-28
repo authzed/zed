@@ -75,7 +75,7 @@ func Run() {
 	rootCmd.PersistentFlags().Bool("no-verify-ca", false, "do not attempt to verify the server's certificate chain and host name")
 	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
 	rootCmd.PersistentFlags().String("request-id", "", "optional id to send along with SpiceDB requests for tracing")
-	rootCmd.PersistentFlags().Int("max-message-size", 4*1024*1024, "maximum size (bytes) of a gRPC message sent or received by zed")
+	rootCmd.PersistentFlags().Int("max-message-size", 0, "maximum size (bytes) of a gRPC message that can be sent or received by zed")
 	_ = rootCmd.PersistentFlags().MarkHidden("debug") // This cannot return its error.
 
 	versionCmd := &cobra.Command{
