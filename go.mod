@@ -2,7 +2,7 @@ module github.com/authzed/zed
 
 go 1.22.7
 
-toolchain go1.22.7
+toolchain go1.23.1
 
 require (
 	github.com/99designs/keyring v1.2.2
