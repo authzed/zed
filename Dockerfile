@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine3.20 AS zed-builder
+FROM golang:1.23-alpine3.20 AS zed-builder
 WORKDIR /go/src/app
 RUN apk update && apk add --no-cache git
 COPY . .
