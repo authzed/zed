@@ -228,9 +228,9 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 	canceled, cancelErr := isCanceledError(ctx.Err(), err)
 	unknown := !retryable && !conflict && !canceled && err != nil
 
-	intExpectedLoaded, err := safecast.ToInt64(expectedLoaded)
-	if err != nil {
-		return err
+	intExpectedLoaded, castErr := safecast.ToInt64(expectedLoaded)
+	if castErr != nil {
+		return castErr
 	}
 
 	intNumBatches := int64(len(batchesToBeCommitted))
