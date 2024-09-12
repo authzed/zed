@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-func min(a int, b int) int {
+func minimum(a int, b int) int {
 	if a <= b {
 		return a
 	}
@@ -60,7 +60,7 @@ func ConcurrentBatch(ctx context.Context, n int, batchSize int, maxWorkers int, 
 		g.Go(func() error {
 			defer sem.Release(1)
 			start := batchNum * batchSize
-			end := min(start+batchSize, n)
+			end := minimum(start+batchSize, n)
 			return each(ctx, batchNum, start, end)
 		})
 	}

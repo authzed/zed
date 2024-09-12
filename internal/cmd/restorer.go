@@ -9,6 +9,7 @@ import (
 	"time"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/ccoveille/go-safecast"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
@@ -225,6 +226,13 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 	canceled, cancelErr := isCanceledError(ctx.Err(), err)
 	unknown := !retryable && !conflict && !canceled && err != nil
 
+	intExpectedLoaded, err := safecast.ToInt64(expectedLoaded)
+	if err != nil {
+		return err
+	}
+
+	intNumBatches := int64(len(batchesToBeCommitted))
+
 	switch {
 	case canceled:
 		r.bar.Describe("backup restore aborted")
@@ -235,24 +243,29 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 	case retryable && r.disableRetryErrors:
 		return err
 	case conflict && r.conflictStrategy == Skip:
-		r.skippedRels += int64(expectedLoaded)
-		r.skippedBatches += int64(len(batchesToBeCommitted))
-		r.duplicateBatches += int64(len(batchesToBeCommitted))
-		r.duplicateRels += int64(expectedLoaded)
+		r.skippedRels += intExpectedLoaded
+		r.skippedBatches += intNumBatches
+		r.duplicateBatches += intNumBatches
+		r.duplicateRels += intExpectedLoaded
 		r.bar.Describe("skipping conflicting batch")
 	case conflict && r.conflictStrategy == Touch:
 		r.bar.Describe("touching conflicting batch")
-		r.duplicateRels += int64(expectedLoaded)
-		r.duplicateBatches += int64(len(batchesToBeCommitted))
+		r.duplicateRels += intExpectedLoaded
+		r.duplicateBatches += intNumBatches
 		r.totalRetries++
 		numLoaded, retries, err = r.writeBatchesWithRetry(ctx, batchesToBeCommitted)
 		if err != nil {
 			return fmt.Errorf("failed to write retried batch: %w", err)
 		}
 
+		intNumLoaded, err := safecast.ToInt64(numLoaded)
+		if err != nil {
+			return err
+		}
+
 		retries++ // account for the initial attempt
-		r.writtenBatches += int64(len(batchesToBeCommitted))
-		r.writtenRels += int64(numLoaded)
+		r.writtenBatches += intNumBatches
+		r.writtenRels += intNumLoaded
 	case conflict && r.conflictStrategy == Fail:
 		r.bar.Describe("conflict detected, aborting restore")
 		return fmt.Errorf("duplicate relationships found")
@@ -264,17 +277,27 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 			return fmt.Errorf("failed to write retried batch: %w", err)
 		}
 
+		intNumLoaded, err := safecast.ToInt64(numLoaded)
+		if err != nil {
+			return err
+		}
+
 		retries++ // account for the initial attempt
-		r.writtenBatches += int64(len(batchesToBeCommitted))
-		r.writtenRels += int64(numLoaded)
+		r.writtenBatches += intNumBatches
+		r.writtenRels += intNumLoaded
 	default:
 		r.bar.Describe("restoring relationships from backup")
-		r.writtenBatches += int64(len(batchesToBeCommitted))
+		r.writtenBatches += intNumBatches
 	}
 
 	// it was a successful transaction commit without duplicates
 	if resp != nil {
-		r.writtenRels += int64(resp.NumLoaded)
+		intNumLoaded, err := safecast.ToInt64(resp.NumLoaded)
+		if err != nil {
+			return err
+		}
+
+		r.writtenRels += intNumLoaded
 		if expectedLoaded != resp.NumLoaded {
 			log.Warn().Uint64("loaded", resp.NumLoaded).Uint64("expected", expectedLoaded).Msg("unexpected number of relationships loaded")
 		}

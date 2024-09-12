@@ -13,6 +13,7 @@ import (
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/authzed/spicedb/pkg/schemadsl/input"
+	"github.com/ccoveille/go-safecast"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
@@ -119,7 +120,11 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 && term.IsTerminal(int(os.Stdin.Fd())) {
+	intFd, err := safecast.ToInt(uint(os.Stdout.Fd()))
+	if err != nil {
+		return err
+	}
+	if len(args) == 0 && term.IsTerminal(intFd) {
 		return fmt.Errorf("must provide file path or contents via stdin")
 	}
 

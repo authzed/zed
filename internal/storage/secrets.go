@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/99designs/keyring"
+	"github.com/ccoveille/go-safecast"
 	"github.com/jzelinskie/stringz"
 	"golang.org/x/term"
 
@@ -27,7 +28,7 @@ type Token struct {
 }
 
 func (t Token) Certificate() (cert []byte, ok bool) {
-	if t.CACert != nil && len(t.CACert) > 0 {
+	if len(t.CACert) > 0 {
 		return t.CACert, true
 	}
 	return nil, false
@@ -146,7 +147,11 @@ func fileExists(path string) (bool, error) {
 
 func promptPassword(prompt string) (string, error) {
 	console.Printf(prompt)
-	b, err := term.ReadPassword(int(os.Stdin.Fd()))
+	intFd, err := safecast.ToInt(uint(os.Stdin.Fd()))
+	if err != nil {
+		return "", err
+	}
+	b, err := term.ReadPassword(intFd)
 	if err != nil {
 		return "", err
 	}
