@@ -195,6 +195,8 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 	}
 
 	totalTime := time.Since(relationshipWriteStart)
+	// This shouldn't realistically overflow.
+	writtenAndSkipped, _ := safecast.ToUint64(r.writtenRels + r.skippedRels)
 	log.Info().
 		Int64("batches", r.writtenBatches).
 		Int64("relationships_loaded", r.writtenRels).
@@ -202,7 +204,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 		Int64("duplicate_relationships", r.duplicateRels).
 		Int64("relationships_filtered_out", r.filteredOutRels).
 		Int64("retried_errors", r.totalRetries).
-		Uint64("perSecond", perSec(uint64(r.writtenRels+r.skippedRels), totalTime)).
+		Uint64("perSecond", perSec(writtenAndSkipped, totalTime)).
 		Stringer("duration", totalTime).
 		Msg("finished restore")
 	return nil

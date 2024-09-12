@@ -174,11 +174,15 @@ func TestRestorer(t *testing.T) {
 			require.Equal(expectedTouchedRels, c.touchedRels, "unexpected number of touched commits")
 
 			// assert on restorer stats
+			uintExpectedConflicts, err := safecast.ToUint(expectedConflicts)
+			require.NoError(err)
+			uintDuplicateBatches, err := safecast.ToUint(r.duplicateBatches)
+			require.NoError(err)
 			require.Equal(expectedWrittenRels, int(r.writtenRels), "unexpected number of written relationships")
 			require.Equal(expectedWrittenBatches, int(r.writtenBatches), "unexpected number of written relationships")
 			require.Equal(expectedSkippedBatches, int(r.skippedBatches), "unexpected number of conflicting batches skipped")
 			require.Equal(expectedSkippedRels, int(r.skippedRels), "unexpected number of conflicting relationships skipped")
-			require.Equal(uint(expectedConflicts)*tt.batchesPerTransaction, uint(r.duplicateBatches), "unexpected number of duplicate batches detected")
+			require.Equal(uintExpectedConflicts*tt.batchesPerTransaction, uintDuplicateBatches, "unexpected number of duplicate batches detected")
 			require.Equal(expectedConflicts*batchesPerTransaction*tt.batchSize, int(r.duplicateRels), "unexpected number of duplicate relationships detected")
 			require.Equal(int64(expectedRetries+expectedConflicts-expectedSkippedBatches), r.totalRetries, "unexpected number of retries")
 			require.Equal(len(tt.relationships)-len(expectedFilteredRels), int(r.filteredOutRels), "unexpected number of filtered out relationships")
