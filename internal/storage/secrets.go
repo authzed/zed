@@ -8,9 +8,8 @@ import (
 	"strings"
 
 	"github.com/99designs/keyring"
-	"github.com/ccoveille/go-safecast"
+	"github.com/charmbracelet/x/term"
 	"github.com/jzelinskie/stringz"
-	"golang.org/x/term"
 
 	"github.com/authzed/zed/internal/console"
 )
@@ -147,11 +146,7 @@ func fileExists(path string) (bool, error) {
 
 func promptPassword(prompt string) (string, error) {
 	console.Printf(prompt)
-	intFd, err := safecast.ToInt(uint(os.Stdin.Fd()))
-	if err != nil {
-		return "", err
-	}
-	b, err := term.ReadPassword(intFd)
+	b, err := term.ReadPassword(os.Stdin.Fd())
 	if err != nil {
 		return "", err
 	}
