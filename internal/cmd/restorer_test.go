@@ -8,6 +8,7 @@ import (
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
+	"github.com/ccoveille/go-safecast"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -178,7 +179,7 @@ func TestRestorer(t *testing.T) {
 			require.Equal(expectedConflicts*tt.batchesPerTransaction, r.duplicateBatches, "unexpected number of duplicate batches detected")
 			require.Equal(expectedConflicts*tt.batchesPerTransaction*tt.batchSize, r.duplicateRels, "unexpected number of duplicate relationships detected")
 			require.Equal(expectedRetries+expectedConflicts-expectedSkippedBatches, r.totalRetries, "unexpected number of retries")
-			require.Equal(uint(len(tt.relationships)-len(expectedFilteredRels)), r.filteredOutRels, "unexpected number of filtered out relationships")
+			require.Equal(uint(len(tt.relationships))-uint(len(expectedFilteredRels)), r.filteredOutRels, "unexpected number of filtered out relationships")
 		})
 	}
 }
@@ -223,7 +224,9 @@ func (m *mockClient) Send(req *v1.BulkImportRelationshipsRequest) error {
 	}
 
 	for i, rel := range req.Relationships {
-		require.True(m.t, proto.Equal(rel, tuple.ParseRel(m.expectedRels[((m.receivedBatches-1)*m.requestedBatchSize)+uint(i)])))
+		// This is a gosec115 false positive which should be fixed in a future version.
+		uinti, _ := safecast.ToUint(i)
+		require.True(m.t, proto.Equal(rel, tuple.ParseRel(m.expectedRels[((m.receivedBatches-1)*m.requestedBatchSize)+uinti])))
 	}
 
 	return nil
