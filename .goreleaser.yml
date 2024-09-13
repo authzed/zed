@@ -118,10 +118,6 @@ nfpms:
     builds: ["linux-amd64-musl", "linux-arm64-musl"]
     formats: ["apk"]
 
-furies:
-  - account: "authzed"
-    secret_name: "GEMFURY_PUSH_TOKEN"
-
 brews:
   - description: "command-line client for managing SpiceDB"
     homepage: "https://github.com/authzed/zed"
@@ -158,7 +154,7 @@ checksum:
   name_template: "checksums.txt"
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 
 changelog:
   use: "github-native"
