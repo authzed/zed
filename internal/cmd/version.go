@@ -6,12 +6,11 @@ import (
 
 	"github.com/authzed/authzed-go/pkg/responsemeta"
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/ccoveille/go-safecast"
 	"github.com/gookit/color"
 	"github.com/jzelinskie/cobrautil/v2"
+	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -21,11 +20,7 @@ import (
 )
 
 func versionCmdFunc(cmd *cobra.Command, _ []string) error {
-	intFd, err := safecast.ToInt(uint(os.Stdout.Fd()))
-	if err != nil {
-		return err
-	}
-	if !term.IsTerminal(intFd) {
+	if !isatty.IsTerminal(os.Stdout.Fd()) {
 		color.Disable()
 	}
 
