@@ -75,7 +75,7 @@ jobs:
         id: "goreleaser"
         with:
           distribution: "goreleaser-pro"
-          version: "latest"
+          version: "2.2.0"
           args: "release -f .goreleaser.docker.yml --clean --split --snapshot"
         env:
           GORELEASER_KEY: "${{ secrets.GORELEASER_KEY }}"
