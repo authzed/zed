@@ -126,7 +126,7 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 }
 
 func registerBackupRestoreFlags(cmd *cobra.Command) {
-	cmd.Flags().Int("batch-size", 1_000, "restore relationship write batch size")
+	cmd.Flags().Uint("batch-size", 1_000, "restore relationship write batch size")
 	cmd.Flags().Uint("batches-per-transaction", 10, "number of batches per transaction")
 	cmd.Flags().String("conflict-strategy", "fail", "strategy used when a conflicting relationship is found. Possible values: fail, skip, touch")
 	cmd.Flags().Bool("disable-retries", false, "retries when an errors is determined to be retryable (e.g. serialization errors)")
@@ -397,7 +397,7 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unable to initialize client: %w", err)
 	}
 
-	batchSize := cobrautil.MustGetInt(cmd, "batch-size")
+	batchSize := cobrautil.MustGetUint(cmd, "batch-size")
 	batchesPerTransaction := cobrautil.MustGetUint(cmd, "batches-per-transaction")
 
 	strategy, err := GetEnum[ConflictStrategy](cmd, "conflict-strategy", conflictStrategyMapping)

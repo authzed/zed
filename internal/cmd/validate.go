@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ccoveille/go-safecast"
 	"github.com/spf13/cobra"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -166,10 +167,13 @@ func ouputErrorWithSource(validateContents []byte, errWithSource spiceerrors.Err
 
 func outputForLine(validateContents []byte, oneIndexedLineNumber uint64, sourceCodeString string, oneIndexedColumnPosition uint64) {
 	lines := strings.Split(string(validateContents), "\n")
-	errorLineNumber := int(oneIndexedLineNumber) - 1
+	// These should be fine to be zero if the cast fails.
+	intLineNumber, _ := safecast.ToInt(oneIndexedLineNumber)
+	intColumnPosition, _ := safecast.ToInt(oneIndexedColumnPosition)
+	errorLineNumber := intLineNumber - 1
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
-			renderLine(lines, i, sourceCodeString, errorLineNumber, int(oneIndexedColumnPosition)-1)
+			renderLine(lines, i, sourceCodeString, errorLineNumber, intColumnPosition-1)
 		} else {
 			renderLine(lines, i, "", errorLineNumber, -1)
 		}

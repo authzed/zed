@@ -1,8 +1,8 @@
 module github.com/authzed/zed
 
-go 1.22.4
+go 1.22.7
 
-toolchain go1.22.5
+toolchain go1.23.1
 
 require (
 	github.com/99designs/keyring v1.2.2
@@ -11,8 +11,10 @@ require (
 	github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b
 	github.com/authzed/spicedb v1.35.3
 	github.com/brianvoe/gofakeit/v6 v6.28.0
+	github.com/ccoveille/go-safecast v1.1.0
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/charmbracelet/lipgloss v0.12.1
+	github.com/charmbracelet/x/term v0.2.0
 	github.com/google/uuid v1.6.0
 	github.com/gookit/color v1.5.4
 	github.com/hamba/avro/v2 v2.22.1
@@ -230,7 +232,7 @@ require (
 	golang.org/x/crypto v0.25.0 // indirect
 	golang.org/x/net v0.27.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
-	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/sys v0.24.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/spiceerrors"
+	"github.com/ccoveille/go-safecast"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
@@ -57,25 +59,25 @@ type restorer struct {
 	decoder               *backupformat.Decoder
 	client                client.Client
 	prefixFilter          string
-	batchSize             int
+	batchSize             uint
 	batchesPerTransaction uint
 	conflictStrategy      ConflictStrategy
 	disableRetryErrors    bool
 	bar                   *progressbar.ProgressBar
 
 	// stats
-	filteredOutRels  int64
-	writtenRels      int64
-	writtenBatches   int64
-	skippedRels      int64
-	skippedBatches   int64
-	duplicateRels    int64
-	duplicateBatches int64
-	totalRetries     int64
+	filteredOutRels  uint
+	writtenRels      uint
+	writtenBatches   uint
+	skippedRels      uint
+	skippedBatches   uint
+	duplicateRels    uint
+	duplicateBatches uint
+	totalRetries     uint
 	requestTimeout   time.Duration
 }
 
-func newRestorer(schema string, decoder *backupformat.Decoder, client client.Client, prefixFilter string, batchSize int,
+func newRestorer(schema string, decoder *backupformat.Decoder, client client.Client, prefixFilter string, batchSize uint,
 	batchesPerTransaction uint, conflictStrategy ConflictStrategy, disableRetryErrors bool,
 	requestTimeout time.Duration,
 ) *restorer {
@@ -129,7 +131,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 
 		batch = append(batch, rel)
 
-		if len(batch)%r.batchSize == 0 {
+		if uint(len(batch))%r.batchSize == 0 {
 			batchesToBeCommitted = append(batchesToBeCommitted, batch)
 			err := relationshipWriter.Send(&v1.BulkImportRelationshipsRequest{
 				Relationships: batch,
@@ -195,13 +197,13 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 
 	totalTime := time.Since(relationshipWriteStart)
 	log.Info().
-		Int64("batches", r.writtenBatches).
-		Int64("relationships_loaded", r.writtenRels).
-		Int64("relationships_skipped", r.skippedRels).
-		Int64("duplicate_relationships", r.duplicateRels).
-		Int64("relationships_filtered_out", r.filteredOutRels).
-		Int64("retried_errors", r.totalRetries).
-		Uint64("perSecond", perSec(uint64(r.writtenRels+r.skippedRels), totalTime)).
+		Uint("batches", r.writtenBatches).
+		Uint("relationships_loaded", r.writtenRels).
+		Uint("relationships_skipped", r.skippedRels).
+		Uint("duplicate_relationships", r.duplicateRels).
+		Uint("relationships_filtered_out", r.filteredOutRels).
+		Uint("retried_errors", r.totalRetries).
+		Uint64("perSecond", perSec(uint64(r.writtenRels), totalTime)).
 		Stringer("duration", totalTime).
 		Msg("finished restore")
 	return nil
@@ -210,9 +212,9 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.ExperimentalService_BulkImportRelationshipsClient,
 	batchesToBeCommitted [][]*v1.Relationship,
 ) error {
-	var numLoaded, expectedLoaded, retries uint64
+	var numLoaded, expectedLoaded, retries uint
 	for _, b := range batchesToBeCommitted {
-		expectedLoaded += uint64(len(b))
+		expectedLoaded += uint(len(b))
 	}
 
 	resp, err := bulkImportClient.CloseAndRecv() // transaction commit happens here
@@ -225,6 +227,8 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 	canceled, cancelErr := isCanceledError(ctx.Err(), err)
 	unknown := !retryable && !conflict && !canceled && err != nil
 
+	numBatches := uint(len(batchesToBeCommitted))
+
 	switch {
 	case canceled:
 		r.bar.Describe("backup restore aborted")
@@ -235,15 +239,15 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 	case retryable && r.disableRetryErrors:
 		return err
 	case conflict && r.conflictStrategy == Skip:
-		r.skippedRels += int64(expectedLoaded)
-		r.skippedBatches += int64(len(batchesToBeCommitted))
-		r.duplicateBatches += int64(len(batchesToBeCommitted))
-		r.duplicateRels += int64(expectedLoaded)
+		r.skippedRels += expectedLoaded
+		r.skippedBatches += numBatches
+		r.duplicateBatches += numBatches
+		r.duplicateRels += expectedLoaded
 		r.bar.Describe("skipping conflicting batch")
 	case conflict && r.conflictStrategy == Touch:
 		r.bar.Describe("touching conflicting batch")
-		r.duplicateRels += int64(expectedLoaded)
-		r.duplicateBatches += int64(len(batchesToBeCommitted))
+		r.duplicateRels += expectedLoaded
+		r.duplicateBatches += numBatches
 		r.totalRetries++
 		numLoaded, retries, err = r.writeBatchesWithRetry(ctx, batchesToBeCommitted)
 		if err != nil {
@@ -251,8 +255,8 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 		}
 
 		retries++ // account for the initial attempt
-		r.writtenBatches += int64(len(batchesToBeCommitted))
-		r.writtenRels += int64(numLoaded)
+		r.writtenBatches += numBatches
+		r.writtenRels += numLoaded
 	case conflict && r.conflictStrategy == Fail:
 		r.bar.Describe("conflict detected, aborting restore")
 		return fmt.Errorf("duplicate relationships found")
@@ -265,34 +269,43 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 		}
 
 		retries++ // account for the initial attempt
-		r.writtenBatches += int64(len(batchesToBeCommitted))
-		r.writtenRels += int64(numLoaded)
+		r.writtenBatches += numBatches
+		r.writtenRels += numLoaded
 	default:
 		r.bar.Describe("restoring relationships from backup")
-		r.writtenBatches += int64(len(batchesToBeCommitted))
+		r.writtenBatches += numBatches
 	}
 
 	// it was a successful transaction commit without duplicates
 	if resp != nil {
-		r.writtenRels += int64(resp.NumLoaded)
-		if expectedLoaded != resp.NumLoaded {
-			log.Warn().Uint64("loaded", resp.NumLoaded).Uint64("expected", expectedLoaded).Msg("unexpected number of relationships loaded")
+		numLoaded, err := safecast.ToUint(resp.NumLoaded)
+		if err != nil {
+			return spiceerrors.MustBugf("could not cast numLoaded to uint")
+		}
+		r.writtenRels += numLoaded
+		if uint64(expectedLoaded) != resp.NumLoaded {
+			log.Warn().Uint64("loaded", resp.NumLoaded).Uint("expected", expectedLoaded).Msg("unexpected number of relationships loaded")
 		}
 	}
 
-	if err := r.bar.Set64(r.writtenRels + r.skippedRels); err != nil {
+	writtenAndSkipped, err := safecast.ToInt64(r.writtenRels + r.skippedRels)
+	if err != nil {
+		return fmt.Errorf("too many written and skipped rels for an int64")
+	}
+
+	if err := r.bar.Set64(writtenAndSkipped); err != nil {
 		return fmt.Errorf("error incrementing progress bar: %w", err)
 	}
 
 	if !isatty.IsTerminal(os.Stderr.Fd()) {
 		log.Trace().
-			Int64("batches_written", r.writtenBatches).
-			Int64("relationships_written", r.writtenRels).
-			Int64("duplicate_batches", r.duplicateBatches).
-			Int64("duplicate_relationships", r.duplicateRels).
-			Int64("skipped_batches", r.skippedBatches).
-			Int64("skipped_relationships", r.skippedRels).
-			Uint64("retries", retries).
+			Uint("batches_written", r.writtenBatches).
+			Uint("relationships_written", r.writtenRels).
+			Uint("duplicate_batches", r.duplicateBatches).
+			Uint("duplicate_relationships", r.duplicateRels).
+			Uint("skipped_batches", r.skippedBatches).
+			Uint("skipped_relationships", r.skippedRels).
+			Uint("retries", retries).
 			Msg("restore progress")
 	}
 
@@ -301,14 +314,14 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Experim
 
 // writeBatchesWithRetry writes a set of batches using touch semantics and without transactional guarantees -
 // each batch will be committed independently. If a batch fails, it will be retried up to 10 times with a backoff.
-func (r *restorer) writeBatchesWithRetry(ctx context.Context, batches [][]*v1.Relationship) (uint64, uint64, error) {
+func (r *restorer) writeBatchesWithRetry(ctx context.Context, batches [][]*v1.Relationship) (uint, uint, error) {
 	backoffInterval := backoff.NewExponentialBackOff()
 	backoffInterval.InitialInterval = defaultBackoff
 	backoffInterval.MaxInterval = 2 * time.Second
 	backoffInterval.MaxElapsedTime = 0
 	backoffInterval.Reset()
 
-	var currentRetries, totalRetries, loadedRels uint64
+	var currentRetries, totalRetries, loadedRels uint
 	for _, batch := range batches {
 		updates := lo.Map[*v1.Relationship, *v1.RelationshipUpdate](batch, func(item *v1.Relationship, _ int) *v1.RelationshipUpdate {
 			return &v1.RelationshipUpdate{
@@ -339,7 +352,7 @@ func (r *restorer) writeBatchesWithRetry(ctx context.Context, batches [][]*v1.Re
 
 			currentRetries = 0
 			backoffInterval.Reset()
-			loadedRels += uint64(len(batch))
+			loadedRels += uint(len(batch))
 			break
 		}
 	}

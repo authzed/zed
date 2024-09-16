@@ -21,7 +21,8 @@ jobs:
       - uses: "goreleaser/goreleaser-action@v6"
         with:
           distribution: "goreleaser-pro"
-          version: "latest"
+          # Pinning to v2.2.0 to work around a regression in 2.3.0
+          version: &goreleaser_version "2.2.0"
           args: "release --clean"
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
@@ -46,7 +47,7 @@ jobs:
       - uses: "goreleaser/goreleaser-action@v6"
         with:
           distribution: "goreleaser-pro"
-          version: "latest"
+          version: *goreleaser_version
           args: "release --config=.goreleaser.docker.yml --clean"
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

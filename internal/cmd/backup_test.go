@@ -330,7 +330,7 @@ func TestBackupRestoreCmdFunc(t *testing.T) {
 		zedtesting.BoolFlag{FlagName: "rewrite-legacy"},
 		zedtesting.StringFlag{FlagName: "conflict-strategy", FlagValue: "fail"},
 		zedtesting.BoolFlag{FlagName: "disable-retries"},
-		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
+		zedtesting.UintFlag{FlagName: "batch-size", FlagValue: 100},
 		zedtesting.UintFlag{FlagName: "batches-per-transaction", FlagValue: 10},
 		zedtesting.DurationFlag{FlagName: "request-timeout"},
 	)
