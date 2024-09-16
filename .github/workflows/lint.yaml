@@ -75,7 +75,8 @@ jobs:
         id: "goreleaser"
         with:
           distribution: "goreleaser-pro"
-          version: "2.3.1"
+          # Pinning to version 2.2.0 to get around a regression in 2.3.0.
+          version: "2.2.0"
           args: "release -f .goreleaser.docker.yml --clean --split --snapshot"
         env:
           GORELEASER_KEY: "${{ secrets.GORELEASER_KEY }}"
