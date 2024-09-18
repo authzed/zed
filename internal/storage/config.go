@@ -27,38 +27,47 @@ type ConfigStore interface {
 	Put(Config) error
 }
 
-var ErrMissingToken = errors.New("could not find token")
-
-// DefaultToken creates a Token from input, filling any missing values in
-// with the current context's defaults.
-func DefaultToken(overrideEndpoint, overrideAPIToken string, cs ConfigStore, ss SecretStore) (Token, error) {
-	if overrideEndpoint != "" && overrideAPIToken != "" {
-		return Token{
-			Name:     "env",
-			Endpoint: overrideEndpoint,
-			APIToken: overrideAPIToken,
-		}, nil
+// TokenWithOverride returns a Token that retrieves its values from the reference Token, and has its values overridden
+// any of the non-empty/non-nil values of the overrideToken.
+func TokenWithOverride(overrideToken Token, referenceToken Token) (Token, error) {
+	insecure := referenceToken.Insecure
+	if overrideToken.Insecure != nil {
+		insecure = overrideToken.Insecure
 	}
 
-	token, err := CurrentToken(cs, ss)
-	if err != nil {
-		if errors.Is(err, ErrConfigNotFound) {
-			return Token{}, errors.New("no context found: see `zed context set --help` to setup a context or make sure to specifiy *all* context flags (--endpoint, --token and --insecure if necessary) to run without context")
-		}
-		return Token{}, err
+	// done so that logging messages don't show nil for the resulting context
+	if insecure == nil {
+		bFalse := false
+		insecure = &bFalse
+	}
+
+	noVerifyCA := referenceToken.NoVerifyCA
+	if overrideToken.NoVerifyCA != nil {
+		noVerifyCA = overrideToken.NoVerifyCA
+	}
+
+	// done so that logging messages don't show nil for the resulting context
+	if noVerifyCA == nil {
+		bFalse := false
+		noVerifyCA = &bFalse
+	}
+
+	caCert := referenceToken.CACert
+	if overrideToken.CACert != nil {
+		caCert = overrideToken.CACert
 	}
 
 	return Token{
-		Name:       token.Name,
-		Endpoint:   stringz.DefaultEmpty(overrideEndpoint, token.Endpoint),
-		APIToken:   stringz.DefaultEmpty(overrideAPIToken, token.APIToken),
-		Insecure:   token.Insecure,
-		NoVerifyCA: token.NoVerifyCA,
-		CACert:     token.CACert,
+		Name:       referenceToken.Name,
+		Endpoint:   stringz.DefaultEmpty(overrideToken.Endpoint, referenceToken.Endpoint),
+		APIToken:   stringz.DefaultEmpty(overrideToken.APIToken, referenceToken.APIToken),
+		Insecure:   insecure,
+		NoVerifyCA: noVerifyCA,
+		CACert:     caCert,
 	}, nil
 }
 
-// CurrentToken is convenient way to obtain the CurrentToken field from the
+// CurrentToken is a convenient way to obtain the CurrentToken field from the
 // current Config.
 func CurrentToken(cs ConfigStore, ss SecretStore) (Token, error) {
 	cfg, err := cs.Get()

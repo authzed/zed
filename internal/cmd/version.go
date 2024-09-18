@@ -9,14 +9,12 @@ import (
 	"github.com/gookit/color"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/mattn/go-isatty"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/console"
-	"github.com/authzed/zed/internal/storage"
 )
 
 func versionCmdFunc(cmd *cobra.Command, _ []string) error {
@@ -26,14 +24,9 @@ func versionCmdFunc(cmd *cobra.Command, _ []string) error {
 
 	includeRemoteVersion := cobrautil.MustGetBool(cmd, "include-remote-version")
 	hasContext := false
-	configStore, secretStore := client.DefaultStorage()
 	if includeRemoteVersion {
-		_, err := storage.DefaultToken(
-			cobrautil.MustGetString(cmd, "endpoint"),
-			cobrautil.MustGetString(cmd, "token"),
-			configStore,
-			secretStore,
-		)
+		configStore, secretStore := client.DefaultStorage()
+		_, err := client.GetCurrentTokenWithCLIOverride(cmd, configStore, secretStore)
 		hasContext = err == nil
 	}
 
@@ -45,17 +38,6 @@ func versionCmdFunc(cmd *cobra.Command, _ []string) error {
 	console.Println(cobrautil.UsageVersion("zed", cobrautil.MustGetBool(cmd, "include-deps")))
 
 	if hasContext && includeRemoteVersion {
-		token, err := storage.DefaultToken(
-			cobrautil.MustGetString(cmd, "endpoint"),
-			cobrautil.MustGetString(cmd, "token"),
-			configStore,
-			secretStore,
-		)
-		if err != nil {
-			return err
-		}
-		log.Trace().Interface("token", token).Send()
-
 		client, err := client.NewClient(cmd)
 		if err != nil {
 			return err

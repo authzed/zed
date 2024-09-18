@@ -64,31 +64,37 @@ func NewTestServer(ctx context.Context, t *testing.T) server.RunnableServer {
 type StringFlag struct {
 	FlagName  string
 	FlagValue string
+	Changed   bool
 }
 
 type BoolFlag struct {
 	FlagName  string
 	FlagValue bool
+	Changed   bool
 }
 
 type IntFlag struct {
 	FlagName  string
 	FlagValue int
+	Changed   bool
 }
 
 type UintFlag struct {
 	FlagName  string
 	FlagValue uint
+	Changed   bool
 }
 
 type UintFlag32 struct {
 	FlagName  string
 	FlagValue uint32
+	Changed   bool
 }
 
 type DurationFlag struct {
 	FlagName  string
 	FlagValue time.Duration
+	Changed   bool
 }
 
 func CreateTestCobraCommandWithFlagValue(t *testing.T, flagAndValues ...any) *cobra.Command {
@@ -99,16 +105,22 @@ func CreateTestCobraCommandWithFlagValue(t *testing.T, flagAndValues ...any) *co
 		switch f := flagAndValue.(type) {
 		case StringFlag:
 			c.Flags().String(f.FlagName, f.FlagValue, "")
+			c.Flag(f.FlagName).Changed = f.Changed
 		case BoolFlag:
 			c.Flags().Bool(f.FlagName, f.FlagValue, "")
+			c.Flag(f.FlagName).Changed = f.Changed
 		case IntFlag:
 			c.Flags().Int(f.FlagName, f.FlagValue, "")
+			c.Flag(f.FlagName).Changed = f.Changed
 		case UintFlag:
 			c.Flags().Uint(f.FlagName, f.FlagValue, "")
+			c.Flag(f.FlagName).Changed = f.Changed
 		case UintFlag32:
 			c.Flags().Uint32(f.FlagName, f.FlagValue, "")
+			c.Flag(f.FlagName).Changed = f.Changed
 		case DurationFlag:
 			c.Flags().Duration(f.FlagName, f.FlagValue, "")
+			c.Flag(f.FlagName).Changed = f.Changed
 		default:
 			t.Fatalf("unknown flag type: %T", f)
 		}

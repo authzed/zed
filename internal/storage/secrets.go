@@ -26,6 +26,14 @@ type Token struct {
 	CACert     []byte
 }
 
+func (t Token) AnyValue() bool {
+	if t.Endpoint != "" || t.APIToken != "" || t.Insecure != nil || t.NoVerifyCA != nil || len(t.CACert) > 0 {
+		return true
+	}
+
+	return false
+}
+
 func (t Token) Certificate() (cert []byte, ok bool) {
 	if len(t.CACert) > 0 {
 		return t.CACert, true
