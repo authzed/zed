@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/authzed-go/v1"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/authzed/spicedb/pkg/schemadsl/input"
@@ -23,7 +22,6 @@ import (
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/commands"
 	"github.com/authzed/zed/internal/console"
-	"github.com/authzed/zed/internal/storage"
 )
 
 func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
@@ -52,28 +50,14 @@ var schemaCopyCmd = &cobra.Command{
 	RunE:              schemaCopyCmdFunc,
 }
 
-// TODO(jschorr): support this in the client package
-func clientForContext(cmd *cobra.Command, contextName string, secretStore storage.SecretStore) (*authzed.Client, error) {
-	token, err := storage.GetToken(contextName, secretStore)
-	if err != nil {
-		return nil, err
-	}
-	log.Trace().Interface("token", token).Send()
-
-	dialOpts, err := client.DialOptsFromFlags(cmd, token)
-	if err != nil {
-		return nil, err
-	}
-	return authzed.NewClient(token.Endpoint, dialOpts...)
-}
-
 func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 	_, secretStore := client.DefaultStorage()
-	srcClient, err := clientForContext(cmd, args[0], secretStore)
+	srcClient, err := client.NewClientForContext(cmd, args[0], secretStore)
 	if err != nil {
 		return err
 	}
-	destClient, err := clientForContext(cmd, args[1], secretStore)
+
+	destClient, err := client.NewClientForContext(cmd, args[1], secretStore)
 	if err != nil {
 		return err
 	}

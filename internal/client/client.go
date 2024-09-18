@@ -12,7 +12,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	zgrpcutil "github.com/authzed/zed/internal/grpcutil"
@@ -28,20 +28,17 @@ type Client interface {
 }
 
 // NewClient defines an (overridable) means of creating a new client.
-var NewClient = newGRPCClient
+var (
+	NewClient           = newClientForCurrentContext
+	NewClientForContext = newClientForContext
+)
 
-func newGRPCClient(cmd *cobra.Command) (Client, error) {
+func newClientForCurrentContext(cmd *cobra.Command) (Client, error) {
 	configStore, secretStore := DefaultStorage()
-	token, err := storage.DefaultToken(
-		cobrautil.MustGetString(cmd, "endpoint"),
-		cobrautil.MustGetString(cmd, "token"),
-		configStore,
-		secretStore,
-	)
+	token, err := GetCurrentTokenWithCLIOverride(cmd, configStore, secretStore)
 	if err != nil {
 		return nil, err
 	}
-	log.Trace().Interface("token", token).Send()
 
 	dialOpts, err := DialOptsFromFlags(cmd, token)
 	if err != nil {
@@ -56,28 +53,115 @@ func newGRPCClient(cmd *cobra.Command) (Client, error) {
 	return client, err
 }
 
+func newClientForContext(cmd *cobra.Command, contextName string, secretStore storage.SecretStore) (*authzed.Client, error) {
+	currentToken, err := storage.GetToken(contextName, secretStore)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := GetTokenWithCLIOverride(cmd, currentToken)
+	if err != nil {
+		return nil, err
+	}
+
+	dialOpts, err := DialOptsFromFlags(cmd, token)
+	if err != nil {
+		return nil, err
+	}
+
+	return authzed.NewClient(token.Endpoint, dialOpts...)
+}
+
+// GetCurrentTokenWithCLIOverride returns the current token, but overridden by any parameter specified via CLI args
+func GetCurrentTokenWithCLIOverride(cmd *cobra.Command, configStore storage.ConfigStore, secretStore storage.SecretStore) (storage.Token, error) {
+	token, err := storage.CurrentToken(
+		configStore,
+		secretStore,
+	)
+	if err != nil {
+		return storage.Token{}, err
+	}
+
+	return GetTokenWithCLIOverride(cmd, token)
+}
+
+// GetTokenWithCLIOverride returns the provided token, but overridden by any parameter specified explicitly via command
+// flags
+func GetTokenWithCLIOverride(cmd *cobra.Command, token storage.Token) (storage.Token, error) {
+	overrideToken, err := tokenFromCli(cmd)
+	if err != nil {
+		return storage.Token{}, err
+	}
+
+	result, err := storage.TokenWithOverride(
+		overrideToken,
+		token,
+	)
+	if err != nil {
+		return storage.Token{}, err
+	}
+
+	log.Trace().Bool("context-override-via-cli", overrideToken.AnyValue()).Interface("context", result).Send()
+	return result, nil
+}
+
+func tokenFromCli(cmd *cobra.Command) (storage.Token, error) {
+	certPath := cobrautil.MustGetStringExpanded(cmd, "certificate-path")
+	var certBytes []byte
+	var err error
+	if certPath != "" {
+		certBytes, err = os.ReadFile(certPath)
+		if err != nil {
+			return storage.Token{}, fmt.Errorf("failed to read ceritficate: %w", err)
+		}
+	}
+
+	explicitInsecure := cmd.Flags().Changed("insecure")
+	var notSecure *bool
+	if explicitInsecure {
+		i := cobrautil.MustGetBool(cmd, "insecure")
+		notSecure = &i
+	}
+
+	explicitNoVerifyCA := cmd.Flags().Changed("no-verify-ca")
+	var notVerifyCA *bool
+	if explicitNoVerifyCA {
+		nvc := cobrautil.MustGetBool(cmd, "no-verify-ca")
+		notVerifyCA = &nvc
+	}
+	overrideToken := storage.Token{
+		APIToken:   cobrautil.MustGetString(cmd, "token"),
+		Endpoint:   cobrautil.MustGetString(cmd, "endpoint"),
+		Insecure:   notSecure,
+		NoVerifyCA: notVerifyCA,
+		CACert:     certBytes,
+	}
+	return overrideToken, nil
+}
+
 // DefaultStorage returns the default configured config store and secret store.
 func DefaultStorage() (storage.ConfigStore, storage.SecretStore) {
 	var home string
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 		home = filepath.Join(xdg, "zed")
 	} else {
-		homedir, _ := homedir.Dir()
-		home = filepath.Join(homedir, ".zed")
+		hmdir, _ := homedir.Dir()
+		home = filepath.Join(hmdir, ".zed")
 	}
 	return &storage.JSONConfigStore{ConfigPath: home},
 		&storage.KeychainSecretStore{ConfigPath: home}
 }
 
-func certOption(cmd *cobra.Command, token storage.Token) (opt grpc.DialOption, err error) {
+func certOption(token storage.Token) (opt grpc.DialOption, err error) {
 	verification := grpcutil.VerifyCA
-	if cobrautil.MustGetBool(cmd, "no-verify-ca") || token.HasNoVerifyCA() {
+	if token.HasNoVerifyCA() {
 		verification = grpcutil.SkipVerifyCA
 	}
 
 	if certBytes, ok := token.Certificate(); ok {
 		return grpcutil.WithCustomCertBytes(verification, certBytes)
 	}
+
 	return grpcutil.WithSystemCerts(verification)
 }
 
@@ -96,12 +180,12 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 		grpc.WithChainStreamInterceptor(zgrpcutil.StreamLogDispatchTrailers),
 	}
 
-	if cobrautil.MustGetBool(cmd, "insecure") || (token.IsInsecure()) {
+	if token.IsInsecure() {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		opts = append(opts, grpcutil.WithInsecureBearerToken(token.APIToken))
 	} else {
 		opts = append(opts, grpcutil.WithBearerToken(token.APIToken))
-		certOpt, err := certOption(cmd, token)
+		certOpt, err := certOption(token)
 		if err != nil {
 			return nil, fmt.Errorf("failed to configure TLS cert: %w", err)
 		}
