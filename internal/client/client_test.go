@@ -104,7 +104,7 @@ func TestGetCurrentTokenWithCLIOverrideWithoutSecretFile(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "")
 	require.NoError(err)
 	configPath := path.Join(tmpDir, "config.json")
-	err = os.WriteFile(configPath, []byte("{}"), 0600)
+	err = os.WriteFile(configPath, []byte("{}"), 0o600)
 	require.NoError(err)
 
 	configStore := &storage.JSONConfigStore{ConfigPath: tmpDir}
