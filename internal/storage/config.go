@@ -15,6 +15,9 @@ const configFileName = "config.json"
 // ErrConfigNotFound is returned if there is no Config in a ConfigStore.
 var ErrConfigNotFound = errors.New("config did not exist")
 
+// ErrTokenNotFound is returned if there is no Token in a ConfigStore.
+var ErrTokenNotFound = errors.New("token does not exist")
+
 // Config represents the contents of a zed configuration file.
 type Config struct {
 	Version      string
@@ -69,21 +72,26 @@ func TokenWithOverride(overrideToken Token, referenceToken Token) (Token, error)
 
 // CurrentToken is a convenient way to obtain the CurrentToken field from the
 // current Config.
-func CurrentToken(cs ConfigStore, ss SecretStore) (Token, error) {
+func CurrentToken(cs ConfigStore, ss SecretStore) (token Token, err error) {
 	cfg, err := cs.Get()
 	if err != nil {
 		return Token{}, err
 	}
 
-	return GetToken(cfg.CurrentToken, ss)
+	return GetTokenIfExists(cfg.CurrentToken, ss)
 }
 
 // SetCurrentToken is a convenient way to set the CurrentToken field in a
 // the current config.
 func SetCurrentToken(name string, cs ConfigStore, ss SecretStore) error {
 	// Ensure the token exists
-	if _, err := GetToken(name, ss); err != nil {
+	exists, err := TokenExists(name, ss)
+	if err != nil {
 		return err
+	}
+
+	if !exists {
+		return ErrTokenNotFound
 	}
 
 	cfg, err := cs.Get()
