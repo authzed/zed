@@ -54,7 +54,7 @@ func newClientForCurrentContext(cmd *cobra.Command) (Client, error) {
 }
 
 func newClientForContext(cmd *cobra.Command, contextName string, secretStore storage.SecretStore) (*authzed.Client, error) {
-	currentToken, err := storage.GetToken(contextName, secretStore)
+	currentToken, err := storage.GetTokenIfExists(contextName, secretStore)
 	if err != nil {
 		return nil, err
 	}
