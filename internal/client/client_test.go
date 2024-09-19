@@ -12,10 +12,11 @@ import (
 )
 
 func TestGetTokenWithCLIOverride(t *testing.T) {
+	require := require.New(t)
 	testCert, err := os.CreateTemp("", "")
-	require.NoError(t, err)
+	require.NoError(err)
 	_, err = testCert.Write([]byte("hi"))
-	require.NoError(t, err)
+	require.NoError(err)
 	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
 		zedtesting.StringFlag{FlagName: "token", FlagValue: "t1", Changed: true},
 		zedtesting.StringFlag{FlagName: "certificate-path", FlagValue: testCert.Name(), Changed: true},
@@ -29,13 +30,13 @@ func TestGetTokenWithCLIOverride(t *testing.T) {
 
 	// cli args take precedence when defined
 	to, err := client.GetTokenWithCLIOverride(cmd, storage.Token{})
-	require.NoError(t, err)
-	require.True(t, to.AnyValue())
-	require.Equal(t, "t1", to.APIToken)
-	require.Equal(t, "e1", to.Endpoint)
-	require.Equal(t, []byte("hi"), to.CACert)
-	require.Equal(t, &bTrue, to.Insecure)
-	require.Equal(t, &bTrue, to.NoVerifyCA)
+	require.NoError(err)
+	require.True(to.AnyValue())
+	require.Equal("t1", to.APIToken)
+	require.Equal("e1", to.Endpoint)
+	require.Equal([]byte("hi"), to.CACert)
+	require.Equal(&bTrue, to.Insecure)
+	require.Equal(&bTrue, to.NoVerifyCA)
 
 	// storage token takes precedence when defined
 	cmd = zedtesting.CreateTestCobraCommandWithFlagValue(t,
@@ -52,11 +53,51 @@ func TestGetTokenWithCLIOverride(t *testing.T) {
 		Insecure:   &bFalse,
 		NoVerifyCA: &bFalse,
 	})
-	require.NoError(t, err)
-	require.True(t, to.AnyValue())
-	require.Equal(t, "t2", to.APIToken)
-	require.Equal(t, "e2", to.Endpoint)
-	require.Equal(t, []byte("bye"), to.CACert)
-	require.Equal(t, &bFalse, to.Insecure)
-	require.Equal(t, &bFalse, to.NoVerifyCA)
+	require.NoError(err)
+	require.True(to.AnyValue())
+	require.Equal("t2", to.APIToken)
+	require.Equal("e2", to.Endpoint)
+	require.Equal([]byte("bye"), to.CACert)
+	require.Equal(&bFalse, to.Insecure)
+	require.Equal(&bFalse, to.NoVerifyCA)
+}
+
+func TestGetCurrentTokenWithCLIOverrideWithoutStoredContext(t *testing.T) {
+	// When we refactored the token setting logic, we broke the workflow where zed is used without a saved
+	// context. This asserts that that workflow works.
+	require := require.New(t)
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "token", FlagValue: "t1", Changed: true},
+		zedtesting.StringFlag{FlagName: "endpoint", FlagValue: "e1", Changed: true},
+		zedtesting.StringFlag{FlagName: "certificate-path", FlagValue: "", Changed: false},
+		zedtesting.BoolFlag{FlagName: "insecure", FlagValue: true, Changed: true},
+	)
+
+	bTrue := true
+
+	configStore, secretStore := client.DefaultStorage()
+	token, err := client.GetCurrentTokenWithCLIOverride(cmd, configStore, secretStore)
+
+	// cli args take precedence when defined
+	require.NoError(err)
+	require.True(token.AnyValue())
+	require.Equal("t1", token.APIToken)
+	require.Equal("e1", token.Endpoint)
+	require.Equal(&bTrue, token.Insecure)
+}
+
+func TestGetCurrentTokenWithCLIOverrideWithInsufficientArgs (t *testing.T) {
+	// This is to ensure that insufficient args don't unintentionally validate.
+	require := require.New(t)
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "token", FlagValue: "", Changed: false},
+		zedtesting.StringFlag{FlagName: "endpoint", FlagValue: "e1", Changed: true},
+		zedtesting.StringFlag{FlagName: "certificate-path", FlagValue: "", Changed: false},
+	)
+
+	configStore, secretStore := client.DefaultStorage()
+	_, err := client.GetCurrentTokenWithCLIOverride(cmd, configStore, secretStore)
+
+	// cli args take precedence when defined
+	require.NoError(err)
 }
