@@ -14,9 +14,6 @@ import (
 	"github.com/authzed/zed/internal/console"
 )
 
-// ErrTokenNotFound is returned if there is no Token in a ConfigStore.
-var ErrTokenNotFound = errors.New("token does not exist")
-
 type Token struct {
 	Name       string
 	Endpoint   string
@@ -72,7 +69,8 @@ type SecretStore interface {
 	Put(s Secrets) error
 }
 
-func GetToken(name string, ss SecretStore) (Token, error) {
+// Returns an empty token if no token exists.
+func GetTokenIfExists(name string, ss SecretStore) (Token, error) {
 	secrets, err := ss.Get()
 	if err != nil {
 		return Token{}, err
@@ -84,7 +82,22 @@ func GetToken(name string, ss SecretStore) (Token, error) {
 		}
 	}
 
-	return Token{}, ErrTokenNotFound
+	return Token{}, nil
+}
+
+func TokenExists(name string, ss SecretStore) (bool, error) {
+	secrets, err := ss.Get()
+	if err != nil {
+		return false, err
+	}
+
+	for _, token := range secrets.Tokens {
+		if name == token.Name {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func PutToken(t Token, ss SecretStore) error {
