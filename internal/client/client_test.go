@@ -2,6 +2,7 @@ package client_test
 
 import (
 	"os"
+	"path"
 	"testing"
 
 	"github.com/authzed/zed/internal/client"
@@ -62,7 +63,7 @@ func TestGetTokenWithCLIOverride(t *testing.T) {
 	require.Equal(&bFalse, to.NoVerifyCA)
 }
 
-func TestGetCurrentTokenWithCLIOverrideWithoutStoredContext(t *testing.T) {
+func TestGetCurrentTokenWithCLIOverrideWithoutConfigFile(t *testing.T) {
 	// When we refactored the token setting logic, we broke the workflow where zed is used without a saved
 	// context. This asserts that that workflow works.
 	require := require.New(t)
@@ -75,7 +76,39 @@ func TestGetCurrentTokenWithCLIOverrideWithoutStoredContext(t *testing.T) {
 
 	bTrue := true
 
-	configStore, secretStore := client.DefaultStorage()
+	configStore := &storage.JSONConfigStore{ConfigPath: "/not/a/valid/path"}
+	secretStore := &storage.KeychainSecretStore{ConfigPath: "/not/a/valid/path"}
+	token, err := client.GetCurrentTokenWithCLIOverride(cmd, configStore, secretStore)
+
+	// cli args take precedence when defined
+	require.NoError(err)
+	require.True(token.AnyValue())
+	require.Equal("t1", token.APIToken)
+	require.Equal("e1", token.Endpoint)
+	require.Equal(&bTrue, token.Insecure)
+}
+
+func TestGetCurrentTokenWithCLIOverrideWithoutSecretFile(t *testing.T) {
+	// When we refactored the token setting logic, we broke the workflow where zed is used without a saved
+	// context. This asserts that that workflow works.
+	require := require.New(t)
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "token", FlagValue: "t1", Changed: true},
+		zedtesting.StringFlag{FlagName: "endpoint", FlagValue: "e1", Changed: true},
+		zedtesting.StringFlag{FlagName: "certificate-path", FlagValue: "", Changed: false},
+		zedtesting.BoolFlag{FlagName: "insecure", FlagValue: true, Changed: true},
+	)
+
+	bTrue := true
+
+	tmpDir, err := os.MkdirTemp("", "")
+	require.NoError(err)
+	configPath := path.Join(tmpDir, "config.json")
+	err = os.WriteFile(configPath, []byte("{}"), 0600)
+	require.NoError(err)
+
+	configStore := &storage.JSONConfigStore{ConfigPath: tmpDir}
+	secretStore := &storage.KeychainSecretStore{ConfigPath: "/not/a/valid/path"}
 	token, err := client.GetCurrentTokenWithCLIOverride(cmd, configStore, secretStore)
 
 	// cli args take precedence when defined
