@@ -65,7 +65,7 @@ func TestGetTokenWithCLIOverride(t *testing.T) {
 
 func TestGetCurrentTokenWithCLIOverrideWithoutConfigFile(t *testing.T) {
 	// When we refactored the token setting logic, we broke the workflow where zed is used without a saved
-	// context. This asserts that that workflow works.
+	// configuration. This asserts that that workflow works.
 	require := require.New(t)
 	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
 		zedtesting.StringFlag{FlagName: "token", FlagValue: "t1", Changed: true},
