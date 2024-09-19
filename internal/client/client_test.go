@@ -74,8 +74,6 @@ func TestGetCurrentTokenWithCLIOverrideWithoutConfigFile(t *testing.T) {
 		zedtesting.BoolFlag{FlagName: "insecure", FlagValue: true, Changed: true},
 	)
 
-	bTrue := true
-
 	configStore := &storage.JSONConfigStore{ConfigPath: "/not/a/valid/path"}
 	secretStore := &storage.KeychainSecretStore{ConfigPath: "/not/a/valid/path"}
 	token, err := client.GetCurrentTokenWithCLIOverride(cmd, configStore, secretStore)
