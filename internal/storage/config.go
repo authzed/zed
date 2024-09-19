@@ -28,6 +28,7 @@ type Config struct {
 type ConfigStore interface {
 	Get() (Config, error)
 	Put(Config) error
+	Exists() (bool, error)
 }
 
 // TokenWithOverride returns a Token that retrieves its values from the reference Token, and has its values overridden
@@ -145,6 +146,17 @@ func (s JSONConfigStore) Put(cfg Config) error {
 	}
 
 	return atomicWriteFile(filepath.Join(s.ConfigPath, configFileName), cfgBytes, 0o774)
+}
+
+func (s JSONConfigStore) Exists() (bool, error) {
+	_, err := os.Stat(filepath.Join(s.ConfigPath, configFileName))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // atomicWriteFile writes data to filename+some suffix, then renames it into
