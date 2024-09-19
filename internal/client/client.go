@@ -74,6 +74,14 @@ func newClientForContext(cmd *cobra.Command, contextName string, secretStore sto
 
 // GetCurrentTokenWithCLIOverride returns the current token, but overridden by any parameter specified via CLI args
 func GetCurrentTokenWithCLIOverride(cmd *cobra.Command, configStore storage.ConfigStore, secretStore storage.SecretStore) (storage.Token, error) {
+	// Handle the no-config case separately
+	configExists, err := configStore.Exists()
+	if err != nil {
+		return storage.Token{}, err
+	}
+	if !configExists {
+		return GetTokenWithCLIOverride(cmd, storage.Token{})
+	}
 	token, err := storage.CurrentToken(
 		configStore,
 		secretStore,
