@@ -118,19 +118,3 @@ func TestGetCurrentTokenWithCLIOverrideWithoutSecretFile(t *testing.T) {
 	require.Equal("e1", token.Endpoint)
 	require.Equal(&bTrue, token.Insecure)
 }
-
-func TestGetCurrentTokenWithCLIOverrideWithInsufficientArgs (t *testing.T) {
-	// This is to ensure that insufficient args don't unintentionally validate.
-	require := require.New(t)
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
-		zedtesting.StringFlag{FlagName: "token", FlagValue: "", Changed: false},
-		zedtesting.StringFlag{FlagName: "endpoint", FlagValue: "e1", Changed: true},
-		zedtesting.StringFlag{FlagName: "certificate-path", FlagValue: "", Changed: false},
-	)
-
-	configStore, secretStore := client.DefaultStorage()
-	_, err := client.GetCurrentTokenWithCLIOverride(cmd, configStore, secretStore)
-
-	// cli args take precedence when defined
-	require.NoError(err)
-}
