@@ -85,7 +85,8 @@ func TestGetCurrentTokenWithCLIOverrideWithoutConfigFile(t *testing.T) {
 	require.True(token.AnyValue())
 	require.Equal("t1", token.APIToken)
 	require.Equal("e1", token.Endpoint)
-	require.Equal(&bTrue, token.Insecure)
+	require.NotNil(token.Insecure)
+	require.True(*token.Insecure)
 }
 
 func TestGetCurrentTokenWithCLIOverrideWithoutSecretFile(t *testing.T) {
