@@ -85,6 +85,7 @@ zed context list
 ```
 
 ### Overriding Context
+
 You can also provide context values via environment variables or CLI flags. If values are provided this way, they override
 the context values in a piecemeal fashion:
 
