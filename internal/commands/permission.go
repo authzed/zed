@@ -344,7 +344,7 @@ func checkBulkCmdFunc(cmd *cobra.Command, args []string) error {
 
 	for _, item := range resp.Pairs {
 		console.Printf("%s:%s#%s@%s:%s => ",
-			item.Request.Resource.ObjectType, item.Request.Resource.ObjectId, item.Request.Permission, item.Request.Subject.Object.ObjectId, item.Request.Subject.Object.ObjectType)
+			item.Request.Resource.ObjectType, item.Request.Resource.ObjectId, item.Request.Permission, item.Request.Subject.Object.ObjectType, item.Request.Subject.Object.ObjectId)
 
 		switch responseType := item.Response.(type) {
 		case *v1.CheckBulkPermissionsPair_Item:
