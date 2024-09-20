@@ -75,14 +75,25 @@ sudo dnf install -y zed
 
 Contexts store connection credentials for accessing SpiceDB clusters securely in the OS keychain.
 Before performing most commands, a context must be set.
-Alternatively, you can provide context values via environment variables which will override the existing context for that execution.
 
 The `zed context` subcommand has operations for setting the current, creating, listing, deleting contexts:
 
 ```sh
 zed context set prod grpc.authzed.com:443 tc_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
-zed context set dev localhost:80 testpresharedkey
+zed context set dev localhost:80 testpresharedkey --insecure
 zed context list
+```
+
+### Overriding Context
+
+You can also provide context values via environment variables or CLI flags. If values are provided this way, they override
+the context values in a piecemeal fashion:
+
+```sh
+zed context set prod grpc.authzed.com:443 tc_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
+
+# This will use the token and TLS values set above, but swap out the endpoint for the one provided.
+zed permission check --endpoint my.authzed.domain:443 document:firstdoc writer user:emilia
 ```
 
 ### Headless usage
