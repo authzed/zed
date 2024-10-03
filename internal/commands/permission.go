@@ -91,10 +91,13 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	expandCmd.Flags().String("revision", "", "optional revision at which to check")
 	registerConsistencyFlags(expandCmd.Flags())
 
+	// NOTE: `lookup` is an alias of `lookup-resources` (below)
+	// and must have the same list of flags in order for it to work.
 	permissionCmd.AddCommand(lookupCmd)
 	lookupCmd.Flags().Bool("json", false, "output as JSON")
 	lookupCmd.Flags().String("revision", "", "optional revision at which to check")
 	lookupCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
+	lookupCmd.Flags().Uint32("page-limit", 0, "limit of relations returned per page")
 	registerConsistencyFlags(lookupCmd.Flags())
 
 	permissionCmd.AddCommand(lookupResourcesCmd)
@@ -156,6 +159,7 @@ var lookupCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(3),
 	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
 	RunE:              lookupResourcesCmdFunc,
+	Deprecated:        "prefer lookup-resources",
 	Hidden:            true,
 }
 
