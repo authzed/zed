@@ -77,6 +77,16 @@ func (wc wasmClient) BulkImportRelationships(ctx context.Context, opts ...grpc.C
 	return client.BulkImportRelationships(ctx, opts...)
 }
 
+func (wc wasmClient) ExportBulkRelationships(ctx context.Context, in *v1.ExportBulkRelationshipsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[v1.ExportBulkRelationshipsResponse], error) {
+	client := v1.NewPermissionsServiceClient(wc.conn)
+	return client.ExportBulkRelationships(ctx, in, opts...)
+}
+
+func (wc wasmClient) ImportBulkRelationships(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[v1.ImportBulkRelationshipsRequest, v1.ImportBulkRelationshipsResponse], error) {
+	client := v1.NewPermissionsServiceClient(wc.conn)
+	return client.ImportBulkRelationships(ctx, opts...)
+}
+
 func (wc wasmClient) BulkCheckPermission(ctx context.Context, in *v1.BulkCheckPermissionRequest, opts ...grpc.CallOption) (*v1.BulkCheckPermissionResponse, error) {
 	client := v1.NewExperimentalServiceClient(wc.conn)
 	return client.BulkCheckPermission(ctx, in, opts...)
