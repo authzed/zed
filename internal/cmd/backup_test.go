@@ -2,19 +2,23 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/authzed/zed/internal/client"
-	zedtesting "github.com/authzed/zed/internal/testing"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+
+	"github.com/authzed/zed/internal/client"
+	zedtesting "github.com/authzed/zed/internal/testing"
 )
 
 func init() {
@@ -378,4 +382,54 @@ func TestBackupRestoreCmdFunc(t *testing.T) {
 
 	require.NoError(t, rrCli.CloseSend())
 	require.Equal(t, "test/resource:1#reader@test/user:1", tuple.MustStringRelationship(rrResp.Relationship))
+}
+
+func TestAddSizeErrInfo(t *testing.T) {
+	tcs := []struct {
+		name          string
+		err           error
+		expectedError string
+	}{
+		{
+			name:          "error is nil",
+			err:           nil,
+			expectedError: "",
+		},
+		{
+			name:          "error is not a size error",
+			err:           errors.New("some error"),
+			expectedError: "some error",
+		},
+		{
+			name:          "error has correct code, wrong message",
+			err:           status.New(codes.ResourceExhausted, "foobar").Err(),
+			expectedError: "foobar",
+		},
+		{
+			name:          "error has correct message, wrong code",
+			err:           status.New(codes.Unauthenticated, "received message larger than max").Err(),
+			expectedError: "received message larger than max",
+		},
+		{
+			name:          "error has correct code and message",
+			err:           status.New(codes.ResourceExhausted, "received message larger than max").Err(),
+			expectedError: "set flag --max-message-size=bytecounthere",
+		},
+		{
+			name:          "error has correct code and message with additional info",
+			err:           status.New(codes.ResourceExhausted, "received message larger than max (1234 vs. 45)").Err(),
+			expectedError: "set flag --max-message-size=2468",
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			err := addSizeErrInfo(tc.err)
+			if tc.expectedError == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.expectedError)
+			}
+		})
+	}
 }
