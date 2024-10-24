@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,6 +23,8 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/constraints"
 	"golang.org/x/exp/maps"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/commands"
@@ -249,7 +252,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	ctx := cmd.Context()
 	schemaResp, err := c.ReadSchema(ctx, &v1.ReadSchemaRequest{})
 	if err != nil {
-		return fmt.Errorf("error reading schema: %w", err)
+		return fmt.Errorf("error reading schema: %w", addSizeErrInfo(err))
 	} else if schemaResp.ReadAt == nil {
 		return fmt.Errorf("`backup` is not supported on this version of SpiceDB")
 	}
@@ -284,7 +287,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("error exporting relationships: %w", err)
+		return fmt.Errorf("error exporting relationships: %w", addSizeErrInfo(err))
 	}
 
 	relationshipReadStart := time.Now()
@@ -299,7 +302,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		relsResp, err := relationshipStream.Recv()
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
-				return fmt.Errorf("error receiving relationships: %w", err)
+				return fmt.Errorf("error receiving relationships: %w", addSizeErrInfo(err))
 			}
 			break
 		}
@@ -618,4 +621,33 @@ func replaceRelString(rel string) string {
 func rewriteLegacy(schema string) string {
 	schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
 	return string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
+}
+
+var sizeErrorRegEx = regexp.MustCompile(`received message larger than max \((\d+) vs. (\d+)\)`)
+
+func addSizeErrInfo(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	code := status.Code(err)
+	if code != codes.ResourceExhausted {
+		return err
+	}
+
+	if !strings.Contains(err.Error(), "received message larger than max") {
+		return err
+	}
+
+	matches := sizeErrorRegEx.FindStringSubmatch(err.Error())
+	if len(matches) != 3 {
+		return fmt.Errorf("%w: set flag --max-message-size=bytecounthere to increase the maximum allowable size", err)
+	}
+
+	necessaryByteCount, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return fmt.Errorf("%w: set flag --max-message-size=bytecounthere to increase the maximum allowable size", err)
+	}
+
+	return fmt.Errorf("%w: set flag --max-message-size=%d to increase the maximum allowable size", err, 2*necessaryByteCount)
 }
