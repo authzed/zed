@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	newcompiler "github.com/authzed/spicedb/pkg/composableschemadsl/compiler"
+	newinput "github.com/authzed/spicedb/pkg/composableschemadsl/input"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/authzed/spicedb/pkg/schemadsl/input"
@@ -32,6 +34,9 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 	schemaCmd.AddCommand(schemaWriteCmd)
 	schemaWriteCmd.Flags().Bool("json", false, "output as JSON")
 	schemaWriteCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before writing")
+
+	schemaCmd.AddCommand(schemaCompileCmd)
+	schemaCompileCmd.Flags().StringP("out", "o", "", "output file relative path")
 }
 
 var schemaWriteCmd = &cobra.Command{
@@ -48,6 +53,16 @@ var schemaCopyCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(2),
 	ValidArgsFunction: ContextGet,
 	RunE:              schemaCopyCmdFunc,
+}
+
+var schemaCompileCmd = &cobra.Command{
+	Use: "compile <file>",
+	Args: cobra.ExactArgs(1),
+	Short: "Compile a schema that uses extended syntax into one that can be written to SpiceDB",
+	// TODO: add longer example
+	// TODO: is this correct?
+	ValidArgsFunction: commands.FileExtensionCompletions("zed"),
+	RunE: schemaCompileCmdFunc,
 }
 
 func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
@@ -243,4 +258,53 @@ func determinePrefixForSchema(ctx context.Context, specifiedPrefix string, clien
 	}
 
 	return "", nil
+}
+
+// Compiles an input schema written in the new composable schema syntax
+// and produces it as a fully-realized schema
+func schemaCompileCmdFunc(cmd *cobra.Command, args []string) error {
+	// TODO: should we maintain the validate semantics where you can provide any URL?
+	stdOutFd, err := safecast.ToInt(uint(os.Stdout.Fd()))
+	if err != nil {
+		return err
+	}
+	outputFilepath := cobrautil.MustGetString(cmd, "output")
+	if outputFilepath == "" && !term.IsTerminal(stdOutFd) {
+		return fmt.Errorf("must provide stdout or output file path")
+	}
+
+	inputFilepath := args[0]
+	var schemaBytes []byte
+	schemaBytes, err = os.ReadFile(inputFilepath)
+	if err != nil {
+		return fmt.Errorf("failed to read schema file: %w", err)
+	}
+	log.Trace().Str("schema", string(schemaBytes)).Str("file", args[0]).Msg("read schema from file")
+
+	if len(schemaBytes) == 0 {
+		return errors.New("attempted to compile empty schema")
+	}
+
+	compiled, err := newcompiler.Compile(compiler.InputSchema{
+		Source:       newinput.Source("schema"),
+		SchemaString: string(schemaBytes),
+	}, compiler.AllowUnprefixedObjectType())
+	if err != nil {
+		return err
+	}
+
+	// This is where we functionally assert that the two systems are compatible
+	generated, _, err := generator.GenerateSchema(compiled.OrderedDefinitions)
+
+	if outputFilepath == "" {
+		// Print to stdout
+		fmt.Print(generated)
+	} else {
+		err = os.WriteFile(outputFilepath, []byte(generated), 0_644)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
