@@ -1,0 +1,6 @@
+use expiration
+
+definition user {
+  relation parent: user with expiration
+  permission view = parent
+}

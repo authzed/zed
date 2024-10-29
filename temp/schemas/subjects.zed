@@ -1,0 +1,6 @@
+from .user import user
+
+definition group {
+    relation user: user
+    permission member = user
+}
