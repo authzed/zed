@@ -134,8 +134,8 @@ func importRelationships(ctx context.Context, client client.Client, relationship
 		if strings.HasPrefix(line, "//") {
 			continue
 		}
-		rel := tuple.ParseRel(line)
-		if rel == nil {
+		rel, err := tuple.ParseV1Rel(line)
+		if err != nil {
 			return fmt.Errorf("failed to parse %s as relationship", line)
 		}
 		log.Trace().Str("line", line).Send()

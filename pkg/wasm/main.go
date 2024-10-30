@@ -180,12 +180,12 @@ func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringPara
 		if err != nil {
 			return zedCommandResult{Error: err.Error()}
 		}
-		defer it.Close()
-
-		for rel := it.Next(); rel != nil; rel = it.Next() {
-			relationships = append(relationships, rel)
+		for rel, err := range it {
+			if err != nil {
+				return zedCommandResult{Error: err.Error()}
+			}
+			relationships = append(relationships, rel.ToCoreTuple())
 		}
-		it.Close()
 	}
 
 	caveatDefs, err := reader.ListAllCaveats(ctx)

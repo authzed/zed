@@ -67,7 +67,7 @@ func TestRelationshipToString(t *testing.T) {
 	} {
 		tt := tt
 		t.Run(tt.rawRel, func(t *testing.T) {
-			rel := tuple.ParseRel(tt.rawRel)
+			rel := tuple.MustParseV1Rel(tt.rawRel)
 			out, err := relationshipToString(rel)
 			require.NoError(t, err)
 			require.Equal(t, tt.expected, out)
@@ -244,7 +244,7 @@ func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
 			Updates: []*v1.RelationshipUpdate{
 				{
 					Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-					Relationship: tuple.ParseRel(`resource:1#view@user:1[cav:{"letters": ["a", "b", "c"]}]`),
+					Relationship: tuple.MustParseV1Rel(`resource:1#view@user:1[cav:{"letters": ["a", "b", "c"]}]`),
 				},
 			},
 		}}}, nil
@@ -287,7 +287,7 @@ func TestWriteRelationshipCmdFuncArgsTakePrecedence(t *testing.T) {
 			Updates: []*v1.RelationshipUpdate{
 				{
 					Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-					Relationship: tuple.ParseRel("resource:1#viewer@user:1"),
+					Relationship: tuple.MustParseV1Rel("resource:1#viewer@user:1"),
 				},
 			},
 		}}}, nil
@@ -333,11 +333,11 @@ func TestWriteRelationshipCmdFuncFromStdin(t *testing.T) {
 			Updates: []*v1.RelationshipUpdate{
 				{
 					Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-					Relationship: tuple.ParseRel("resource:1#viewer@user:1"),
+					Relationship: tuple.MustParseV1Rel("resource:1#viewer@user:1"),
 				},
 				{
 					Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-					Relationship: tuple.ParseRel("resource:1#viewer@user:2"),
+					Relationship: tuple.MustParseV1Rel("resource:1#viewer@user:2"),
 				},
 			},
 		}}}, nil
@@ -377,7 +377,7 @@ func TestWriteRelationshipCmdFuncFromStdinBatch(t *testing.T) {
 				Updates: []*v1.RelationshipUpdate{
 					{
 						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-						Relationship: tuple.ParseRel(`resource:1#viewer@user:1[cav:{"letters": ["a", "b", "c"]}]`),
+						Relationship: tuple.MustParseV1Rel(`resource:1#viewer@user:1[cav:{"letters": ["a", "b", "c"]}]`),
 					},
 				},
 			},
@@ -385,7 +385,7 @@ func TestWriteRelationshipCmdFuncFromStdinBatch(t *testing.T) {
 				Updates: []*v1.RelationshipUpdate{
 					{
 						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-						Relationship: tuple.ParseRel(`resource:1#viewer@user:2[cav:{"letters": ["a", "b", "c"]}]`),
+						Relationship: tuple.MustParseV1Rel(`resource:1#viewer@user:2[cav:{"letters": ["a", "b", "c"]}]`),
 					},
 				},
 			},
@@ -426,7 +426,7 @@ func TestWriteRelationshipCmdFuncFromFailsWithCaveatArg(t *testing.T) {
 				Updates: []*v1.RelationshipUpdate{
 					{
 						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-						Relationship: tuple.ParseRel(`resource:1#viewer@user:1[cav:{"letters": ["a", "b", "c"]}]`),
+						Relationship: tuple.MustParseV1Rel(`resource:1#viewer@user:1[cav:{"letters": ["a", "b", "c"]}]`),
 					},
 				},
 			},
@@ -593,15 +593,15 @@ func TestBulkDeleteForcing(t *testing.T) {
 		Updates: []*v1.RelationshipUpdate{
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel("test/resource:1#reader@test/user:1"),
+				Relationship: tuple.MustParseV1Rel("test/resource:1#reader@test/user:1"),
 			},
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel("test/resource:1#writer@test/user:2"),
+				Relationship: tuple.MustParseV1Rel("test/resource:1#writer@test/user:2"),
 			},
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel("test/resource:1#writer@test/user:3"),
+				Relationship: tuple.MustParseV1Rel("test/resource:1#writer@test/user:3"),
 			},
 		},
 	})
@@ -643,7 +643,7 @@ func TestBulkDeleteManyForcing(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		updates = append(updates, &v1.RelationshipUpdate{
 			Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-			Relationship: tuple.ParseRel(fmt.Sprintf("test/resource:%d#reader@test/user:1", i)),
+			Relationship: tuple.MustParseV1Rel(fmt.Sprintf("test/resource:%d#reader@test/user:1", i)),
 		})
 	}
 	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{Updates: updates})
@@ -685,15 +685,15 @@ func TestBulkDeleteNotForcing(t *testing.T) {
 		Updates: []*v1.RelationshipUpdate{
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel("test/resource:1#reader@test/user:1"),
+				Relationship: tuple.MustParseV1Rel("test/resource:1#reader@test/user:1"),
 			},
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel("test/resource:1#writer@test/user:2"),
+				Relationship: tuple.MustParseV1Rel("test/resource:1#writer@test/user:2"),
 			},
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel("test/resource:1#writer@test/user:3"),
+				Relationship: tuple.MustParseV1Rel("test/resource:1#writer@test/user:3"),
 			},
 		},
 	})

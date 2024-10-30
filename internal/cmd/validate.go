@@ -10,12 +10,10 @@ import (
 	"github.com/ccoveille/go-safecast"
 	"github.com/spf13/cobra"
 
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/development"
 	core "github.com/authzed/spicedb/pkg/proto/core/v1"
 	devinterface "github.com/authzed/spicedb/pkg/proto/developer/v1"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
-	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/charmbracelet/lipgloss"
 
@@ -97,7 +95,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	tuples := make([]*core.RelationTuple, 0, len(parsed.Relationships.Relationships))
 	for _, rel := range parsed.Relationships.Relationships {
-		tuples = append(tuples, tuple.MustFromRelationship[*v1.ObjectReference, *v1.SubjectReference, *v1.ContextualizedCaveat](rel))
+		tuples = append(tuples, rel.ToCoreTuple())
 	}
 	devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
 		Schema:        parsed.Schema.Schema,
