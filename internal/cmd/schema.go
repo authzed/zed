@@ -56,13 +56,13 @@ var schemaCopyCmd = &cobra.Command{
 }
 
 var schemaCompileCmd = &cobra.Command{
-	Use: "compile <file>",
-	Args: cobra.ExactArgs(1),
+	Use:   "compile <file>",
+	Args:  cobra.ExactArgs(1),
 	Short: "Compile a schema that uses extended syntax into one that can be written to SpiceDB",
 	// TODO: add longer example
 	// TODO: is this correct?
 	ValidArgsFunction: commands.FileExtensionCompletions("zed"),
-	RunE: schemaCompileCmdFunc,
+	RunE:              schemaCompileCmdFunc,
 }
 
 func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
@@ -268,7 +268,7 @@ func schemaCompileCmdFunc(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	outputFilepath := cobrautil.MustGetString(cmd, "output")
+	outputFilepath := cobrautil.MustGetString(cmd, "out")
 	if outputFilepath == "" && !term.IsTerminal(stdOutFd) {
 		return fmt.Errorf("must provide stdout or output file path")
 	}
@@ -285,22 +285,38 @@ func schemaCompileCmdFunc(cmd *cobra.Command, args []string) error {
 		return errors.New("attempted to compile empty schema")
 	}
 
-	compiled, err := newcompiler.Compile(compiler.InputSchema{
+	compiled, err := newcompiler.Compile(newcompiler.InputSchema{
 		Source:       newinput.Source("schema"),
 		SchemaString: string(schemaBytes),
-	}, compiler.AllowUnprefixedObjectType())
+	}, newcompiler.AllowUnprefixedObjectType())
 	if err != nil {
 		return err
 	}
 
+	// Attempt to cast one kind of OrderedDefinition to another
+	oldDefinitions := make([]compiler.SchemaDefinition, 0, len(compiled.OrderedDefinitions))
+	for _, definition := range compiled.OrderedDefinitions {
+		oldDefinition, ok := definition.(compiler.SchemaDefinition)
+		if !ok {
+			return fmt.Errorf("could not convert definition to old schemadefinition: %v", oldDefinition)
+		}
+		oldDefinitions = append(oldDefinitions, oldDefinition)
+	}
+
 	// This is where we functionally assert that the two systems are compatible
-	generated, _, err := generator.GenerateSchema(compiled.OrderedDefinitions)
+	generated, _, err := generator.GenerateSchema(oldDefinitions)
+	if err != nil {
+		return fmt.Errorf("could not generate resulting schema: %w", err)
+	}
+
+	// Add a newline at the end for hygiene's sake
+	terminated := generated + "\n"
 
 	if outputFilepath == "" {
 		// Print to stdout
-		fmt.Print(generated)
+		fmt.Print(terminated)
 	} else {
-		err = os.WriteFile(outputFilepath, []byte(generated), 0_644)
+		err = os.WriteFile(outputFilepath, []byte(terminated), 0o_600)
 		if err != nil {
 			return err
 		}
