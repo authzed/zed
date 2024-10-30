@@ -289,8 +289,8 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 func checkBulkCmdFunc(cmd *cobra.Command, args []string) error {
 	items := make([]*v1.CheckBulkPermissionsRequestItem, 0, len(args))
 	for _, arg := range args {
-		rel := tuple.ParseRel(arg)
-		if rel == nil {
+		rel, err := tuple.ParseV1Rel(arg)
+		if err != nil {
 			return fmt.Errorf("unable to parse relation: %s", arg)
 		}
 

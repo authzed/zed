@@ -131,7 +131,7 @@ func TestLookupResourcesCommand(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		updates = append(updates, &v1.RelationshipUpdate{
 			Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-			Relationship: tuple.ParseRel(fmt.Sprintf("test/resource:%d#reader@test/user:1", i)),
+			Relationship: tuple.MustParseV1Rel(fmt.Sprintf("test/resource:%d#reader@test/user:1", i)),
 		})
 	}
 

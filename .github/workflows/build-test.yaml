@@ -1,10 +1,6 @@
 ---
 name: "Build & Test"
 on: # yamllint disable-line rule:truthy
-  push:
-    branches:
-      - "!dependabot/*"
-      - "*"
   pull_request:
     branches:
       - "*"
@@ -43,6 +39,10 @@ jobs:
       - uses: "actions/checkout@v4"
       - uses: "authzed/actions/setup-go@main"
         with:
+          # NOTE: This needs to match the toolchain version, or else
+          # go env gopath won't point at the right install location for the
+          # wasm tool.
+          go-version: "1.23.2"
           cache: "false" # do not cache to prevent cache poisoning
       - name: "Install wasmbrowsertest"
         run: "go install github.com/agnivade/wasmbrowsertest@latest"

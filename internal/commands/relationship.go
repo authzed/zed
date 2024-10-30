@@ -334,8 +334,8 @@ func argsToRelationship(args []string) (*v1.Relationship, error) {
 		return nil, fmt.Errorf("expected 3 arguments, but got %d", len(args))
 	}
 
-	rel := tupleToRel(args[0], args[1], args[2])
-	if rel == nil {
+	rel, err := tupleToRel(args[0], args[1], args[2])
+	if err != nil {
 		return nil, errors.New("failed to parse input arguments")
 	}
 
@@ -343,7 +343,7 @@ func argsToRelationship(args []string) (*v1.Relationship, error) {
 }
 
 func relationshipToString(rel *v1.Relationship) (string, error) {
-	relString, err := tuple.StringRelationship(rel)
+	relString, err := tuple.V1StringRelationship(rel)
 	if err != nil {
 		return "", err
 	}
@@ -396,7 +396,7 @@ func FileRelationshipParser(f *os.File) RelationshipParser {
 			if err != nil {
 				return nil, err
 			}
-			return tupleToRel(res, rel, subj), nil
+			return tupleToRel(res, rel, subj)
 		}
 		if err := scanner.Err(); err != nil {
 			return nil, err
@@ -405,8 +405,8 @@ func FileRelationshipParser(f *os.File) RelationshipParser {
 	}
 }
 
-func tupleToRel(resource, relation, subject string) *v1.Relationship {
-	return tuple.ParseRel(resource + "#" + relation + "@" + subject)
+func tupleToRel(resource, relation, subject string) (*v1.Relationship, error) {
+	return tuple.ParseV1Rel(resource + "#" + relation + "@" + subject)
 }
 
 func SliceRelationshipParser(args []string) RelationshipParser {
@@ -416,7 +416,7 @@ func SliceRelationshipParser(args []string) RelationshipParser {
 			return nil, ErrExhaustedRelationships
 		}
 		ran = true
-		return tupleToRel(args[0], args[1], args[2]), nil
+		return tupleToRel(args[0], args[1], args[2])
 	}
 }
 

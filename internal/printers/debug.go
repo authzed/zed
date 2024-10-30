@@ -141,7 +141,7 @@ func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp *TreePrinter, hasError
 }
 
 func cycleKey(checkTrace *v1.CheckDebugTrace) string {
-	return fmt.Sprintf("%s#%s", tuple.StringObjectRef(checkTrace.Resource), checkTrace.Permission)
+	return fmt.Sprintf("%s#%s", tuple.V1StringObjectRef(checkTrace.Resource), checkTrace.Permission)
 }
 
 func isPartOfCycle(checkTrace *v1.CheckDebugTrace, encountered map[string]struct{}) bool {

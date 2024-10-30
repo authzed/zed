@@ -72,7 +72,7 @@ func TestRestorer(t *testing.T) {
 
 			expectedFilteredRels := make([]string, 0, len(tt.relationships))
 			for _, rel := range tt.relationships {
-				if !hasRelPrefix(tuple.ParseRel(rel), tt.prefixFilter) {
+				if !hasRelPrefix(tuple.MustParseV1Rel(rel), tt.prefixFilter) {
 					continue
 				}
 
@@ -226,7 +226,7 @@ func (m *mockClient) Send(req *v1.BulkImportRelationshipsRequest) error {
 	for i, rel := range req.Relationships {
 		// This is a gosec115 false positive which should be fixed in a future version.
 		uinti, _ := safecast.ToUint(i)
-		require.True(m.t, proto.Equal(rel, tuple.ParseRel(m.expectedRels[((m.receivedBatches-1)*m.requestedBatchSize)+uinti])))
+		require.True(m.t, proto.Equal(rel, tuple.MustParseV1Rel(m.expectedRels[((m.receivedBatches-1)*m.requestedBatchSize)+uinti])))
 	}
 
 	return nil

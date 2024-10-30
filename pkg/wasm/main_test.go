@@ -33,8 +33,8 @@ func TestZedCommand(t *testing.T) {
 		}`,
 
 		Relationships: []*v1.RelationTuple{
-			tuple.MustParse(`document:first#viewer@user:fred[somecaveat:{"somecondition": 42}]`),
-			tuple.MustParse("document:first#viewer@user:tom"),
+			tuple.MustParse(`document:first#viewer@user:fred[somecaveat:{"somecondition": 42}]`).ToCoreTuple(),
+			tuple.MustParse("document:first#viewer@user:tom").ToCoreTuple(),
 		},
 	}
 
@@ -56,8 +56,8 @@ func TestZedCommand(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Contains(t, updatedContext.Schema, "definition document")
-	require.Equal(t, `document:first#viewer@user:fred[somecaveat:{"somecondition":42}]`, tuple.MustString(updatedContext.Relationships[0]))
-	require.Equal(t, "document:first#viewer@user:tom", tuple.MustString(updatedContext.Relationships[1]))
+	require.Equal(t, `document:first#viewer@user:fred[somecaveat:{"somecondition":42}]`, tuple.MustCoreRelationToString(updatedContext.Relationships[0]))
+	require.Equal(t, "document:first#viewer@user:tom", tuple.MustCoreRelationToString(updatedContext.Relationships[1]))
 	require.Len(t, updatedContext.Relationships, 2)
 
 	// Run the actual command.

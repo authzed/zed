@@ -581,7 +581,7 @@ func backupParseRelsCmdFunc(cmd *cobra.Command, out io.Writer, args []string) er
 			continue
 		}
 
-		relString, err := tuple.StringRelationship(rel)
+		relString, err := tuple.V1StringRelationship(rel)
 		if err != nil {
 			return err
 		}

@@ -305,7 +305,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		Updates: []*v1.RelationshipUpdate{
 			{
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.ParseRel(testRel),
+				Relationship: tuple.MustParseV1Rel(testRel),
 			},
 		},
 	})
@@ -324,7 +324,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 	require.Equal(t, testSchema, d.Schema())
 	rel, err := d.Next()
 	require.NoError(t, err)
-	require.Equal(t, testRel, tuple.MustStringRelationship(rel))
+	require.Equal(t, testRel, tuple.MustV1StringRelationship(rel))
 	require.Equal(t, resp.WrittenAt.Token, d.ZedToken().Token)
 }
 
@@ -381,7 +381,7 @@ func TestBackupRestoreCmdFunc(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, rrCli.CloseSend())
-	require.Equal(t, "test/resource:1#reader@test/user:1", tuple.MustStringRelationship(rrResp.Relationship))
+	require.Equal(t, "test/resource:1#reader@test/user:1", tuple.MustV1StringRelationship(rrResp.Relationship))
 }
 
 func TestAddSizeErrInfo(t *testing.T) {
