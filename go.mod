@@ -9,11 +9,11 @@ require (
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
 	github.com/authzed/authzed-go v1.0.1-0.20241001202507-27cc182a7b92
 	github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b
-	github.com/authzed/spicedb v1.37.1-0.20241030210113-595bb46cd8b4
+	github.com/authzed/spicedb v1.37.1
 	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/ccoveille/go-safecast v1.1.0
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/charmbracelet/lipgloss v0.13.0
+	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/charmbracelet/x/term v0.2.0
 	github.com/google/uuid v1.6.0
 	github.com/gookit/color v1.5.4
@@ -26,7 +26,7 @@ require (
 	github.com/rodaine/table v1.3.0
 	github.com/rs/zerolog v1.33.0
 	github.com/samber/lo v1.47.0
-	github.com/schollz/progressbar/v3 v3.16.1
+	github.com/schollz/progressbar/v3 v3.17.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
@@ -60,7 +60,6 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.24.1 // indirect
 	github.com/IBM/pgxpoolprometheus v1.1.1 // indirect
 	github.com/KimMachineGun/automemlimit v0.6.1 // indirect
-	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/Yiling-J/theine-go v0.4.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
@@ -88,7 +87,7 @@ require (
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/charmbracelet/x/ansi v0.1.4 // indirect
+	github.com/charmbracelet/x/ansi v0.4.2 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/cloudspannerecosystem/spanner-change-streams-tail v0.3.1 // indirect
 	github.com/cncf/xds/go v0.0.0-20240822171458-6449f94b4d59 // indirect
