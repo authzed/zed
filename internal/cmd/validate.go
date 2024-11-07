@@ -16,6 +16,8 @@ import (
 	"github.com/authzed/spicedb/pkg/spiceerrors"
 	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/jzelinskie/cobrautil/v2"
+	"github.com/muesli/termenv"
 
 	"github.com/authzed/zed/internal/commands"
 	"github.com/authzed/zed/internal/console"
@@ -24,21 +26,28 @@ import (
 )
 
 var (
-	success                = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("Success!")
-	complete               = lipgloss.NewStyle().Bold(true).Render("complete")
-	errorPrefix            = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("9")).Render("error: ")
-	warningPrefix          = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("3")).Render("warning: ")
-	errorMessageStyle      = lipgloss.NewStyle().Bold(true).Width(80)
-	linePrefixStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
-	highlightedSourceStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	highlightedLineStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	codeStyle              = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-	highlightedCodeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
-	traceStyle             = lipgloss.NewStyle().Bold(true)
+	// NOTE: these need to be set *after* the renderer has been set, otherwise
+	// the forceColor setting can't work, hence the thunking.
+	success = func() string {
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("Success!")
+	}
+	complete      = func() string { return lipgloss.NewStyle().Bold(true).Render("complete") }
+	errorPrefix   = func() string { return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("9")).Render("error: ") }
+	warningPrefix = func() string {
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("3")).Render("warning: ")
+	}
+	errorMessageStyle      = func() lipgloss.Style { return lipgloss.NewStyle().Bold(true).Width(80) }
+	linePrefixStyle        = func() lipgloss.Style { return lipgloss.NewStyle().Foreground(lipgloss.Color("12")) }
+	highlightedSourceStyle = func() lipgloss.Style { return lipgloss.NewStyle().Foreground(lipgloss.Color("9")) }
+	highlightedLineStyle   = func() lipgloss.Style { return lipgloss.NewStyle().Foreground(lipgloss.Color("9")) }
+	codeStyle              = func() lipgloss.Style { return lipgloss.NewStyle().Foreground(lipgloss.Color("8")) }
+	highlightedCodeStyle   = func() lipgloss.Style { return lipgloss.NewStyle().Foreground(lipgloss.Color("15")) }
+	traceStyle             = func() lipgloss.Style { return lipgloss.NewStyle().Bold(true) }
 )
 
-func registerValidateCmd(rootCmd *cobra.Command) {
-	rootCmd.AddCommand(validateCmd)
+func registerValidateCmd(cmd *cobra.Command) {
+	validateCmd.Flags().Bool("force-color", false, "force color code output even in non-tty environments")
+	cmd.AddCommand(validateCmd)
 }
 
 var validateCmd = &cobra.Command{
@@ -64,7 +73,21 @@ var validateCmd = &cobra.Command{
 		zed validate https://localhost:8443/download`,
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: commands.FileExtensionCompletions("zed", "yaml", "zaml"),
+	PreRunE:           validatePreRunE,
 	RunE:              validateCmdFunc,
+}
+
+func validatePreRunE(cmd *cobra.Command, _ []string) error {
+	// Override lipgloss's autodetection of whether it's in a terminal environment
+	// and display things in color anyway. This can be nice in CI environments that
+	// support it.
+	setForceColor := cobrautil.MustGetBool(cmd, "force-color")
+	if setForceColor {
+		lipgloss.SetColorProfile(termenv.ANSI256)
+		fmt.Println(lipgloss.DefaultRenderer().ColorProfile() == termenv.ANSI256)
+	}
+
+	return nil
 }
 
 func validateCmdFunc(cmd *cobra.Command, args []string) error {
@@ -139,14 +162,14 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 
 	if len(warnings) > 0 {
 		for _, warning := range warnings {
-			console.Printf("%s%s\n", warningPrefix, warning.Message)
+			console.Printf("%s%s\n", warningPrefix(), warning.Message)
 			outputForLine(validateContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
 			console.Printf("\n")
 		}
 
-		console.Print(complete)
+		console.Print(complete())
 	} else {
-		console.Print(success)
+		console.Print(success())
 	}
 
 	console.Printf(" - %d relationships loaded, %d assertions run, %d expected relations validated\n",
@@ -158,7 +181,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func ouputErrorWithSource(validateContents []byte, errWithSource spiceerrors.ErrorWithSource) {
-	console.Printf("%s%s\n", errorPrefix, errorMessageStyle.Render(errWithSource.Error()))
+	console.Printf("%s%s\n", errorPrefix(), errorMessageStyle().Render(errWithSource.Error()))
 	outputForLine(validateContents, errWithSource.LineNumber, errWithSource.SourceCodeString, 0) // errWithSource.LineNumber is 1-indexed
 	os.Exit(1)
 }
@@ -193,7 +216,7 @@ func outputDeveloperErrorsWithLineOffset(validateContents []byte, devErrors []*d
 }
 
 func outputDeveloperError(devError *devinterface.DeveloperError, lines []string, lineOffset int) {
-	console.Printf("%s %s\n", errorPrefix, errorMessageStyle.Render(devError.Message))
+	console.Printf("%s %s\n", errorPrefix(), errorMessageStyle().Render(devError.Message))
 	errorLineNumber := int(devError.Line) - 1 + lineOffset // devError.Line is 1-indexed
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
@@ -204,7 +227,7 @@ func outputDeveloperError(devError *devinterface.DeveloperError, lines []string,
 	}
 
 	if devError.CheckResolvedDebugInformation != nil && devError.CheckResolvedDebugInformation.Check != nil {
-		console.Printf("\n  %s\n", traceStyle.Render("Explanation:"))
+		console.Printf("\n  %s\n", traceStyle().Render("Explanation:"))
 		tp := printers.NewTreePrinter()
 		printers.DisplayCheckTrace(devError.CheckResolvedDebugInformation.Check, tp, true)
 		tp.PrintIndented()
@@ -261,23 +284,23 @@ func renderLine(lines []string, index int, highlight string, highlightLineIndex 
 	lineNumberSpacer := strings.Repeat(" ", lineNumberLength-len(lineNumberStr))
 
 	if highlightColumnIndex < 0 {
-		console.Printf(" %s%s %s %s\n", lineNumberSpacer, lineNumberStyle.Render(lineNumberStr), lineDelimiter, lineContentsStyle.Render(lineContents))
+		console.Printf(" %s%s %s %s\n", lineNumberSpacer, lineNumberStyle().Render(lineNumberStr), lineDelimiter, lineContentsStyle().Render(lineContents))
 	} else {
 		console.Printf(" %s%s %s %s%s%s\n",
 			lineNumberSpacer,
-			lineNumberStyle.Render(lineNumberStr),
+			lineNumberStyle().Render(lineNumberStr),
 			lineDelimiter,
-			lineContentsStyle.Render(lineContents[0:highlightColumnIndex]),
-			highlightedSourceStyle.Render(highlight),
-			lineContentsStyle.Render(lineContents[highlightColumnIndex+len(highlight):]),
+			lineContentsStyle().Render(lineContents[0:highlightColumnIndex]),
+			highlightedSourceStyle().Render(highlight),
+			lineContentsStyle().Render(lineContents[highlightColumnIndex+len(highlight):]),
 		)
 
 		console.Printf(" %s %s %s%s%s\n",
 			noNumberSpaces,
 			lineDelimiter,
 			strings.Repeat(" ", highlightColumnIndex),
-			highlightedSourceStyle.Render("^"),
-			highlightedSourceStyle.Render(strings.Repeat("~", highlightLength)),
+			highlightedSourceStyle().Render("^"),
+			highlightedSourceStyle().Render(strings.Repeat("~", highlightLength)),
 		)
 	}
 }
