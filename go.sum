@@ -720,6 +720,8 @@ github.com/authzed/spicedb v1.37.1-0.20241030210113-595bb46cd8b4 h1:1TpCoQZK3BkD
 github.com/authzed/spicedb v1.37.1-0.20241030210113-595bb46cd8b4/go.mod h1:EBaDOgUgH4/AnrWOA3OeLuU7DNJzHC1LCX804HyfnYg=
 github.com/authzed/spicedb v1.38.0 h1:WQjG2zpZjKKzuDm02h3ldwFu5KHmp3J2gUwv5iafO8s=
 github.com/authzed/spicedb v1.38.0/go.mod h1:MqEs2FWF0pPd8E6CpwKu5gDBTgMIGcjN7gc8RChBiE0=
+github.com/authzed/spicedb v1.38.1-0.20241030210113-595bb46cd8b4 h1:3Fa0PlSRvRFL53DYQ3Zg7tErZgqxU0qDDgMhLChMZCw=
+github.com/authzed/spicedb v1.38.1-0.20241030210113-595bb46cd8b4/go.mod h1:EBaDOgUgH4/AnrWOA3OeLuU7DNJzHC1LCX804HyfnYg=
 github.com/aws/aws-sdk-go-v2 v1.31.0 h1:3V05LbxTSItI5kUqNwhJrrrY1BAXxXt0sN0l72QmG5U=
 github.com/aws/aws-sdk-go-v2 v1.31.0/go.mod h1:ztolYtaEUtdpf9Wftr31CJfLVjOnD/CVRkKOOYgF8hA=
 github.com/aws/aws-sdk-go-v2/config v1.27.39 h1:FCylu78eTGzW1ynHcongXK9YHtoXD5AiiUqq3YfJYjU=
