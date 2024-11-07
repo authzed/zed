@@ -1,6 +1,6 @@
 ---
 name: "Build & Test"
-on: # yamllint disable-line rule:truthy
+on:  # yamllint disable-line rule:truthy
   pull_request:
     branches:
       - "*"
@@ -43,7 +43,7 @@ jobs:
           # go env gopath won't point at the right install location for the
           # wasm tool.
           go-version: "1.23.2"
-          cache: "false" # do not cache to prevent cache poisoning
+          cache: "false"  # do not cache to prevent cache poisoning
       - name: "Install wasmbrowsertest"
         run: "go install github.com/agnivade/wasmbrowsertest@latest"
       - name: "Run WASM Tests"
