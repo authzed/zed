@@ -7,10 +7,8 @@ import (
 
 	"github.com/TylerBrock/colorjson"
 	"github.com/authzed/authzed-go/pkg/requestmeta"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
-	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -95,16 +93,5 @@ func InjectRequestID(cmd *cobra.Command, _ []string) error {
 		cmd.SetContext(requestmeta.WithRequestID(ctx, requestID))
 	}
 
-	return nil
-}
-
-// Override lipgloss's autodetection of whether it's in a terminal environment
-// and display things in color anyway. This can be nice in CI environments that
-// support it.
-func SetForceColorIfNeeded(cmd *cobra.Command, _ []string) error {
-	setForceColor := cobrautil.MustGetBool(cmd, "force-color")
-	if setForceColor {
-		lipgloss.SetColorProfile(termenv.ANSI256)
-	}
 	return nil
 }
