@@ -84,7 +84,6 @@ func validatePreRunE(cmd *cobra.Command, _ []string) error {
 	setForceColor := cobrautil.MustGetBool(cmd, "force-color")
 	if setForceColor {
 		lipgloss.SetColorProfile(termenv.ANSI256)
-		fmt.Println(lipgloss.DefaultRenderer().ColorProfile() == termenv.ANSI256)
 	}
 
 	return nil
