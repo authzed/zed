@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/diff"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/authzed/spicedb/pkg/schemadsl/input"
@@ -32,6 +33,8 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 	schemaCmd.AddCommand(schemaWriteCmd)
 	schemaWriteCmd.Flags().Bool("json", false, "output as JSON")
 	schemaWriteCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before writing")
+
+	schemaCmd.AddCommand(schemaDiffCmd)
 }
 
 var schemaWriteCmd = &cobra.Command{
@@ -48,6 +51,74 @@ var schemaCopyCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(2),
 	ValidArgsFunction: ContextGet,
 	RunE:              schemaCopyCmdFunc,
+}
+
+var schemaDiffCmd = &cobra.Command{
+	Use:   "diff <before file> <after file>",
+	Short: "Diff two schema files",
+	Args:  cobra.ExactArgs(2),
+	RunE:  schemaDiffCmdFunc,
+}
+
+func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {
+	beforeBytes, err := os.ReadFile(args[0])
+	if err != nil {
+		return fmt.Errorf("failed to read before schema file: %w", err)
+	}
+
+	afterBytes, err := os.ReadFile(args[1])
+	if err != nil {
+		return fmt.Errorf("failed to read after schema file: %w", err)
+	}
+
+	before, err := compiler.Compile(
+		compiler.InputSchema{Source: input.Source(args[0]), SchemaString: string(beforeBytes)},
+		compiler.AllowUnprefixedObjectType(),
+	)
+	if err != nil {
+		return err
+	}
+
+	after, err := compiler.Compile(
+		compiler.InputSchema{Source: input.Source(args[1]), SchemaString: string(afterBytes)},
+		compiler.AllowUnprefixedObjectType(),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbefore := diff.NewDiffableSchemaFromCompiledSchema(before)
+	dafter := diff.NewDiffableSchemaFromCompiledSchema(after)
+
+	schemaDiff, err := diff.DiffSchemas(dbefore, dafter)
+	if err != nil {
+		return err
+	}
+
+	for _, ns := range schemaDiff.AddedNamespaces {
+		console.Printf("Added definition: %s\n", ns)
+	}
+
+	for _, ns := range schemaDiff.RemovedNamespaces {
+		console.Printf("Removed definition: %s\n", ns)
+	}
+
+	for nsName, ns := range schemaDiff.ChangedNamespaces {
+		console.Printf("Changed definition: %s\n", nsName)
+		for _, delta := range ns.Deltas() {
+			console.Printf("\t %s: %s\n", delta.Type, delta.RelationName)
+		}
+	}
+
+	for _, caveat := range schemaDiff.AddedCaveats {
+		console.Printf("Added caveat: %s\n", caveat)
+	}
+
+	for _, caveat := range schemaDiff.RemovedCaveats {
+		console.Printf("Removed caveat: %s\n", caveat)
+	}
+
+	return nil
 }
 
 func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
