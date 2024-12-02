@@ -4,7 +4,6 @@
 # a musl-dynamic container. - 2024-12-02 Tanner Stirrat
 FROM cgr.dev/chainguard/go:latest AS zed-builder
 WORKDIR /go/src/app
-RUN apk update && apk add --no-cache git
 COPY . .
 RUN go build -v ./cmd/zed/
 
