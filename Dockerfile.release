@@ -1,5 +1,9 @@
 # vim: syntax=dockerfile
-ARG BASE=cgr.dev/chainguard/musl-dynamic:latest
+# NOTE: we use chainguard's static image because
+# the version of zed that we build for this container
+# is statically-linked (i.e. CGO_ENABLED=0) and therefore
+# doesn't need a libc.
+ARG BASE=cgr.dev/chainguard/static:latest
 
 FROM $BASE
 

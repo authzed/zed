@@ -45,7 +45,7 @@ dockers:
       - &amd_debug_image_gh "ghcr.io/authzed/zed:v{{ .Version }}-amd64-debug"
       - &amd_debug_image_dh "authzed/zed:v{{ .Version }}-amd64-debug"
     ids: ["linux-amd64"]
-    dockerfile: &dockerfile "Dockerfile.release"
+    dockerfile: "Dockerfile.release"
     goos: "linux"
     goarch: "amd64"
     use: "buildx"
