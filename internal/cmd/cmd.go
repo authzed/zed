@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/signal"
@@ -133,7 +134,7 @@ func Run() {
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, errParsing) {
-			log.Err(err).Msg("terminated with errors")
+			log.Error().Msg(fmt.Sprintf("terminated with errors: %s", err.Error()))
 		}
 
 		os.Exit(1)
