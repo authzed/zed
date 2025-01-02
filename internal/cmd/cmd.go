@@ -55,7 +55,7 @@ func Run() {
 			commands.InjectRequestID,
 		),
 		SilenceErrors: true,
-		SilenceUsage:  true,
+		SilenceUsage:  false,
 	}
 	rootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		cmd.Println(err)
