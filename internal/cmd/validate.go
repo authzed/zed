@@ -105,7 +105,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	var parsed validationfile.ValidationFile
 	validateContents, isOnlySchema, err := decoder(&parsed)
 	if err != nil {
-		var errWithSource spiceerrors.ErrorWithSource
+		var errWithSource spiceerrors.WithSourceError
 		if errors.As(err, &errWithSource) {
 			ouputErrorWithSource(validateContents, errWithSource)
 		}
@@ -179,7 +179,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func ouputErrorWithSource(validateContents []byte, errWithSource spiceerrors.ErrorWithSource) {
+func ouputErrorWithSource(validateContents []byte, errWithSource spiceerrors.WithSourceError) {
 	console.Printf("%s%s\n", errorPrefix(), errorMessageStyle().Render(errWithSource.Error()))
 	outputForLine(validateContents, errWithSource.LineNumber, errWithSource.SourceCodeString, 0) // errWithSource.LineNumber is 1-indexed
 	os.Exit(1)

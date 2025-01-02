@@ -19,12 +19,12 @@ import (
 )
 
 var (
-	unrecoverableError    = status.Error(codes.Internal, "unrecoverable")
-	retryableError        = status.Error(codes.Unavailable, "serialization")
-	conflictError         = status.Error(codes.AlreadyExists, "conflict")
-	oneUnrecoverableError = []error{unrecoverableError}
-	oneRetryableError     = []error{retryableError}
-	oneConflictError      = []error{conflictError}
+	errUnrecoverable      = status.Error(codes.Internal, "unrecoverable")
+	errRetryable          = status.Error(codes.Unavailable, "serialization")
+	errConflict           = status.Error(codes.AlreadyExists, "conflict")
+	oneUnrecoverableError = []error{errUnrecoverable}
+	oneRetryableError     = []error{errRetryable}
+	oneConflictError      = []error{errConflict}
 )
 
 func TestRestorer(t *testing.T) {
