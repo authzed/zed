@@ -116,7 +116,9 @@ zed permission check document:firstdoc writer user:emilia --explain
 ```
 
 ## FAQ
+
 ### `commands` vs `cmd`
+
 `zed` is used both via WASM in the playground and as a CLI. The commands in `commands` are
 the commands that zed uses in the playground to talk to the WASM instance of SpiceDB.
 The commands in `cmd` are those which are CLI-only.
