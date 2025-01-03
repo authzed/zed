@@ -101,6 +101,7 @@ func Run() {
 	registerImportCmd(rootCmd)
 	registerValidateCmd(rootCmd)
 	registerBackupCmd(rootCmd)
+	registerPreviewCmd(rootCmd)
 
 	// Register shared commands.
 	commands.RegisterPermissionCmd(rootCmd)
