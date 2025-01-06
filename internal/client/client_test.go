@@ -107,7 +107,9 @@ func TestGetCurrentTokenWithCLIOverrideWithoutSecretFile(t *testing.T) {
 	require.NoError(err)
 
 	configStore := &storage.JSONConfigStore{ConfigPath: tmpDir}
-	secretStore := &storage.KeychainSecretStore{ConfigPath: "/not/a/valid/path"}
+	// NOTE: we put this path in the tmpdir as well because getting the token attempts to
+	// create the dir if it doesn't already exist, which will probably error.
+	secretStore := &storage.KeychainSecretStore{ConfigPath: path.Join(tmpDir, "/not/a/valid/path")}
 	token, err := client.GetCurrentTokenWithCLIOverride(cmd, configStore, secretStore)
 
 	// cli args take precedence when defined
