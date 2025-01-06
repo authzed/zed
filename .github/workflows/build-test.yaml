@@ -34,7 +34,9 @@ jobs:
 
   development:
     name: "WASM Tests"
-    runs-on: "ubuntu-latest"
+    # TODO: figure out workaround for apparmor issue
+    # see #449
+    runs-on: "ubuntu-22.04"
     steps:
       - uses: "actions/checkout@v4"
       - uses: "authzed/actions/setup-go@main"
