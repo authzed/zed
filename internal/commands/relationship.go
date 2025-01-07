@@ -86,9 +86,17 @@ var deleteCmd = &cobra.Command{
 	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE, os.Stdin),
 }
 
+const readCmdHelpLong = `Enumerates relationships matching the provided pattern.
+
+To filter returned relationships using a resource ID prefix, append a '%' to the resource ID:
+
+zed relationship read some-type:some-prefix-%
+`
+
 var readCmd = &cobra.Command{
 	Use:               "read <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
 	Short:             "Enumerates relationships matching the provided pattern",
+	Long:              readCmdHelpLong,
 	Args:              cobra.RangeArgs(1, 3),
 	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
 	RunE:              readRelationships,
