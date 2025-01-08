@@ -22,6 +22,7 @@ func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp *TreePrinter, hasError
 	white := color.FgWhite.Render
 	faint := color.FgGray.Render
 	magenta := color.FgMagenta.Render
+	yellow := color.FgYellow.Render
 
 	orange := color.C256(166).Sprint
 	purple := color.C256(99).Sprint
@@ -50,15 +51,37 @@ func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp *TreePrinter, hasError
 			resourceColor = faint
 			permissionColor = faint
 		}
-	} else if checkTrace.Result != v1.CheckDebugTrace_PERMISSIONSHIP_HAS_PERMISSION {
+	} else if checkTrace.Result == v1.CheckDebugTrace_PERMISSIONSHIP_NO_PERMISSION {
 		hasPermission = red("⨉")
 		resourceColor = faint
 		permissionColor = faint
+	} else if checkTrace.Result == v1.CheckDebugTrace_PERMISSIONSHIP_UNSPECIFIED {
+		hasPermission = yellow("∵")
 	}
 
 	additional := ""
 	if checkTrace.GetWasCachedResult() {
-		additional = cyan(" (cached)")
+		sourceKind := ""
+		source := checkTrace.Source
+		if source != "" {
+			parts := strings.Split(source, ":")
+			if len(parts) > 0 {
+				sourceKind = parts[0]
+			}
+		}
+		switch sourceKind {
+		case "":
+			additional = cyan(" (cached)")
+
+		case "spicedb":
+			additional = cyan(" (cached by spicedb)")
+
+		case "materialize":
+			additional = purple(" (cached by materialize)")
+
+		default:
+			additional = cyan(fmt.Sprintf(" (cached by %s)", sourceKind))
+		}
 	} else if hasError && isPartOfCycle(checkTrace, map[string]struct{}{}) {
 		hasPermission = orange("!")
 		resourceColor = white
