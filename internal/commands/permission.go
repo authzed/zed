@@ -82,9 +82,11 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	registerConsistencyFlags(checkCmd.Flags())
 
 	permissionCmd.AddCommand(checkBulkCmd)
-	registerConsistencyFlags(checkBulkCmd.Flags())
 	checkBulkCmd.Flags().String("revision", "", "optional revision at which to check")
 	checkBulkCmd.Flags().Bool("json", false, "output as JSON")
+	checkBulkCmd.Flags().Bool("explain", false, "requests debug information from SpiceDB and prints out a trace of the requests")
+	checkBulkCmd.Flags().Bool("schema", false, "requests debug information from SpiceDB and prints out the schema used")
+	registerConsistencyFlags(checkBulkCmd.Flags())
 
 	permissionCmd.AddCommand(expandCmd)
 	expandCmd.Flags().Bool("json", false, "output as JSON")
@@ -222,6 +224,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") {
 		log.Info().Msg("debugging requested on check")
 		ctx = requestmeta.AddRequestHeaders(ctx, requestmeta.RequestDebugInformation)
+		request.WithTracing = true
 	}
 
 	var trailerMD metadata.MD
@@ -331,6 +334,10 @@ func checkBulkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") {
+		bulk.WithTracing = true
+	}
+
 	resp, err := c.CheckBulkPermissions(ctx, bulk)
 	if err != nil {
 		return err
@@ -362,6 +369,12 @@ func checkBulkCmdFunc(cmd *cobra.Command, args []string) error {
 			case v1.CheckPermissionResponse_PERMISSIONSHIP_NO_PERMISSION:
 				console.Println("false")
 			}
+
+			err = displayDebugInformationIfRequested(cmd, responseType.Item.DebugTrace, nil, false)
+			if err != nil {
+				return err
+			}
+
 		case *v1.CheckBulkPermissionsPair_Error:
 			console.Println(fmt.Sprintf("error: %s", responseType.Error))
 		}
