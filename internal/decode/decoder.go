@@ -33,21 +33,21 @@ type Func func(out interface{}) ([]byte, bool, error)
 
 // DecoderForURL returns the appropriate decoder for a given URL.
 // Some URLs have special handling to dereference to the actual file.
-func DecoderForURL(u *url.URL) (d Func, err error) {
+func DecoderForURL(u *url.URL, args []string) (d Func, err error) {
 	switch s := u.Scheme; s {
 	case "file":
-		d = fileDecoder(u)
+		d = fileDecoder(u, args)
 	case "http", "https":
 		d = httpDecoder(u)
 	case "":
-		d = fileDecoder(u)
+		d = fileDecoder(u, args)
 	default:
 		err = fmt.Errorf("%s scheme not supported", s)
 	}
 	return
 }
 
-func fileDecoder(u *url.URL) Func {
+func fileDecoder(u *url.URL, args []string) Func {
 	return func(out interface{}) ([]byte, bool, error) {
 		file, err := os.Open(u.Path)
 		if err != nil {
@@ -57,7 +57,7 @@ func fileDecoder(u *url.URL) Func {
 		if err != nil {
 			return nil, false, err
 		}
-		isOnlySchema, err := unmarshalAsYAMLOrSchema(data, out)
+		isOnlySchema, err := unmarshalAsYAMLOrSchemaWithFile(data, out, args)
 		return data, isOnlySchema, err
 	}
 }
@@ -103,6 +103,30 @@ func directHTTPDecoder(u *url.URL) Func {
 		isOnlySchema, err := unmarshalAsYAMLOrSchema(data, out)
 		return data, isOnlySchema, err
 	}
+}
+
+// Uses the files passed in the args and looks for the specified schemaFile to parse the YAML.
+func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, args []string) (bool, error) {
+	if strings.Contains(string(data), "schemaFile:") {
+		if err := yaml.Unmarshal(data, out); err != nil {
+			return false, err
+		}
+		schema := out.(*validationfile.ValidationFile)
+
+		for _, arg := range args {
+			if strings.Contains(arg, schema.SchemaFile) {
+				file, err := os.Open(arg)
+				if err != nil {
+					return false, err
+				}
+				data, err = io.ReadAll(file)
+				if err != nil {
+					return false, err
+				}
+			}
+		}
+	}
+	return unmarshalAsYAMLOrSchema(data, out)
 }
 
 func unmarshalAsYAMLOrSchema(data []byte, out interface{}) (bool, error) {

@@ -71,7 +71,7 @@ var validateCmd = &cobra.Command{
 
 	From a devtools instance:
 		zed validate https://localhost:8443/download`,
-	Args:              cobra.ExactArgs(1),
+	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: commands.FileExtensionCompletions("zed", "yaml", "zaml"),
 	PreRunE:           validatePreRunE,
 	RunE:              validateCmdFunc,
@@ -90,37 +90,55 @@ func validatePreRunE(cmd *cobra.Command, _ []string) error {
 }
 
 func validateCmdFunc(cmd *cobra.Command, args []string) error {
-	// Parse the URL of the validation document to import.
-	u, err := url.Parse(args[0])
-	if err != nil {
-		return err
-	}
+	// Initialize variables for multiple files
+	var (
+		onlySchemaFiles            = true
+		validateContentsFiles      [][]byte
+		parsedFiles                []validationfile.ValidationFile
+		totalAssertions            int
+		totalRelationsValidated    int
+		totalFiles                 = len(args)
+		successfullyValidatedFiles = 0
+	)
 
-	decoder, err := decode.DecoderForURL(u)
-	if err != nil {
-		return err
-	}
-
-	// Decode the validation document.
-	var parsed validationfile.ValidationFile
-	validateContents, isOnlySchema, err := decoder(&parsed)
-	if err != nil {
-		var errWithSource spiceerrors.WithSourceError
-		if errors.As(err, &errWithSource) {
-			ouputErrorWithSource(validateContents, errWithSource)
+	for _, arg := range args {
+		u, err := url.Parse(arg)
+		if err != nil {
+			return err
 		}
 
-		return err
+		decoder, err := decode.DecoderForURL(u, args)
+		if err != nil {
+			return err
+		}
+
+		var parsed validationfile.ValidationFile
+		validateContents, isOnlySchema, err := decoder(&parsed)
+		if err != nil {
+			var errWithSource spiceerrors.WithSourceError
+			if errors.As(err, &errWithSource) {
+				ouputErrorWithSource(validateContents, errWithSource)
+			}
+			return err
+		}
+
+		onlySchemaFiles = isOnlySchema && onlySchemaFiles
+
+		// Store the contents and parsed file
+		validateContentsFiles = append(validateContentsFiles, validateContents)
+		parsedFiles = append(parsedFiles, parsed)
 	}
 
-	// Create the development context.
+	// Create the development context for all parsed files
 	ctx := cmd.Context()
-	tuples := make([]*core.RelationTuple, 0, len(parsed.Relationships.Relationships))
-	for _, rel := range parsed.Relationships.Relationships {
-		tuples = append(tuples, rel.ToCoreTuple())
+	tuples := make([]*core.RelationTuple, 0)
+	for _, parsed := range parsedFiles {
+		for _, rel := range parsed.Relationships.Relationships {
+			tuples = append(tuples, rel.ToCoreTuple())
+		}
 	}
 	devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
-		Schema:        parsed.Schema.Schema,
+		Schema:        parsedFiles[0].Schema.Schema,
 		Relationships: tuples,
 	})
 	if err != nil {
@@ -128,32 +146,42 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	if devErrs != nil {
 		schemaOffset := 1 /* for the 'schema:' */
-		if isOnlySchema {
+		if onlySchemaFiles {
 			schemaOffset = 0
 		}
 
-		outputDeveloperErrorsWithLineOffset(validateContents, devErrs.InputErrors, schemaOffset)
+		// Output errors for all files
+		for _, validateContents := range validateContentsFiles {
+			outputDeveloperErrorsWithLineOffset(validateContents, devErrs.InputErrors, schemaOffset)
+		}
+	}
+	// Run assertions for all parsed files
+	for _, parsed := range parsedFiles {
+		adevErrs, aerr := development.RunAllAssertions(devCtx, &parsed.Assertions)
+		if aerr != nil {
+			return aerr
+		}
+		if adevErrs != nil {
+			for _, validateContents := range validateContentsFiles {
+				outputDeveloperErrors(validateContents, adevErrs)
+			}
+		}
+		successfullyValidatedFiles++
+	}
+	// Run expected relations for all parsed files
+	for _, parsed := range parsedFiles {
+		_, erDevErrs, rerr := development.RunValidation(devCtx, &parsed.ExpectedRelations)
+		if rerr != nil {
+			return rerr
+		}
+		if erDevErrs != nil {
+			for _, validateContents := range validateContentsFiles {
+				outputDeveloperErrors(validateContents, erDevErrs)
+			}
+		}
 	}
 
-	// Run assertions.
-	adevErrs, aerr := development.RunAllAssertions(devCtx, &parsed.Assertions)
-	if aerr != nil {
-		return aerr
-	}
-	if adevErrs != nil {
-		outputDeveloperErrors(validateContents, adevErrs)
-	}
-
-	// Run expected relations.
-	_, erDevErrs, rerr := development.RunValidation(devCtx, &parsed.ExpectedRelations)
-	if rerr != nil {
-		return rerr
-	}
-	if erDevErrs != nil {
-		outputDeveloperErrors(validateContents, erDevErrs)
-	}
-
-	// Print out any warnings.
+	// Print out any warnings for all files
 	warnings, err := development.GetWarnings(ctx, devCtx)
 	if err != nil {
 		return err
@@ -162,7 +190,9 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	if len(warnings) > 0 {
 		for _, warning := range warnings {
 			console.Printf("%s%s\n", warningPrefix(), warning.Message)
-			outputForLine(validateContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
+			for _, validateContents := range validateContentsFiles {
+				outputForLine(validateContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
+			}
 			console.Printf("\n")
 		}
 
@@ -171,11 +201,18 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 		console.Print(success())
 	}
 
+	for _, parsedFile := range parsedFiles {
+		totalAssertions += len(parsedFile.Assertions.AssertTrue) + len(parsedFile.Assertions.AssertFalse)
+		totalRelationsValidated += len(parsedFile.ExpectedRelations.ValidationMap)
+	}
+
 	console.Printf(" - %d relationships loaded, %d assertions run, %d expected relations validated\n",
 		len(tuples),
-		len(parsed.Assertions.AssertTrue)+len(parsed.Assertions.AssertFalse),
-		len(parsed.ExpectedRelations.ValidationMap),
+		totalAssertions,
+		totalRelationsValidated,
 	)
+
+	console.Printf("total files: %d, successfully validated files: %d\n", totalFiles, successfullyValidatedFiles)
 	return nil
 }
 
