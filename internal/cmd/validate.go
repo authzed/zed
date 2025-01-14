@@ -93,8 +93,8 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	// Initialize variables for multiple files
 	var (
 		onlySchemaFiles            = true
-		validateContentsFiles      [][]byte
-		parsedFiles                []validationfile.ValidationFile
+		validateContentsFiles      = make([][]byte, 0, len(args))
+		parsedFiles                = make([]validationfile.ValidationFile, 0, len(args))
 		totalAssertions            int
 		totalRelationsValidated    int
 		totalFiles                 = len(args)
@@ -132,31 +132,30 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 	// Create the development context for all parsed files
 	ctx := cmd.Context()
 	tuples := make([]*core.RelationTuple, 0)
+
 	for _, parsed := range parsedFiles {
 		for _, rel := range parsed.Relationships.Relationships {
 			tuples = append(tuples, rel.ToCoreTuple())
 		}
-	}
-	devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
-		Schema:        parsedFiles[0].Schema.Schema,
-		Relationships: tuples,
-	})
-	if err != nil {
-		return err
-	}
-	if devErrs != nil {
-		schemaOffset := 1 /* for the 'schema:' */
-		if onlySchemaFiles {
-			schemaOffset = 0
+		devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
+			Schema:        parsed.Schema.Schema,
+			Relationships: tuples,
+		})
+		if err != nil {
+			return err
 		}
+		if devErrs != nil {
+			schemaOffset := 1 /* for the 'schema:' */
+			if onlySchemaFiles {
+				schemaOffset = 0
+			}
 
-		// Output errors for all files
-		for _, validateContents := range validateContentsFiles {
-			outputDeveloperErrorsWithLineOffset(validateContents, devErrs.InputErrors, schemaOffset)
+			// Output errors for all files
+			for _, validateContents := range validateContentsFiles {
+				outputDeveloperErrorsWithLineOffset(validateContents, devErrs.InputErrors, schemaOffset)
+			}
 		}
-	}
-	// Run assertions for all parsed files
-	for _, parsed := range parsedFiles {
+		// Run assertions for all parsed files
 		adevErrs, aerr := development.RunAllAssertions(devCtx, &parsed.Assertions)
 		if aerr != nil {
 			return aerr
@@ -167,9 +166,8 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 			}
 		}
 		successfullyValidatedFiles++
-	}
-	// Run expected relations for all parsed files
-	for _, parsed := range parsedFiles {
+
+		// Run expected relations for all parsed files
 		_, erDevErrs, rerr := development.RunValidation(devCtx, &parsed.ExpectedRelations)
 		if rerr != nil {
 			return rerr
@@ -179,31 +177,26 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 				outputDeveloperErrors(validateContents, erDevErrs)
 			}
 		}
-	}
-
-	// Print out any warnings for all files
-	warnings, err := development.GetWarnings(ctx, devCtx)
-	if err != nil {
-		return err
-	}
-
-	if len(warnings) > 0 {
-		for _, warning := range warnings {
-			console.Printf("%s%s\n", warningPrefix(), warning.Message)
-			for _, validateContents := range validateContentsFiles {
-				outputForLine(validateContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
-			}
-			console.Printf("\n")
+		// Print out any warnings for all files
+		warnings, err := development.GetWarnings(ctx, devCtx)
+		if err != nil {
+			return err
 		}
+		if len(warnings) > 0 {
+			for _, warning := range warnings {
+				console.Printf("%s%s\n", warningPrefix(), warning.Message)
+				for _, validateContents := range validateContentsFiles {
+					outputForLine(validateContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
+				}
+				console.Printf("\n")
+			}
 
-		console.Print(complete())
-	} else {
-		console.Print(success())
-	}
-
-	for _, parsedFile := range parsedFiles {
-		totalAssertions += len(parsedFile.Assertions.AssertTrue) + len(parsedFile.Assertions.AssertFalse)
-		totalRelationsValidated += len(parsedFile.ExpectedRelations.ValidationMap)
+			console.Print(complete())
+		} else {
+			console.Print(success())
+		}
+		totalAssertions += len(parsed.Assertions.AssertTrue) + len(parsed.Assertions.AssertFalse)
+		totalRelationsValidated += len(parsed.ExpectedRelations.ValidationMap)
 	}
 
 	console.Printf(" - %d relationships loaded, %d assertions run, %d expected relations validated\n",

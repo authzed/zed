@@ -678,8 +678,6 @@ github.com/authzed/consistent v0.1.0 h1:tlh1wvKoRbjRhMm2P+X5WQQyR54SRoS4MyjLOg17
 github.com/authzed/consistent v0.1.0/go.mod h1:plwHlrN/EJUCwQ+Bca0MhM1KnisPs7HEkZI5giCXrcc=
 github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b h1:wbh8IK+aMLTCey9sZasO7b6BWLAJnHHvb79fvWCXwxw=
 github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b/go.mod h1:s3qC7V7XIbiNWERv7Lfljy/Lx25/V1Qlexb0WJuA8uQ=
-github.com/authzed/spicedb v1.39.1-0.20250108165209-c18b1656bdd0 h1:ewOiKCJmuLU7/+HyUrJD/oIMgd7NG0NrpHfl4nzeW/s=
-github.com/authzed/spicedb v1.39.1-0.20250108165209-c18b1656bdd0/go.mod h1:/UVC4ZJkMUZFN4MVjjOLAU7m/fqitkBP57ZPffyicOs=
 github.com/aws/aws-sdk-go-v2 v1.32.7 h1:ky5o35oENWi0JYWUZkB7WYvVPP+bcRF5/Iq7JWSb5Rw=
 github.com/aws/aws-sdk-go-v2 v1.32.7/go.mod h1:P5WJBrYqqbWVaOxgH0X/FYYD47/nooaPOZPlQdmiN2U=
 github.com/aws/aws-sdk-go-v2/config v1.28.7 h1:GduUnoTXlhkgnxTD93g1nv4tVPILbdNQOzav+Wpg7AE=
@@ -1119,6 +1117,8 @@ github.com/jzelinskie/cobrautil/v2 v2.0.0-20240819150235-f7fe73942d0f h1:+WgAZQQ
 github.com/jzelinskie/cobrautil/v2 v2.0.0-20240819150235-f7fe73942d0f/go.mod h1:jsl6cEF6BT3UeQoSLreA7G0sZXemoI5XNqyxzWCohbE=
 github.com/jzelinskie/stringz v0.0.3 h1:0GhG3lVMYrYtIvRbxvQI6zqRTT1P1xyQlpa0FhfUXas=
 github.com/jzelinskie/stringz v0.0.3/go.mod h1:hHYbgxJuNLRw91CmpuFsYEOyQqpDVFg8pvEh23vy4P0=
+github.com/kartikaysaxena/spicedb v0.0.0-20250113154244-813e62735279 h1:rX8BE4sozX/QQ+ViPUohSf8kPGn61zEsgT7bS8OKV1Q=
+github.com/kartikaysaxena/spicedb v0.0.0-20250113154244-813e62735279/go.mod h1:/UVC4ZJkMUZFN4MVjjOLAU7m/fqitkBP57ZPffyicOs=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51/go.mod h1:CzGEWj7cYgsdH8dAjBGEr58BoE7ScuLd+fwFZ44+/x8=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
