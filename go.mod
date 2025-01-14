@@ -9,7 +9,7 @@ require (
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
 	github.com/authzed/authzed-go v1.2.2-0.20250107172318-7fd4159ab2b7
 	github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b
-	github.com/authzed/spicedb v1.39.1-0.20250108165209-c18b1656bdd0
+	github.com/authzed/spicedb v1.39.1-0.20250114225336-a80f596434e3
 	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/ccoveille/go-safecast v1.5.0
 	github.com/cenkalti/backoff/v4 v4.3.0
@@ -261,5 +261,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
-
-replace github.com/authzed/spicedb => github.com/kartikaysaxena/spicedb v0.0.0-20250113154244-813e62735279

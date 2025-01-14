@@ -1,6 +1,7 @@
 package decode
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -133,29 +134,43 @@ func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, args []string
 func unmarshalAsYAMLOrSchema(data []byte, out interface{}) (bool, error) {
 	// Check for indications of a schema-only file.
 	if !strings.Contains(string(data), "schema:") && !strings.Contains(string(data), "relationships:") {
-		compiled, serr := compiler.Compile(compiler.InputSchema{
-			Source:       input.Source("schema"),
-			SchemaString: string(data),
-		}, compiler.AllowUnprefixedObjectType())
-		if serr != nil {
-			return false, serr
+		if err := compileSchemaFromData(data, out); err != nil {
+			return false, err
 		}
-
-		// If that succeeds, return the compiled schema.
-		vfile := *out.(*validationfile.ValidationFile)
-		vfile.Schema = blocks.ParsedSchema{
-			CompiledSchema: compiled,
-			Schema:         string(data),
-			SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
-		}
-		*out.(*validationfile.ValidationFile) = vfile
 		return true, nil
 	}
 
+	if !strings.Contains(string(data), "schema:") && !strings.Contains(string(data), "schemaFile:") {
+		// If there is no schema and no schemaFile and it doesn't compile then it must be yaml with missing fields
+		if err := compileSchemaFromData(data, out); err != nil {
+			return false, errors.New("either schema or schemaFile must be present")
+		}
+		return true, nil
+	}
 	// Try to unparse as YAML for the validation file format.
 	if err := yaml.Unmarshal(data, out); err != nil {
 		return false, err
 	}
 
 	return false, nil
+}
+
+func compileSchemaFromData(data []byte, out interface{}) error {
+	compiled, serr := compiler.Compile(compiler.InputSchema{
+		Source:       input.Source("schema"),
+		SchemaString: string(data),
+	}, compiler.AllowUnprefixedObjectType())
+	if serr != nil {
+		return serr
+	}
+
+	// If that succeeds, return the compiled schema.
+	vfile := *out.(*validationfile.ValidationFile)
+	vfile.Schema = blocks.ParsedSchema{
+		CompiledSchema: compiled,
+		Schema:         string(data),
+		SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
+	}
+	*out.(*validationfile.ValidationFile) = vfile
+	return nil
 }
