@@ -107,7 +107,7 @@ func directHTTPDecoder(u *url.URL) Func {
 
 // Uses the files passed in the args and looks for the specified schemaFile to parse the YAML.
 func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, args []string) (bool, error) {
-	if (strings.Contains(string(data), "schemaFile:") && !strings.Contains(string(data), "schema:")) {
+	if strings.Contains(string(data), "schemaFile:") && !strings.Contains(string(data), "schema:") {
 		if err := yaml.Unmarshal(data, out); err != nil {
 			return false, err
 		}
@@ -132,7 +132,7 @@ func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, args []string
 
 func unmarshalAsYAMLOrSchema(data []byte, out interface{}) (bool, error) {
 	// Check for indications of a schema-only file.
-	if (!strings.Contains(string(data), "schema:") && !strings.Contains(string(data), "relationships:")) {
+	if !strings.Contains(string(data), "schema:") && !strings.Contains(string(data), "relationships:") {
 		compiled, serr := compiler.Compile(compiler.InputSchema{
 			Source:       input.Source("schema"),
 			SchemaString: string(data),
