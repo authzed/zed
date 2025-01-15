@@ -1,6 +1,7 @@
 package decode
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,21 +34,21 @@ type Func func(out interface{}) ([]byte, bool, error)
 
 // DecoderForURL returns the appropriate decoder for a given URL.
 // Some URLs have special handling to dereference to the actual file.
-func DecoderForURL(u *url.URL) (d Func, err error) {
+func DecoderForURL(u *url.URL, args []string) (d Func, err error) {
 	switch s := u.Scheme; s {
 	case "file":
-		d = fileDecoder(u)
+		d = fileDecoder(u, args)
 	case "http", "https":
 		d = httpDecoder(u)
 	case "":
-		d = fileDecoder(u)
+		d = fileDecoder(u, args)
 	default:
 		err = fmt.Errorf("%s scheme not supported", s)
 	}
 	return
 }
 
-func fileDecoder(u *url.URL) Func {
+func fileDecoder(u *url.URL, args []string) Func {
 	return func(out interface{}) ([]byte, bool, error) {
 		file, err := os.Open(u.Path)
 		if err != nil {
@@ -57,7 +58,7 @@ func fileDecoder(u *url.URL) Func {
 		if err != nil {
 			return nil, false, err
 		}
-		isOnlySchema, err := unmarshalAsYAMLOrSchema(data, out)
+		isOnlySchema, err := unmarshalAsYAMLOrSchemaWithFile(data, out, args)
 		return data, isOnlySchema, err
 	}
 }
@@ -105,32 +106,71 @@ func directHTTPDecoder(u *url.URL) Func {
 	}
 }
 
+// Uses the files passed in the args and looks for the specified schemaFile to parse the YAML.
+func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, args []string) (bool, error) {
+	if strings.Contains(string(data), "schemaFile:") && !strings.Contains(string(data), "schema:") {
+		if err := yaml.Unmarshal(data, out); err != nil {
+			return false, err
+		}
+		schema := out.(*validationfile.ValidationFile)
+
+		for _, arg := range args {
+			// Check if the file specified in schemaFile is passed as an arguement.
+			if strings.Contains(arg, schema.SchemaFile) {
+				file, err := os.Open(arg)
+				if err != nil {
+					return false, err
+				}
+				data, err = io.ReadAll(file)
+				if err != nil {
+					return false, err
+				}
+			}
+		}
+	}
+	return unmarshalAsYAMLOrSchema(data, out)
+}
+
 func unmarshalAsYAMLOrSchema(data []byte, out interface{}) (bool, error) {
 	// Check for indications of a schema-only file.
-	if !strings.Contains(string(data), "schema:") {
-		compiled, serr := compiler.Compile(compiler.InputSchema{
-			Source:       input.Source("schema"),
-			SchemaString: string(data),
-		}, compiler.AllowUnprefixedObjectType())
-		if serr != nil {
-			return false, serr
+	if !strings.Contains(string(data), "schema:") && !strings.Contains(string(data), "relationships:") {
+		if err := compileSchemaFromData(data, out); err != nil {
+			return false, err
 		}
-
-		// If that succeeds, return the compiled schema.
-		vfile := *out.(*validationfile.ValidationFile)
-		vfile.Schema = blocks.ParsedSchema{
-			CompiledSchema: compiled,
-			Schema:         string(data),
-			SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
-		}
-		*out.(*validationfile.ValidationFile) = vfile
 		return true, nil
 	}
 
+	if !strings.Contains(string(data), "schema:") && !strings.Contains(string(data), "schemaFile:") {
+		// If there is no schema and no schemaFile and it doesn't compile then it must be yaml with missing fields
+		if err := compileSchemaFromData(data, out); err != nil {
+			return false, errors.New("either schema or schemaFile must be present")
+		}
+		return true, nil
+	}
 	// Try to unparse as YAML for the validation file format.
 	if err := yaml.Unmarshal(data, out); err != nil {
 		return false, err
 	}
 
 	return false, nil
+}
+
+func compileSchemaFromData(data []byte, out interface{}) error {
+	compiled, serr := compiler.Compile(compiler.InputSchema{
+		Source:       input.Source("schema"),
+		SchemaString: string(data),
+	}, compiler.AllowUnprefixedObjectType())
+	if serr != nil {
+		return serr
+	}
+
+	// If that succeeds, return the compiled schema.
+	vfile := *out.(*validationfile.ValidationFile)
+	vfile.Schema = blocks.ParsedSchema{
+		CompiledSchema: compiled,
+		Schema:         string(data),
+		SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
+	}
+	*out.(*validationfile.ValidationFile) = vfile
+	return nil
 }
