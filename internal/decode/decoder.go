@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -34,21 +35,21 @@ type Func func(out interface{}) ([]byte, bool, error)
 
 // DecoderForURL returns the appropriate decoder for a given URL.
 // Some URLs have special handling to dereference to the actual file.
-func DecoderForURL(u *url.URL, args []string) (d Func, err error) {
+func DecoderForURL(u *url.URL) (d Func, err error) {
 	switch s := u.Scheme; s {
 	case "file":
-		d = fileDecoder(u, args)
+		d = fileDecoder(u)
 	case "http", "https":
 		d = httpDecoder(u)
 	case "":
-		d = fileDecoder(u, args)
+		d = fileDecoder(u)
 	default:
 		err = fmt.Errorf("%s scheme not supported", s)
 	}
 	return
 }
 
-func fileDecoder(u *url.URL, args []string) Func {
+func fileDecoder(u *url.URL) Func {
 	return func(out interface{}) ([]byte, bool, error) {
 		file, err := os.Open(u.Path)
 		if err != nil {
@@ -58,7 +59,7 @@ func fileDecoder(u *url.URL, args []string) Func {
 		if err != nil {
 			return nil, false, err
 		}
-		isOnlySchema, err := unmarshalAsYAMLOrSchemaWithFile(data, out, args)
+		isOnlySchema, err := unmarshalAsYAMLOrSchemaWithFile(data, out, u.Path)
 		return data, isOnlySchema, err
 	}
 }
@@ -107,25 +108,33 @@ func directHTTPDecoder(u *url.URL) Func {
 }
 
 // Uses the files passed in the args and looks for the specified schemaFile to parse the YAML.
-func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, args []string) (bool, error) {
+func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, filename string) (bool, error) {
 	if strings.Contains(string(data), "schemaFile:") && !strings.Contains(string(data), "schema:") {
 		if err := yaml.Unmarshal(data, out); err != nil {
 			return false, err
 		}
-		schema := out.(*validationfile.ValidationFile)
+		validationFile := out.(*validationfile.ValidationFile)
 
-		for _, arg := range args {
-			// Check if the file specified in schemaFile is passed as an arguement.
-			if strings.Contains(arg, schema.SchemaFile) {
-				file, err := os.Open(arg)
-				if err != nil {
-					return false, err
-				}
-				data, err = io.ReadAll(file)
-				if err != nil {
-					return false, err
-				}
-			}
+		// Need to join the original filepath with the requested filepath
+		// to construct the path to the referenced schema file.
+		// NOTE: This does not allow for yaml files to transitively reference
+		// each other's schemaFile fields.
+		// TODO: enable this behavior
+		schemaPath := filepath.Join(path.Dir(filename), validationFile.SchemaFile)
+
+		if !filepath.IsLocal(schemaPath) {
+			// We want to prevent access of files that are outside of the folder
+			// where the command was originally invoked. This should do that.
+			return false, fmt.Errorf("schema filepath %s must be local to where the command was invoked", schemaPath)
+		}
+
+		file, err := os.Open(schemaPath)
+		if err != nil {
+			return false, err
+		}
+		data, err = io.ReadAll(file)
+		if err != nil {
+			return false, err
 		}
 	}
 	return unmarshalAsYAMLOrSchema(data, out)

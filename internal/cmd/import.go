@@ -72,7 +72,7 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	decoder, err := decode.DecoderForURL(u, args)
+	decoder, err := decode.DecoderForURL(u)
 	if err != nil {
 		return err
 	}
