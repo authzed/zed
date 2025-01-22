@@ -75,6 +75,11 @@ var validateCmd = &cobra.Command{
 	ValidArgsFunction: commands.FileExtensionCompletions("zed", "yaml", "zaml"),
 	PreRunE:           validatePreRunE,
 	RunE:              validateCmdFunc,
+
+	// A schema that causes the parser/compiler to error will halt execution
+	// of this command with an error. In that case, we want to just display the error,
+	// rather than showing usage for this command.
+	SilenceUsage: true,
 }
 
 func validatePreRunE(cmd *cobra.Command, _ []string) error {
@@ -89,25 +94,25 @@ func validatePreRunE(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func validateCmdFunc(cmd *cobra.Command, args []string) error {
+func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
 	// Initialize variables for multiple files
 	var (
-		onlySchemaFiles            = true
-		validateContentsFiles      = make([][]byte, 0, len(args))
-		parsedFiles                = make([]validationfile.ValidationFile, 0, len(args))
-		totalAssertions            int
-		totalRelationsValidated    int
-		totalFiles                 = len(args)
+		totalFiles                 = len(filenames)
 		successfullyValidatedFiles = 0
 	)
 
-	for _, arg := range args {
-		u, err := url.Parse(arg)
+	for _, filename := range filenames {
+		// If we're running over multiple files, print the filename for context/debugging purposes
+		if totalFiles > 1 {
+			console.Println(filename)
+		}
+
+		u, err := url.Parse(filename)
 		if err != nil {
 			return err
 		}
 
-		decoder, err := decode.DecoderForURL(u, args)
+		decoder, err := decode.DecoderForURL(u)
 		if err != nil {
 			return err
 		}
@@ -122,21 +127,16 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		onlySchemaFiles = isOnlySchema && onlySchemaFiles
+		tuples := make([]*core.RelationTuple, 0)
+		totalAssertions := 0
+		totalRelationsValidated := 0
 
-		// Store the contents and parsed file
-		validateContentsFiles = append(validateContentsFiles, validateContents)
-		parsedFiles = append(parsedFiles, parsed)
-	}
-
-	// Create the development context for all parsed files
-	ctx := cmd.Context()
-	tuples := make([]*core.RelationTuple, 0)
-
-	for _, parsed := range parsedFiles {
 		for _, rel := range parsed.Relationships.Relationships {
 			tuples = append(tuples, rel.ToCoreTuple())
 		}
+
+		// Create the development context for each run
+		ctx := cmd.Context()
 		devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
 			Schema:        parsed.Schema.Schema,
 			Relationships: tuples,
@@ -146,24 +146,20 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 		}
 		if devErrs != nil {
 			schemaOffset := 1 /* for the 'schema:' */
-			if onlySchemaFiles {
+			if isOnlySchema {
 				schemaOffset = 0
 			}
 
-			// Output errors for all files
-			for _, validateContents := range validateContentsFiles {
-				outputDeveloperErrorsWithLineOffset(validateContents, devErrs.InputErrors, schemaOffset)
-			}
+			// Output errors
+			outputDeveloperErrorsWithLineOffset(validateContents, devErrs.InputErrors, schemaOffset)
 		}
-		// Run assertions for all parsed files
+		// Run assertions
 		adevErrs, aerr := development.RunAllAssertions(devCtx, &parsed.Assertions)
 		if aerr != nil {
 			return aerr
 		}
 		if adevErrs != nil {
-			for _, validateContents := range validateContentsFiles {
-				outputDeveloperErrors(validateContents, adevErrs)
-			}
+			outputDeveloperErrors(validateContents, adevErrs)
 		}
 		successfullyValidatedFiles++
 
@@ -173,9 +169,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 			return rerr
 		}
 		if erDevErrs != nil {
-			for _, validateContents := range validateContentsFiles {
-				outputDeveloperErrors(validateContents, erDevErrs)
-			}
+			outputDeveloperErrors(validateContents, erDevErrs)
 		}
 		// Print out any warnings for all files
 		warnings, err := development.GetWarnings(ctx, devCtx)
@@ -185,9 +179,7 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 		if len(warnings) > 0 {
 			for _, warning := range warnings {
 				console.Printf("%s%s\n", warningPrefix(), warning.Message)
-				for _, validateContents := range validateContentsFiles {
-					outputForLine(validateContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
-				}
+				outputForLine(validateContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
 				console.Printf("\n")
 			}
 
@@ -197,15 +189,17 @@ func validateCmdFunc(cmd *cobra.Command, args []string) error {
 		}
 		totalAssertions += len(parsed.Assertions.AssertTrue) + len(parsed.Assertions.AssertFalse)
 		totalRelationsValidated += len(parsed.ExpectedRelations.ValidationMap)
+
+		console.Printf(" - %d relationships loaded, %d assertions run, %d expected relations validated\n",
+			len(tuples),
+			totalAssertions,
+			totalRelationsValidated,
+		)
 	}
 
-	console.Printf(" - %d relationships loaded, %d assertions run, %d expected relations validated\n",
-		len(tuples),
-		totalAssertions,
-		totalRelationsValidated,
-	)
-
-	console.Printf("total files: %d, successfully validated files: %d\n", totalFiles, successfullyValidatedFiles)
+	if totalFiles > 1 {
+		console.Printf("total files: %d, successfully validated files: %d\n", totalFiles, successfullyValidatedFiles)
+	}
 	return nil
 }
 
