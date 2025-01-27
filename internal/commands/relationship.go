@@ -495,7 +495,11 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation, input *
 			}
 
 			if operation != v1.RelationshipUpdate_OPERATION_DELETE {
-				if err := handleCaveatAndExpirationFlags(cmd, rel); err != nil {
+				if err := handleCaveatFlag(cmd, rel); err != nil {
+					return err
+				}
+
+				if err := handleExpirationFlag(cmd, rel); err != nil {
 					return err
 				}
 			}
@@ -553,12 +557,4 @@ func handleExpirationFlag(cmd *cobra.Command, rel *v1.Relationship) error {
 	}
 
 	return nil
-}
-
-func handleCaveatAndExpirationFlags(cmd *cobra.Command, rel *v1.Relationship) error {
-	if err := handleCaveatFlag(cmd, rel); err != nil {
-		return err
-	}
-
-	return handleExpirationFlag(cmd, rel)
 }
