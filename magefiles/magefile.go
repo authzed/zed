@@ -4,12 +4,10 @@
 package main
 
 import (
-	"os"
-
 	"github.com/authzed/zed/internal/cmd"
 	"github.com/jzelinskie/cobrautil/v2/cobrazerolog"
 	"github.com/magefile/mage/mg"
-	"github.com/spf13/cobra/doc"
+	"os"
 )
 
 type Gen mg.Namespace
@@ -30,5 +28,6 @@ func (Gen) Docs() error {
 	}
 
 	rootCmd := cmd.InitialiseRootCmd(cobrazerolog.New())
-	return doc.GenMarkdownTree(rootCmd, targetDir)
+
+	return GenCustomMarkdownTree(rootCmd, targetDir)
 }
