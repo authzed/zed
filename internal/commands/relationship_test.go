@@ -276,6 +276,7 @@ func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
 	cmd.Flags().Int("batch-size", 100, "")
 	cmd.Flags().Bool("json", true, "")
 	cmd.Flags().String("caveat", `cav:{"letters": ["a", "b", "c"]}`, "")
+	cmd.Flags().String("expiration-time", "", "")
 
 	err = f(cmd, []string{"resource:1", "view", "user:1"})
 	require.NoError(t, err)
@@ -322,6 +323,7 @@ func TestWriteRelationshipCmdFuncArgsTakePrecedence(t *testing.T) {
 	cmd.Flags().Int("batch-size", 100, "")
 	cmd.Flags().Bool("json", true, "")
 	cmd.Flags().String("caveat", "", "")
+	cmd.Flags().String("expiration-time", "", "")
 
 	err := f(cmd, []string{"resource:1", "viewer", "user:1"})
 	require.NoError(t, err)
@@ -365,6 +367,7 @@ func TestWriteRelationshipCmdFuncFromStdin(t *testing.T) {
 	cmd.Flags().Int("batch-size", 100, "")
 	cmd.Flags().Bool("json", true, "")
 	cmd.Flags().String("caveat", "", "")
+	cmd.Flags().String("expiration-time", "", "")
 
 	err := f(cmd, nil)
 	require.NoError(t, err)
@@ -414,6 +417,7 @@ func TestWriteRelationshipCmdFuncFromStdinBatch(t *testing.T) {
 	cmd.Flags().Int("batch-size", 1, "")
 	cmd.Flags().Bool("json", true, "")
 	cmd.Flags().String("caveat", "", "")
+	cmd.Flags().String("expiration-time", "", "")
 
 	err := f(cmd, nil)
 	require.NoError(t, err)
@@ -454,9 +458,110 @@ func TestWriteRelationshipCmdFuncFromFailsWithCaveatArg(t *testing.T) {
 	cmd.Flags().Int("batch-size", 1, "")
 	cmd.Flags().Bool("json", true, "")
 	cmd.Flags().String("caveat", `cav:{"letters": ["a", "b", "c"]}`, "")
+	cmd.Flags().String("expiration-time", "", "")
 
 	err := f(cmd, nil)
 	require.ErrorContains(t, err, "cannot specify a caveat in both the relationship and the --caveat flag")
+}
+
+func TestWriteRelationshipCmdFuncWithExpirationTime(t *testing.T) {
+	mock := func(*cobra.Command) (client.Client, error) {
+		return &mockClient{t: t, expectedWrites: []*v1.WriteRelationshipsRequest{
+			{
+				Updates: []*v1.RelationshipUpdate{
+					{
+						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+						Relationship: tuple.MustParseV1Rel(`resource:1#viewer@user:1[expiration:2025-01-27T20:04:05Z]`),
+					},
+				},
+			},
+			{
+				Updates: []*v1.RelationshipUpdate{
+					{
+						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+						Relationship: tuple.MustParseV1Rel(`resource:1#viewer@user:2[expiration:2025-01-27T20:04:05Z]`),
+					},
+				},
+			},
+		}}, nil
+	}
+
+	fi := fileFromStrings(t, []string{
+		`resource:1 viewer user:1`,
+		`resource:1 viewer user:2`,
+	})
+	defer func() {
+		require.NoError(t, fi.Close())
+	}()
+	t.Cleanup(func() {
+		_ = os.Remove(fi.Name())
+	})
+
+	originalClient := client.NewClient
+	client.NewClient = mock
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, fi)
+	cmd := &cobra.Command{}
+	cmd.Flags().Int("batch-size", 1, "")
+	cmd.Flags().Bool("json", true, "")
+	cmd.Flags().String("caveat", "", "")
+	cmd.Flags().String("expiration-time", "2025-01-27T20:04:05Z", "")
+
+	err := f(cmd, nil)
+	require.NoError(t, err)
+}
+
+func TestWriteRelationshipCmdFuncFromStdinBatchWithExpirationTime(t *testing.T) {
+	mock := func(*cobra.Command) (client.Client, error) {
+		return &mockClient{t: t, expectedWrites: []*v1.WriteRelationshipsRequest{
+			{
+				Updates: []*v1.RelationshipUpdate{
+					{
+						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+						Relationship: tuple.MustParseV1Rel(`resource:1#viewer@user:1[expiration:2025-01-27T20:04:05Z]`),
+					},
+				},
+			},
+			{
+				Updates: []*v1.RelationshipUpdate{
+					{
+						Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+						Relationship: tuple.MustParseV1Rel(`resource:1#viewer@user:2[expiration:2025-01-27T20:04:05Z]`),
+					},
+				},
+			},
+		}}, nil
+	}
+
+	fi := fileFromStrings(t, []string{
+		`resource:1 viewer user:1`,
+		`resource:1 viewer user:2`,
+	})
+	defer func() {
+		require.NoError(t, fi.Close())
+	}()
+	t.Cleanup(func() {
+		_ = os.Remove(fi.Name())
+	})
+
+	originalClient := client.NewClient
+	client.NewClient = mock
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	f := writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, fi)
+	cmd := &cobra.Command{}
+	cmd.Flags().Int("batch-size", 1, "")
+	cmd.Flags().Bool("json", true, "")
+	cmd.Flags().String("caveat", "", "")
+	cmd.Flags().String("expiration-time", "2025-01-27T20:04:05Z", "")
+
+	err := f(cmd, nil)
+	require.NoError(t, err)
 }
 
 func fileFromStrings(t *testing.T, strings []string) *os.File {
