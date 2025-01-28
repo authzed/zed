@@ -1,3 +1,6 @@
+//go:build mage
+// +build mage
+
 package main
 
 import (
@@ -23,7 +26,6 @@ func (s byName) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s byName) Less(i, j int) bool { return s[i].Name() < s[j].Name() }
 
 func GenCustomMarkdownTree(cmd *cobra.Command, dir string) error {
-
 	basename := strings.ReplaceAll(cmd.CommandPath(), " ", "_") + ".md"
 	filename := filepath.Join(dir, basename)
 
@@ -34,7 +36,6 @@ func GenCustomMarkdownTree(cmd *cobra.Command, dir string) error {
 	defer f.Close()
 
 	return genMarkdownTreeCustom(cmd, f)
-
 }
 
 func genMarkdownTreeCustom(cmd *cobra.Command, f *os.File) error {
@@ -132,7 +133,6 @@ func hasSeeAlso(cmd *cobra.Command) bool {
 }
 
 func printOptions(buf *bytes.Buffer, cmd *cobra.Command) error {
-
 	flags := cmd.NonInheritedFlags()
 	flags.SetOutput(buf)
 
@@ -145,12 +145,11 @@ func printOptions(buf *bytes.Buffer, cmd *cobra.Command) error {
 	parentFlags := cmd.InheritedFlags()
 	parentFlags.SetOutput(buf)
 
-	if flags.HasAvailableFlags() {
+	if parentFlags.HasAvailableFlags() {
 		buf.WriteString("### Options Inherited From Parent Flags\n\n```\n")
-		flags.PrintDefaults()
+		parentFlags.PrintDefaults()
 		buf.WriteString("```\n\n")
 	}
 
 	return nil
-
 }

@@ -4,10 +4,11 @@
 package main
 
 import (
+	"os"
+
 	"github.com/authzed/zed/internal/cmd"
 	"github.com/jzelinskie/cobrautil/v2/cobrazerolog"
 	"github.com/magefile/mage/mg"
-	"os"
 )
 
 type Gen mg.Namespace
