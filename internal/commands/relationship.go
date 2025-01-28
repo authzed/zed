@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/authzed/zed/internal/client"
@@ -21,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
@@ -29,11 +31,13 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	relationshipCmd.AddCommand(createCmd)
 	createCmd.Flags().Bool("json", false, "output as JSON")
 	createCmd.Flags().String("caveat", "", `the caveat for the relationship, with format: 'caveat_name:{"some":"context"}'`)
+	createCmd.Flags().String("expiration-time", "", `the expiration time of the relationship in RFC 3339 format`)
 	createCmd.Flags().IntP("batch-size", "b", 100, "batch size when writing streams of relationships from stdin")
 
 	relationshipCmd.AddCommand(touchCmd)
 	touchCmd.Flags().Bool("json", false, "output as JSON")
 	touchCmd.Flags().String("caveat", "", `the caveat for the relationship, with format: 'caveat_name:{"some":"context"}'`)
+	touchCmd.Flags().String("expiration-time", "", `the expiration time for the relationship in RFC 3339 format`)
 	touchCmd.Flags().IntP("batch-size", "b", 100, "batch size when writing streams of relationships from stdin")
 
 	relationshipCmd.AddCommand(deleteCmd)
@@ -494,6 +498,10 @@ func writeRelationshipCmdFunc(operation v1.RelationshipUpdate_Operation, input *
 				if err := handleCaveatFlag(cmd, rel); err != nil {
 					return err
 				}
+
+				if err := handleExpirationFlag(cmd, rel); err != nil {
+					return err
+				}
 			}
 
 			updateBatch = append(updateBatch, &v1.RelationshipUpdate{
@@ -534,5 +542,19 @@ func handleCaveatFlag(cmd *cobra.Command, rel *v1.Relationship) error {
 			rel.OptionalCaveat.Context = caveatCtx
 		}
 	}
+	return nil
+}
+
+func handleExpirationFlag(cmd *cobra.Command, rel *v1.Relationship) error {
+	expirationTime := cobrautil.MustGetString(cmd, "expiration-time")
+
+	if expirationTime != "" {
+		t, err := time.Parse(time.RFC3339, expirationTime)
+		if err != nil {
+			return fmt.Errorf("could not parse RFC 3339 timestamp: %w", err)
+		}
+		rel.OptionalExpiresAt = timestamppb.New(t)
+	}
+
 	return nil
 }
