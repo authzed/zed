@@ -9,6 +9,7 @@ import (
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
+	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -76,7 +77,7 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	var p decode.SchemaRelationships
+	var p validationfile.ValidationFile
 	if _, _, err := decoder(&p); err != nil {
 		return err
 	}
@@ -87,7 +88,7 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	if cobrautil.MustGetBool(cmd, "schema") {
-		if err := importSchema(cmd.Context(), client, p.Schema, prefix); err != nil {
+		if err := importSchema(cmd.Context(), client, p.Schema.Schema, prefix); err != nil {
 			return err
 		}
 	}
@@ -95,7 +96,7 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 	if cobrautil.MustGetBool(cmd, "relationships") {
 		batchSize := cobrautil.MustGetInt(cmd, "batch-size")
 		workers := cobrautil.MustGetInt(cmd, "workers")
-		if err := importRelationships(cmd.Context(), client, p.Relationships, prefix, batchSize, workers); err != nil {
+		if err := importRelationships(cmd.Context(), client, p.Relationships.RelationshipsString, prefix, batchSize, workers); err != nil {
 			return err
 		}
 	}
