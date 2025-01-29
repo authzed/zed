@@ -113,7 +113,10 @@ func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, filename stri
 		if err := yaml.Unmarshal(data, out); err != nil {
 			return false, err
 		}
-		validationFile := out.(*validationfile.ValidationFile)
+		validationFile, ok := out.(*validationfile.ValidationFile)
+		if !ok {
+			return false, fmt.Errorf("could not cast unmarshalled file to validationfile")
+		}
 
 		// Need to join the original filepath with the requested filepath
 		// to construct the path to the referenced schema file.
