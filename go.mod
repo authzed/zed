@@ -9,7 +9,7 @@ require (
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
 	github.com/authzed/authzed-go v1.3.0
 	github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b
-	github.com/authzed/spicedb v1.39.1-0.20250114225336-a80f596434e3
+	github.com/authzed/spicedb v1.40.0
 	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/ccoveille/go-safecast v1.5.0
 	github.com/cenkalti/backoff/v4 v4.3.0
@@ -26,10 +26,10 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/rodaine/table v1.3.0
 	github.com/rs/zerolog v1.33.0
-	github.com/samber/lo v1.49.0
-	github.com/schollz/progressbar/v3 v3.17.1
+	github.com/samber/lo v1.49.1
+	github.com/schollz/progressbar/v3 v3.18.0
 	github.com/spf13/cobra v1.8.1
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	github.com/xlab/treeprint v1.2.0
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
