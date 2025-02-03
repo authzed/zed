@@ -1,7 +1,0 @@
-from .subjects import user, group
-
-definition resource {
-    relation user: user
-    relation group: group
-    permission view = user + group->member
-}

@@ -1,7 +1,0 @@
----
-schemaFile: "../one.zed"
-relationships: >-
-  resource:1#user@user:2
-assertions:
-  assertFalse:
-    - "resource:1#user@user:1"

@@ -4,9 +4,3 @@ temp/
 # Local-only files
 go.work
 go.work.sum
-
-go.work
-go.work.sum
-
-go.work
-go.work.sum

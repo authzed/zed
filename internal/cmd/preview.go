@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 
 	newcompiler "github.com/authzed/spicedb/pkg/composableschemadsl/compiler"
@@ -26,6 +25,7 @@ func registerPreviewCmd(rootCmd *cobra.Command) {
 	previewCmd.AddCommand(schemaCmd)
 
 	schemaCmd.AddCommand(schemaCompileCmd)
+	schemaCompileCmd.Flags().String("out", "", "output filepath; omitting writes to stdout")
 }
 
 var previewCmd = &cobra.Command{
@@ -42,8 +42,12 @@ var schemaCompileCmd = &cobra.Command{
 	Use:   "compile <file>",
 	Args:  cobra.ExactArgs(1),
 	Short: "Compile a schema that uses extended syntax into one that can be written to SpiceDB",
-	// TODO: add longer example
-	// TODO: is this correct?
+	Example: `
+	Write to stdout:
+		zed preview schema compile root.zed
+	Write to an output file:
+		zed preview schema compile --out compiled.zed
+	`,
 	ValidArgsFunction: commands.FileExtensionCompletions("zed"),
 	RunE:              schemaCompileCmdFunc,
 }
@@ -51,7 +55,6 @@ var schemaCompileCmd = &cobra.Command{
 // Compiles an input schema written in the new composable schema syntax
 // and produces it as a fully-realized schema
 func schemaCompileCmdFunc(cmd *cobra.Command, args []string) error {
-	// TODO: should we maintain the validate semantics where you can provide any URL?
 	stdOutFd, err := safecast.ToInt(uint(os.Stdout.Fd()))
 	if err != nil {
 		return err
@@ -61,12 +64,7 @@ func schemaCompileCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("must provide stdout or output file path")
 	}
 
-	relativeInputFilepath := args[0]
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	inputFilepath := path.Join(cwd, relativeInputFilepath)
+	inputFilepath := args[0]
 	inputSourceFolder := filepath.Dir(inputFilepath)
 	var schemaBytes []byte
 	schemaBytes, err = os.ReadFile(inputFilepath)
