@@ -678,8 +678,8 @@ github.com/authzed/consistent v0.1.0 h1:tlh1wvKoRbjRhMm2P+X5WQQyR54SRoS4MyjLOg17
 github.com/authzed/consistent v0.1.0/go.mod h1:plwHlrN/EJUCwQ+Bca0MhM1KnisPs7HEkZI5giCXrcc=
 github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b h1:wbh8IK+aMLTCey9sZasO7b6BWLAJnHHvb79fvWCXwxw=
 github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b/go.mod h1:s3qC7V7XIbiNWERv7Lfljy/Lx25/V1Qlexb0WJuA8uQ=
-github.com/authzed/spicedb v1.40.0 h1:VcYmSZEHNjZXmEI+VIn1qDP8SgeFTFbZuW7UilYj3ns=
-github.com/authzed/spicedb v1.40.0/go.mod h1:/UVC4ZJkMUZFN4MVjjOLAU7m/fqitkBP57ZPffyicOs=
+github.com/authzed/spicedb v1.40.1-0.20250203174657-98e88a128ae5 h1:3BcKukzgDYDwyUKiYn8b6nxgSZBrDfd4eHvfz15+Sos=
+github.com/authzed/spicedb v1.40.1-0.20250203174657-98e88a128ae5/go.mod h1:/UVC4ZJkMUZFN4MVjjOLAU7m/fqitkBP57ZPffyicOs=
 github.com/aws/aws-sdk-go-v2 v1.32.7 h1:ky5o35oENWi0JYWUZkB7WYvVPP+bcRF5/Iq7JWSb5Rw=
 github.com/aws/aws-sdk-go-v2 v1.32.7/go.mod h1:P5WJBrYqqbWVaOxgH0X/FYYD47/nooaPOZPlQdmiN2U=
 github.com/aws/aws-sdk-go-v2/config v1.28.7 h1:GduUnoTXlhkgnxTD93g1nv4tVPILbdNQOzav+Wpg7AE=
