@@ -8,34 +8,25 @@ on:  # yamllint disable-line rule:truthy
 env:
   DOCS_REPO: "authzed/docs"
   DOCS_BRANCH: "main"
-  GENERATED_DOCS_DIR: "docs"
-  TARGET_DOCS_DIR: "pages/zed"
+  GENERATED_DOCS_FILE: "docs/zed.md"
+  TARGET_DOCS_FILE: "pages/zed/zed.md"
+  CHANGES_DETECTED: false
 
 permissions:
   contents: "write"
   pull-requests: "write"
 
 jobs:
-  generate-and-sync-docs:
+  sync-docs:
+    name: "Generate & Sync Documentation"
     runs-on: "ubuntu-latest"
     steps:
-      - name: "Checkout source repository"
-        uses: "actions/checkout@v3"
-        with:
-          fetch-depth: 1
+      - uses: "actions/checkout@v4"
+      - uses: "authzed/actions/setup-go@main"
+      - uses: "authzed/actions/setup-mage@main"
 
-      - name: "Set up Go"
-        uses: "actions/setup-go@v4"
-        with:
-          go-version: 1.20
-
-      - name: "Generate documentation"
-        run: |
-          cd magefiles
-          if ! mage gen:docs; then
-            echo "Documentation generation failed"
-            exit 1
-          fi
+      - name: "Generate Documentation"
+        run: "mage gen:docs"
 
       - name: "Clone docs repository"
         run: |
@@ -44,36 +35,37 @@ jobs:
             exit 1
           }
 
-      - name: "Compare generated docs with target docs"
-        id: "compare"
+      - name: "Sync documentation changes"
+        id: "sync"
         run: |
-          rsync -r --delete $GENERATED_DOCS_DIR/ docs-repo/$TARGET_DOCS_DIR
+          rsync -r --delete $GENERATED_DOCS_FILE/ docs-repo/$TARGET_DOCS_FILE
           cd docs-repo
-          if git diff --exit-code; then
-            echo "No changes detected in docs."
-            echo "changes_detected=false" >> $GITHUB_ENV
+          if ! git diff --exit-code; then
+            echo "CHANGES_DETECTED=true" >> $GITHUB_ENV
           else
-            echo "Changes detected in docs."
-            echo "changes_detected=true" >> $GITHUB_ENV
+            echo "CHANGES_DETECTED=false" >> $GITHUB_ENV
           fi
 
       - name: "Configure Git"
-        if: "env.changes_detected == true"
+        if: |
+          env.CHANGES_DETECTED == 'true'
         run: |
           cd docs-repo
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-      - name: "Commit and push changes if any"
-        if: "env.changes_detected == true"
+      - name: "Commit and push changes"
+        if: |
+          env.CHANGES_DETECTED == 'true'
         run: |
           cd docs-repo
-          git add $TARGET_DOCS_DIR
+          git add $TARGET_DOCS_FILE
           git commit -m "Update generated docs"
           git push origin $DOCS_BRANCH
 
-      - name: "Create a pull request"
-        if: "env.changes_detected == true"
+      - name: "Create pull request"
+        if: |
+          env.CHANGES_DETECTED == 'true'
         uses: "peter-evans/create-pull-request@v5"
         with:
           token: "${{ secrets.GITHUB_TOKEN }}"
@@ -81,5 +73,5 @@ jobs:
           branch: "update-generated-docs"
           title: "Sync generated docs"
           body: |
-            This PR updates the generated documentation files in `$TARGET_DOCS_DIR` with the latest version from the main repository.
+            Update zed documentation in directory `$TARGET_DOCS_FILE` with the latest version from the zed repository
           base: "$DOCS_BRANCH"
