@@ -42,9 +42,8 @@ func init() {
 	log.Logger = l
 }
 
-func Run() {
-	zl := cobrazerolog.New(cobrazerolog.WithPreRunLevel(zerolog.DebugLevel))
-
+// This function is utilised to generate docs for zed
+func InitialiseRootCmd(zl *cobrazerolog.Builder) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "zed",
 		Short: "SpiceDB client, by AuthZed",
@@ -113,6 +112,14 @@ func Run() {
 
 	schemaCmd := commands.RegisterSchemaCmd(rootCmd)
 	registerAdditionalSchemaCmds(schemaCmd)
+
+	return rootCmd
+}
+
+func Run() {
+	zl := cobrazerolog.New(cobrazerolog.WithPreRunLevel(zerolog.DebugLevel))
+
+	rootCmd := InitialiseRootCmd(zl)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
