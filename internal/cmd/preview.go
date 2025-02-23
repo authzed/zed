@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -26,6 +27,7 @@ func registerPreviewCmd(rootCmd *cobra.Command) {
 
 	schemaCmd.AddCommand(schemaCompileCmd)
 	schemaCompileCmd.Flags().String("out", "", "output filepath; omitting writes to stdout")
+	schemaCompileCmd.Flags().Bool("json", false, "output schema as JSON")
 }
 
 var previewCmd = &cobra.Command{
@@ -104,6 +106,21 @@ func schemaCompileCmdFunc(cmd *cobra.Command, args []string) error {
 
 	// Add a newline at the end for hygiene's sake
 	terminated := generated + "\n"
+
+	if cobrautil.MustGetBool(cmd, "json") {
+		output := struct {
+			SchemaText string `json:"schemaText"`
+		}{
+			SchemaText: terminated,
+		}
+
+		jsonOutput, err := json.Marshal(output)
+		if err != nil {
+			return err
+		}
+
+		terminated = string(jsonOutput)
+	}
 
 	if outputFilepath == "" {
 		// Print to stdout
