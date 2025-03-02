@@ -1,4 +1,6 @@
 dist/
+temp/
+docs/
 
 # Local-only files
 go.work
