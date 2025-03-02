@@ -206,7 +206,7 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 			return nil, fmt.Errorf("failed to create socks5 proxy dialer: %w", err)
 		}
 
-		opts = append(opts, grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+		opts = append(opts, grpc.WithContextDialer(func(_ context.Context, addr string) (net.Conn, error) {
 			return dialer.Dial("tcp", addr)
 		}))
 	}
