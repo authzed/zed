@@ -1,9 +1,14 @@
 package client
 
 import (
+	"context"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/net/proxy"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
@@ -186,6 +191,24 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 	opts := []grpc.DialOption{
 		grpc.WithChainUnaryInterceptor(interceptors...),
 		grpc.WithChainStreamInterceptor(zgrpcutil.StreamLogDispatchTrailers),
+	}
+
+	proxyAddr := cobrautil.MustGetString(cmd, "proxy")
+
+	if proxyAddr != "" {
+		addr, err := url.Parse(proxyAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse socks5 proxy addr: %w", err)
+		}
+
+		dialer, err := proxy.SOCKS5("tcp", addr.Host, nil, proxy.Direct)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create socks5 proxy dialer: %w", err)
+		}
+
+		opts = append(opts, grpc.WithContextDialer(func(_ context.Context, addr string) (net.Conn, error) {
+			return dialer.Dial("tcp", addr)
+		}))
 	}
 
 	if token.IsInsecure() {
