@@ -35,7 +35,7 @@ require (
 	github.com/xlab/treeprint v1.2.0
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
 	golang.org/x/mod v0.23.0
-  golang.org/x/net v0.34.0
+	golang.org/x/net v0.34.0
 	golang.org/x/sync v0.11.0
 	golang.org/x/term v0.29.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f
