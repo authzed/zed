@@ -131,3 +131,23 @@ func (wc wasmClient) Watch(ctx context.Context, in *v1.WatchRequest, opts ...grp
 	client := v1.NewWatchServiceClient(wc.conn)
 	return client.Watch(ctx, in, opts...)
 }
+
+func (wc wasmClient) ComputablePermissions(ctx context.Context, in *v1.ComputablePermissionsRequest, opts ...grpc.CallOption) (*v1.ComputablePermissionsResponse, error) {
+	client := v1.NewSchemaServiceClient(wc.conn)
+	return client.ComputablePermissions(ctx, in, opts...)
+}
+
+func (wc wasmClient) DependentRelations(ctx context.Context, in *v1.DependentRelationsRequest, opts ...grpc.CallOption) (*v1.DependentRelationsResponse, error) {
+	client := v1.NewSchemaServiceClient(wc.conn)
+	return client.DependentRelations(ctx, in, opts...)
+}
+
+func (wc wasmClient) DiffSchema(ctx context.Context, in *v1.DiffSchemaRequest, opts ...grpc.CallOption) (*v1.DiffSchemaResponse, error) {
+	client := v1.NewSchemaServiceClient(wc.conn)
+	return client.DiffSchema(ctx, in, opts...)
+}
+
+func (wc wasmClient) ReflectSchema(ctx context.Context, in *v1.ReflectSchemaRequest, opts ...grpc.CallOption) (*v1.ReflectSchemaResponse, error) {
+	client := v1.NewSchemaServiceClient(wc.conn)
+	return client.ReflectSchema(ctx, in, opts...)
+}
