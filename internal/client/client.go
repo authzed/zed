@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/net/proxy"
 
@@ -50,6 +51,10 @@ func newClientForCurrentContext(cmd *cobra.Command) (Client, error) {
 		return nil, err
 	}
 
+	if cobrautil.MustGetString(cmd, "proxy") != "" {
+		token.Endpoint = withPassthroughTarget(token.Endpoint)
+	}
+
 	client, err := authzed.NewClientWithExperimentalAPIs(token.Endpoint, dialOpts...)
 	if err != nil {
 		return nil, err
@@ -72,6 +77,10 @@ func newClientForContext(cmd *cobra.Command, contextName string, secretStore sto
 	dialOpts, err := DialOptsFromFlags(cmd, token)
 	if err != nil {
 		return nil, err
+	}
+
+	if cobrautil.MustGetString(cmd, "proxy") != "" {
+		token.Endpoint = withPassthroughTarget(token.Endpoint)
 	}
 
 	return authzed.NewClient(token.Endpoint, dialOpts...)
@@ -241,4 +250,12 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 	}
 
 	return opts, nil
+}
+
+func withPassthroughTarget(endpoint string) string {
+	// If it already has a scheme, return as-is
+	if strings.Contains(endpoint, "://") {
+		return endpoint
+	}
+	return "passthrough:///" + endpoint
 }
