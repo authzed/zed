@@ -16,10 +16,51 @@ func stripDuration(s string) string {
 	return durationRegex.ReplaceAllString(s, "(Xs)")
 }
 
+func TestValidatePreRun(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		schemaTypeFlag string
+		expectErr      bool
+	}{
+		`invalid`: {
+			schemaTypeFlag: "invalid",
+			expectErr:      true,
+		},
+		`composable`: {
+			schemaTypeFlag: "composable",
+			expectErr:      false,
+		},
+		`standard`: {
+			schemaTypeFlag: "standard",
+			expectErr:      false,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+				zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
+				zedtesting.StringFlag{FlagName: "schema-type", FlagValue: tc.schemaTypeFlag},
+			)
+
+			err := validatePreRunE(cmd, []string{})
+			if tc.expectErr {
+				require.ErrorContains(t, err, "schema-type must be one of \"\", \"standard\", \"composable\"")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestValidate(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
+		schemaTypeFlag          string
 		files                   []string
 		expectErr               string
 		expectStr               string
@@ -172,6 +213,61 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 		//		"https://play.authzed.com/s/iksdFvCtvnkR/schema",
 		//	},
 		//},
+		`composable_schema_passes`: {
+			files: []string{
+				filepath.Join("validate-test", "composable-schema-root.zed"),
+			},
+			expectStr: "Success! - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
+		},
+		`composable_schema_only_without_flag_passes`: {
+			files: []string{
+				filepath.Join("validate-test", "only-passes-composable.zed"),
+			},
+			expectStr: "Success! - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
+		},
+		`standard_only_with_composable_flag_fails`: {
+			schemaTypeFlag: "composable",
+			files: []string{
+				filepath.Join("validate-test", "only-passes-standard.zed"),
+			},
+			expectErr: "Expected identifier, found token TokenTypeKeyword",
+		},
+		`composable_only_with_standard_flag_fails`: {
+			schemaTypeFlag: "standard",
+			files: []string{
+				filepath.Join("validate-test", "only-passes-composable.zed"),
+			},
+			expectErr: "Unexpected token at root level",
+		},
+		`composable_in_validation_yaml_with_standard_fails`: {
+			schemaTypeFlag: "standard",
+			files: []string{
+				filepath.Join("validate-test", "external-and-composable.yaml"),
+			},
+			expectErr: "Unexpected token at root level",
+		},
+		`composable_in_validation_yaml_with_composable_passes`: {
+			schemaTypeFlag: "composable",
+			files: []string{
+				filepath.Join("validate-test", "external-and-composable.yaml"),
+			},
+			expectStr: "Success! - 1 relationships loaded, 2 assertions run, 0 expected relations validated\n",
+		},
+		`warnings_in_composable_fail`: {
+			schemaTypeFlag: "composable",
+			files: []string{
+				filepath.Join("validate-test", "composable-schema-warning-root.zed"),
+			},
+			expectStr: `warning: Permission "edit" references itself, which will cause an error to be raised due to infinite recursion (permission-references-itself)
+ 1 | partial edit_partial {
+ 2 >     permission edit = edit
+   >                       ^~~~
+ 3 | }
+ 4 | 
+
+complete - 0 relationships loaded, 0 assertions run, 0 expected relations validated
+`,
+		},
 	}
 
 	for name, tc := range testCases {
@@ -180,6 +276,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 
 			require := require.New(t)
 			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+				zedtesting.StringFlag{FlagName: "schema-type", FlagValue: tc.schemaTypeFlag},
 				zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
 				zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
 				zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},

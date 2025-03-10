@@ -1,0 +1,7 @@
+partial edit_partial {
+    permission edit = edit
+}
+
+definition resource {
+    ...edit_partial
+}
