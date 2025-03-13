@@ -42,7 +42,7 @@ func readLines(t *testing.T, fileName string) []string {
 func createTestBackup(t *testing.T, schema string, relationships []string) string {
 	t.Helper()
 
-	f, err := os.CreateTemp("", "test-backup")
+	f, err := os.CreateTemp(t.TempDir(), "test-backup")
 	require.NoError(t, err)
 	defer f.Close()
 	t.Cleanup(func() {

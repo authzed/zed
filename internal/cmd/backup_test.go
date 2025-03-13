@@ -168,7 +168,7 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 
 			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t, zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: tt.filter})
 			backupName := createTestBackup(t, tt.schema, tt.relationships)
-			f, err := os.CreateTemp("", "parse-output")
+			f, err := os.CreateTemp(t.TempDir(), "parse-output")
 			require.NoError(t, err)
 			defer func() {
 				_ = f.Close()
@@ -189,7 +189,7 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 func TestBackupParseRevisionCmdFunc(t *testing.T) {
 	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t, zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: "test"})
 	backupName := createTestBackup(t, testSchema, testRelationships)
-	f, err := os.CreateTemp("", "parse-output")
+	f, err := os.CreateTemp(t.TempDir(), "parse-output")
 	require.NoError(t, err)
 	defer func() {
 		_ = f.Close()
@@ -249,7 +249,7 @@ func TestBackupParseSchemaCmdFunc(t *testing.T) {
 				zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: tt.filter},
 				zedtesting.BoolFlag{FlagName: "rewrite-legacy", FlagValue: tt.rewriteLegacy})
 			backupName := createTestBackup(t, tt.schema, nil)
-			f, err := os.CreateTemp("", "parse-output")
+			f, err := os.CreateTemp(t.TempDir(), "parse-output")
 			require.NoError(t, err)
 			defer func() {
 				_ = f.Close()

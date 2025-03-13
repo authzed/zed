@@ -1,0 +1,6 @@
+definition user {}
+
+definition resource {
+  relation user: user
+  permission view = user
+}

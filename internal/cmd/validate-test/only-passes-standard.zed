@@ -1,0 +1,2 @@
+// "or" is a reserved keyword in composable schemas
+definition or {}
