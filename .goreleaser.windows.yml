@@ -1,0 +1,50 @@
+---
+version: 2
+git:
+  tag_sort: "-version:creatordate"
+  prerelease_suffix: "-"
+builds:
+  - main: "./cmd/zed"
+    env:
+      - "CGO_ENABLED=0"
+    goos:
+      - "windows"
+    goarch:
+      - "amd64"
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - "-s -w"
+      - "-X github.com/jzelinskie/cobrautil/v2.Version=v{{ .Version }}"
+archives:
+  - files:
+      - "README.md"
+      - "LICENSE"
+    format_overrides:
+      - goos: "windows"
+        formats: ["zip"]
+
+chocolateys:
+  - name: "zed"
+    package_source_url: "https://github.com/authzed/zed"
+    owners: "AuthZed, Inc"
+    title: "Zed"
+    project_url: "https://github.com/authzed/zed"
+    url_template: "https://github.com/authzed/zed/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    icon_url: "https://authzed.com/favicon.svg"
+    copyright: "2025 AuthZed Inc."
+    authors: "Zed Contributors"
+    license_url: "https://github.com/authzed/zed/blob/main/LICENSE"
+    project_source_url: "https://github.com/authzed/zed"
+    docs_url: "https://authzed.com/docs"
+    bug_tracker_url: "https://github.com/authzed/zed/issues"
+    tags: "spicedb zanzibar authz rebac rbac abac fga cli command-line-tool"
+    summary: "Official command-line tool for managing SpiceDB"
+    description: |
+      Open Source command-line client for managing SpiceDB clusters, built by AuthZed.
+    release_notes: "https://github.com/authzed/zed/releases/tag/v{{ .Version }}"
+    api_key: "{{ .Env.CHOCOLATEY_API_KEY }}"
+    source_repo: "https://push.chocolatey.org/"
+checksum:
+  name_template: "windows_checksums.txt"
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
