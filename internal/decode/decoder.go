@@ -12,8 +12,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
-	"github.com/authzed/spicedb/pkg/schemadsl/input"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
 	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/authzed/spicedb/pkg/validationfile/blocks"
@@ -144,17 +142,18 @@ func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, filename stri
 }
 
 func unmarshalAsYAMLOrSchema(data []byte, out interface{}) (bool, error) {
+	inputString := string(data)
 	// Check for indications of a schema-only file.
-	if !strings.Contains(string(data), "schema:") && !strings.Contains(string(data), "relationships:") {
-		if err := compileSchemaFromData(data, out); err != nil {
+	if !strings.Contains(inputString, "schema:") && !strings.Contains(inputString, "relationships:") {
+		if err := decodeSchemaString(inputString, out); err != nil {
 			return false, err
 		}
 		return true, nil
 	}
 
-	if !strings.Contains(string(data), "schema:") && !strings.Contains(string(data), "schemaFile:") {
+	if !strings.Contains(inputString, "schema:") && !strings.Contains(inputString, "schemaFile:") {
 		// If there is no schema and no schemaFile and it doesn't compile then it must be yaml with missing fields
-		if err := compileSchemaFromData(data, out); err != nil {
+		if err := decodeSchemaString(inputString, out); err != nil {
 			return false, errors.New("either schema or schemaFile must be present")
 		}
 		return true, nil
@@ -167,20 +166,11 @@ func unmarshalAsYAMLOrSchema(data []byte, out interface{}) (bool, error) {
 	return false, nil
 }
 
-func compileSchemaFromData(data []byte, out interface{}) error {
-	compiled, serr := compiler.Compile(compiler.InputSchema{
-		Source:       input.Source("schema"),
-		SchemaString: string(data),
-	}, compiler.AllowUnprefixedObjectType())
-	if serr != nil {
-		return serr
-	}
-
-	// If that succeeds, return the compiled schema.
+func decodeSchemaString(schema string, out interface{}) error {
+	// Create a ValidationFile with the schema set on the struct
 	vfile := *out.(*validationfile.ValidationFile)
-	vfile.Schema = blocks.ParsedSchema{
-		CompiledSchema: compiled,
-		Schema:         string(data),
+	vfile.Schema = blocks.SchemaWithPosition{
+		Schema:         schema,
 		SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
 	}
 	*out.(*validationfile.ValidationFile) = vfile

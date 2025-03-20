@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/ccoveille/go-safecast"
@@ -47,6 +46,7 @@ var (
 
 func registerValidateCmd(cmd *cobra.Command) {
 	validateCmd.Flags().Bool("force-color", false, "force color code output even in non-tty environments")
+	validateCmd.Flags().String("schema-type", "", "force validation according to specific schema syntax (\"\", \"composable\", \"standard\")")
 	cmd.AddCommand(validateCmd)
 }
 
@@ -82,6 +82,8 @@ var validateCmd = &cobra.Command{
 	SilenceUsage: true,
 }
 
+var validSchemaTypes = []string{"", "standard", "composable"}
+
 func validatePreRunE(cmd *cobra.Command, _ []string) error {
 	// Override lipgloss's autodetection of whether it's in a terminal environment
 	// and display things in color anyway. This can be nice in CI environments that
@@ -91,14 +93,32 @@ func validatePreRunE(cmd *cobra.Command, _ []string) error {
 		lipgloss.SetColorProfile(termenv.ANSI256)
 	}
 
+	schemaType := cobrautil.MustGetString(cmd, "schema-type")
+	schemaTypeValid := false
+	for _, validType := range validSchemaTypes {
+		if schemaType == validType {
+			schemaTypeValid = true
+		}
+	}
+	if !schemaTypeValid {
+		return fmt.Errorf("schema-type must be one of \"\", \"standard\", \"composable\". received: %s", schemaType)
+	}
+
 	return nil
 }
+
+/*
+Okay so
+TODO: add flag to force one kind of resolution or the other
+TODO: display error output from composable schema if both fail
+*/
 
 func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
 	// Initialize variables for multiple files
 	var (
 		totalFiles                 = len(filenames)
 		successfullyValidatedFiles = 0
+		schemaType = cobrautil.MustGetString(cmd, "schema-type")
 	)
 
 	for _, filename := range filenames {
@@ -122,7 +142,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
 		if err != nil {
 			var errWithSource spiceerrors.WithSourceError
 			if errors.As(err, &errWithSource) {
-				ouputErrorWithSource(validateContents, errWithSource)
+				outputErrorWithSource(validateContents, errWithSource)
 			}
 			return err
 		}
@@ -145,6 +165,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
 			return err
 		}
 		if devErrs != nil {
+			// TODO: this depends on where `schema:` is in the file
 			schemaOffset := 1 /* for the 'schema:' */
 			if isOnlySchema {
 				schemaOffset = 0
@@ -152,6 +173,8 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
 
 			// Output errors
 			outputDeveloperErrorsWithLineOffset(validateContents, devErrs.InputErrors, schemaOffset)
+			// Return the first error up the chain
+			return errors.New(devErrs.InputErrors[0].Message)
 		}
 		// Run assertions
 		adevErrs, aerr := development.RunAllAssertions(devCtx, &parsed.Assertions)
@@ -160,18 +183,22 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
 		}
 		if adevErrs != nil {
 			outputDeveloperErrors(validateContents, adevErrs)
+			// Return the first of the errors up the chain
+			return errors.New(adevErrs[0].Message)
 		}
 		successfullyValidatedFiles++
 
-		// Run expected relations for all parsed files
+		// Run expected relations for file
 		_, erDevErrs, rerr := development.RunValidation(devCtx, &parsed.ExpectedRelations)
 		if rerr != nil {
 			return rerr
 		}
 		if erDevErrs != nil {
 			outputDeveloperErrors(validateContents, erDevErrs)
+			// Return the first of the errors up the chain
+			return errors.New(erDevErrs[0].Message)
 		}
-		// Print out any warnings for all files
+		// Print out any warnings for file
 		warnings, err := development.GetWarnings(ctx, devCtx)
 		if err != nil {
 			return err
@@ -203,10 +230,11 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
 	return nil
 }
 
-func ouputErrorWithSource(validateContents []byte, errWithSource spiceerrors.WithSourceError) {
+func validateSchemaAndTuples()
+
+func outputErrorWithSource(validateContents []byte, errWithSource spiceerrors.WithSourceError) {
 	console.Printf("%s%s\n", errorPrefix(), errorMessageStyle().Render(errWithSource.Error()))
 	outputForLine(validateContents, errWithSource.LineNumber, errWithSource.SourceCodeString, 0) // errWithSource.LineNumber is 1-indexed
-	os.Exit(1)
 }
 
 func outputForLine(validateContents []byte, oneIndexedLineNumber uint64, sourceCodeString string, oneIndexedColumnPosition uint64) {
@@ -234,8 +262,6 @@ func outputDeveloperErrorsWithLineOffset(validateContents []byte, devErrors []*d
 	for _, devErr := range devErrors {
 		outputDeveloperError(devErr, lines, lineOffset)
 	}
-
-	os.Exit(1)
 }
 
 func outputDeveloperError(devError *devinterface.DeveloperError, lines []string, lineOffset int) {
