@@ -20,7 +20,7 @@ jobs:
       - uses: "authzed/actions/gofumpt@main"
       - uses: "authzed/actions/go-mod-tidy@main"
       - uses: "authzed/actions/go-generate@main"
-      - uses: "authzed/actions/golangci-lint@main"
+      - uses: "authzed/actions/golangci-lint@golangci-lint-v2"
 
   extra-lint:
     name: "Lint YAML & Markdown"
