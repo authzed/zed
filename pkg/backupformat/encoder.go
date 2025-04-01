@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"io"
 
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/hamba/avro/v2/ocf"
 	"google.golang.org/protobuf/proto"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 )
 
 func NewEncoder(w io.Writer, schema string, token *v1.ZedToken) (*Encoder, error) {

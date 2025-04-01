@@ -5,14 +5,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/authzed/spicedb/pkg/cmd/datastore"
 	"github.com/authzed/spicedb/pkg/cmd/server"
 	"github.com/authzed/spicedb/pkg/cmd/util"
-	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 
 	"github.com/authzed/zed/internal/client"
 )

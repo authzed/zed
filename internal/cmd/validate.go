@@ -8,6 +8,9 @@ import (
 	"strings"
 
 	"github.com/ccoveille/go-safecast"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/jzelinskie/cobrautil/v2"
+	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 
 	"github.com/authzed/spicedb/pkg/development"
@@ -15,9 +18,6 @@ import (
 	devinterface "github.com/authzed/spicedb/pkg/proto/developer/v1"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
 	"github.com/authzed/spicedb/pkg/validationfile"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/jzelinskie/cobrautil/v2"
-	"github.com/muesli/termenv"
 
 	"github.com/authzed/zed/internal/commands"
 	"github.com/authzed/zed/internal/console"

@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/spicedb/pkg/spiceerrors"
 	"github.com/ccoveille/go-safecast"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/mattn/go-isatty"
@@ -18,6 +16,9 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/spiceerrors"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/console"

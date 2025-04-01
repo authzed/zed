@@ -7,11 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/authzed/spicedb/pkg/tuple"
-
-	"github.com/authzed/authzed-go/pkg/requestmeta"
-	"github.com/authzed/authzed-go/pkg/responsemeta"
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
@@ -21,6 +16,11 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/encoding/prototext"
+
+	"github.com/authzed/authzed-go/pkg/requestmeta"
+	"github.com/authzed/authzed-go/pkg/responsemeta"
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/console"
@@ -107,6 +107,8 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	lookupResourcesCmd.Flags().String("revision", "", "optional revision at which to check")
 	lookupResourcesCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
 	lookupResourcesCmd.Flags().Uint32("page-limit", 0, "limit of relations returned per page")
+	lookupResourcesCmd.Flags().String("cursor", "", "resume pagination from a specific cursor token")
+	lookupResourcesCmd.Flags().Bool("show-cursor", true, "display the cursor token after pagination")
 	registerConsistencyFlags(lookupResourcesCmd.Flags())
 
 	permissionCmd.AddCommand(lookupSubjectsCmd)
@@ -461,6 +463,10 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	var cursor *v1.Cursor
+	if cursorStr := cobrautil.MustGetString(cmd, "cursor"); cursorStr != "" {
+		cursor = &v1.Cursor{Token: cursorStr}
+	}
+
 	var totalCount uint
 	for {
 		request := &v1.LookupResourcesRequest{
@@ -519,6 +525,11 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 			log.Trace().Interface("request", request).Uint32("page-limit", pageLimit).Uint("count", totalCount).Send()
 			break
 		}
+	}
+
+	showCursor := cobrautil.MustGetBool(cmd, "show-cursor")
+	if showCursor && cursor != nil {
+		console.Printf("Last cursor: %s\n", cursor.Token)
 	}
 
 	return nil
