@@ -33,13 +33,15 @@ func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp *TreePrinter, hasError
 	resourceColor := white
 	permissionColor := color.FgWhite.Render
 
-	if checkTrace.PermissionType == v1.CheckDebugTrace_PERMISSION_TYPE_PERMISSION {
+	switch checkTrace.PermissionType {
+	case v1.CheckDebugTrace_PERMISSION_TYPE_PERMISSION:
 		permissionColor = lightgreen
-	} else if checkTrace.PermissionType == v1.CheckDebugTrace_PERMISSION_TYPE_RELATION {
+	case v1.CheckDebugTrace_PERMISSION_TYPE_RELATION:
 		permissionColor = orange
 	}
 
-	if checkTrace.Result == v1.CheckDebugTrace_PERMISSIONSHIP_CONDITIONAL_PERMISSION {
+	switch checkTrace.Result {
+	case v1.CheckDebugTrace_PERMISSIONSHIP_CONDITIONAL_PERMISSION:
 		switch checkTrace.CaveatEvaluationInfo.Result {
 		case v1.CaveatEvalInfo_RESULT_FALSE:
 			hasPermission = red("⨉")
@@ -51,11 +53,11 @@ func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp *TreePrinter, hasError
 			resourceColor = faint
 			permissionColor = faint
 		}
-	} else if checkTrace.Result == v1.CheckDebugTrace_PERMISSIONSHIP_NO_PERMISSION {
+	case v1.CheckDebugTrace_PERMISSIONSHIP_NO_PERMISSION:
 		hasPermission = red("⨉")
 		resourceColor = faint
 		permissionColor = faint
-	} else if checkTrace.Result == v1.CheckDebugTrace_PERMISSIONSHIP_UNSPECIFIED {
+	case v1.CheckDebugTrace_PERMISSIONSHIP_UNSPECIFIED:
 		hasPermission = yellow("∵")
 	}
 
