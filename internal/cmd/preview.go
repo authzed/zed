@@ -6,15 +6,16 @@ import (
 	"os"
 	"path/filepath"
 
-	newcompiler "github.com/authzed/spicedb/pkg/composableschemadsl/compiler"
-	newinput "github.com/authzed/spicedb/pkg/composableschemadsl/input"
-	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
-	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/ccoveille/go-safecast"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+
+	newcompiler "github.com/authzed/spicedb/pkg/composableschemadsl/compiler"
+	newinput "github.com/authzed/spicedb/pkg/composableschemadsl/input"
+	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
+	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 
 	"github.com/authzed/zed/internal/commands"
 )

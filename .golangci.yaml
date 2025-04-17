@@ -4,11 +4,14 @@ linters:
   enable:
     - "bidichk"
     - "bodyclose"
+    - "errcheck"
     - "errname"
     - "errorlint"
     - "goprintffuncname"
     - "gosec"
+    - "govet"
     - "importas"
+    - "ineffassign"
     - "makezero"
     - "prealloc"
     - "predeclared"
@@ -17,6 +20,8 @@ linters:
     - "rowserrcheck"
     - "staticcheck"
     - "unconvert"
+    - "unused"
+    - "usetesting"
     - "wastedassign"
     - "whitespace"
   exclusions:
@@ -32,9 +37,16 @@ linters:
       - "examples$"
 formatters:
   enable:
+    - "gci"
     - "gofumpt"
     - "goimports"
   settings:
+    gci:
+      sections:
+        - "standard"
+        - "default"
+        - "prefix(github.com/authzed)"
+        - "localmodule"
     goimports:
       local-prefixes:
         - "github.com/authzed/zed"

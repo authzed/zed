@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/authzed/authzed-go/pkg/requestmeta"
-	"github.com/authzed/authzed-go/pkg/responsemeta"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/mod/semver"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/authzed/authzed-go/pkg/requestmeta"
+	"github.com/authzed/authzed-go/pkg/responsemeta"
 	"github.com/authzed/spicedb/pkg/releases"
 )
 

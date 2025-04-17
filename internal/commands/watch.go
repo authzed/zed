@@ -9,11 +9,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/authzed/zed/internal/client"
-	"github.com/authzed/zed/internal/console"
+	"github.com/spf13/cobra"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/spf13/cobra"
+
+	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/console"
 )
 
 var (

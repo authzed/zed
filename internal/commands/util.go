@@ -6,13 +6,14 @@ import (
 	"strings"
 
 	"github.com/TylerBrock/colorjson"
-	"github.com/authzed/authzed-go/pkg/requestmeta"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	"github.com/authzed/authzed-go/pkg/requestmeta"
 )
 
 // ParseSubject parses the given subject string into its namespace, object ID

@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gookit/color"
+
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
-	"github.com/gookit/color"
 )
 
 // DisplayCheckTrace prints out the check trace found in the given debug message.
