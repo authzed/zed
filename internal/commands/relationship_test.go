@@ -9,17 +9,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/authzed/zed/internal/client"
-	zedtesting "github.com/authzed/zed/internal/testing"
-
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/tuple"
+
+	"github.com/authzed/zed/internal/client"
+	zedtesting "github.com/authzed/zed/internal/testing"
 )
 
 const testSchema = `definition test/resource {
@@ -210,7 +211,7 @@ func TestParseRelationshipLine(t *testing.T) {
 }
 
 func TestWriteRelationshipsArgs(t *testing.T) {
-	f, err := os.CreateTemp("", "spicedb-")
+	f, err := os.CreateTemp(t.TempDir(), "spicedb-")
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -258,7 +259,7 @@ func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
 		isFileTerminal = originalFunc
 	}()
 
-	tty, err := os.CreateTemp("", "spicedb-")
+	tty, err := os.CreateTemp(t.TempDir(), "spicedb-")
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -567,7 +568,7 @@ func TestWriteRelationshipCmdFuncFromStdinBatchWithExpirationTime(t *testing.T) 
 func fileFromStrings(t *testing.T, strings []string) *os.File {
 	t.Helper()
 
-	fi, err := os.CreateTemp("", "spicedb-")
+	fi, err := os.CreateTemp(t.TempDir(), "spicedb-")
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, fi.Close())

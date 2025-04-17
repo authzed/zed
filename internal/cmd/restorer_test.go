@@ -6,14 +6,15 @@ import (
 	"testing"
 	"time"
 
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/ccoveille/go-safecast"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
 )

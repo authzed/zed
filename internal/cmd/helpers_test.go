@@ -5,10 +5,11 @@ import (
 	"os"
 	"testing"
 
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/pkg/backupformat"
 )
@@ -42,7 +43,7 @@ func readLines(t *testing.T, fileName string) []string {
 func createTestBackup(t *testing.T, schema string, relationships []string) string {
 	t.Helper()
 
-	f, err := os.CreateTemp("", "test-backup")
+	f, err := os.CreateTemp(t.TempDir(), "test-backup")
 	require.NoError(t, err)
 	defer f.Close()
 	t.Cleanup(func() {

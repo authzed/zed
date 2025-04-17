@@ -11,11 +11,6 @@ import (
 	"strings"
 	"time"
 
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
-	"github.com/authzed/spicedb/pkg/schemadsl/generator"
-	"github.com/authzed/spicedb/pkg/tuple"
-	"github.com/authzed/spicedb/pkg/typesystem"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/mattn/go-isatty"
 	"github.com/rodaine/table"
@@ -25,6 +20,12 @@ import (
 	"golang.org/x/exp/maps"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
+	"github.com/authzed/spicedb/pkg/schemadsl/generator"
+	"github.com/authzed/spicedb/pkg/tuple"
+	"github.com/authzed/spicedb/pkg/typesystem"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/commands"

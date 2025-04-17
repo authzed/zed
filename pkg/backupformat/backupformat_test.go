@@ -5,10 +5,11 @@ import (
 	"encoding/base64"
 	"testing"
 
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 )
 
 func TestWriteAndRead(t *testing.T) {

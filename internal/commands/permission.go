@@ -7,11 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/authzed/spicedb/pkg/tuple"
-
-	"github.com/authzed/authzed-go/pkg/requestmeta"
-	"github.com/authzed/authzed-go/pkg/responsemeta"
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
@@ -21,6 +16,11 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/encoding/prototext"
+
+	"github.com/authzed/authzed-go/pkg/requestmeta"
+	"github.com/authzed/authzed-go/pkg/responsemeta"
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/console"
