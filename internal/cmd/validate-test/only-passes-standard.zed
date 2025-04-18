@@ -1,2 +1,2 @@
-// "or" is a reserved keyword in composable schemas
-definition or {}
+// "and" is a reserved keyword in composable schemas
+definition and {}

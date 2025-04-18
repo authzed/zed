@@ -118,7 +118,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
 	var (
 		totalFiles                 = len(filenames)
 		successfullyValidatedFiles = 0
-		//schemaType = cobrautil.MustGetString(cmd, "schema-type")
+		// schemaType = cobrautil.MustGetString(cmd, "schema-type")
 	)
 
 	for _, filename := range filenames {
@@ -230,8 +230,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
 	return nil
 }
 
-//func validateSchemaAndTuples()
-
+// func validateSchemaAndTuples()
 func outputErrorWithSource(validateContents []byte, errWithSource spiceerrors.WithSourceError) {
 	console.Printf("%s%s\n", errorPrefix(), errorMessageStyle().Render(errWithSource.Error()))
 	outputForLine(validateContents, errWithSource.LineNumber, errWithSource.SourceCodeString, 0) // errWithSource.LineNumber is 1-indexed
