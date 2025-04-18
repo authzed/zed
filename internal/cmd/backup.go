@@ -22,10 +22,10 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	schemapkg "github.com/authzed/spicedb/pkg/schema"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/authzed/spicedb/pkg/tuple"
-	"github.com/authzed/spicedb/pkg/typesystem"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/commands"
@@ -217,12 +217,13 @@ func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) 
 		return "", fmt.Errorf("generated invalid schema: %w", err)
 	}
 
-	for _, def := range compiledFilteredSchema.ObjectDefinitions {
-		ts, err := typesystem.NewNamespaceTypeSystem(def, typesystem.ResolverForSchema(*compiledFilteredSchema))
+	for _, rawDef := range compiledFilteredSchema.ObjectDefinitions {
+		ts := schemapkg.NewTypeSystem(schemapkg.ResolverForCompiledSchema(*compiledFilteredSchema))
+		def, err := schemapkg.NewDefinition(ts, rawDef)
 		if err != nil {
 			return "", fmt.Errorf("generated invalid schema: %w", err)
 		}
-		if _, err := ts.Validate(context.Background()); err != nil {
+		if _, err := def.Validate(context.Background()); err != nil {
 			return "", fmt.Errorf("generated invalid schema: %w", err)
 		}
 	}
