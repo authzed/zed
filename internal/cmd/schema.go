@@ -16,6 +16,7 @@ import (
 	"golang.org/x/term"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/caveats/types"
 	"github.com/authzed/spicedb/pkg/diff"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
@@ -91,7 +92,7 @@ func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {
 	dbefore := diff.NewDiffableSchemaFromCompiledSchema(before)
 	dafter := diff.NewDiffableSchemaFromCompiledSchema(after)
 
-	schemaDiff, err := diff.DiffSchemas(dbefore, dafter)
+	schemaDiff, err := diff.DiffSchemas(dbefore, dafter, types.Default.TypeSet)
 	if err != nil {
 		return err
 	}
