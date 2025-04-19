@@ -190,5 +190,7 @@ func testLookupResourcesCommand(t *testing.T, limit uint32) *cobra.Command {
 		zedtesting.StringFlag{FlagName: "revision"},
 		zedtesting.StringFlag{FlagName: "caveat-context"},
 		zedtesting.UintFlag32{FlagName: "page-limit", FlagValue: limit},
-		zedtesting.BoolFlag{FlagName: "json"})
+		zedtesting.BoolFlag{FlagName: "json"},
+		zedtesting.StringFlag{FlagName: "cursor"},
+		zedtesting.BoolFlag{FlagName: "show-cursor", FlagValue: false})
 }
