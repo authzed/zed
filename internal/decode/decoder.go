@@ -12,13 +12,14 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
+
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/input"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
 	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/authzed/spicedb/pkg/validationfile/blocks"
-	"github.com/rs/zerolog/log"
-	"gopkg.in/yaml.v3"
 )
 
 var playgroundPattern = regexp.MustCompile("^.*/s/.*/schema|relationships|assertions|expected.*$")

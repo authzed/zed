@@ -8,17 +8,19 @@ import (
 	"os"
 	"strings"
 
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/spicedb/pkg/diff"
-	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
-	"github.com/authzed/spicedb/pkg/schemadsl/generator"
-	"github.com/authzed/spicedb/pkg/schemadsl/input"
 	"github.com/ccoveille/go-safecast"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/caveats/types"
+	"github.com/authzed/spicedb/pkg/diff"
+	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
+	"github.com/authzed/spicedb/pkg/schemadsl/generator"
+	"github.com/authzed/spicedb/pkg/schemadsl/input"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/commands"
@@ -90,7 +92,7 @@ func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {
 	dbefore := diff.NewDiffableSchemaFromCompiledSchema(before)
 	dafter := diff.NewDiffableSchemaFromCompiledSchema(after)
 
-	schemaDiff, err := diff.DiffSchemas(dbefore, dafter)
+	schemaDiff, err := diff.DiffSchemas(dbefore, dafter, types.Default.TypeSet)
 	if err != nil {
 		return err
 	}

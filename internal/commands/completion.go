@@ -4,9 +4,10 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
-	"github.com/spf13/cobra"
 
 	"github.com/authzed/zed/internal/client"
 )

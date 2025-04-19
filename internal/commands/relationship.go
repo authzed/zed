@@ -11,11 +11,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/authzed/zed/internal/client"
-	"github.com/authzed/zed/internal/console"
-
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/spicedb/pkg/tuple"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
@@ -23,6 +18,12 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/tuple"
+
+	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/console"
 )
 
 func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {

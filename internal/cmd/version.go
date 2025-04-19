@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/authzed/authzed-go/pkg/responsemeta"
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/gookit/color"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/authzed/authzed-go/pkg/responsemeta"
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/console"

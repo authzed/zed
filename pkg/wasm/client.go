@@ -6,8 +6,9 @@ package main
 import (
 	"context"
 
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"google.golang.org/grpc"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 )
 
 type wasmClient struct {

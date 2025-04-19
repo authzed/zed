@@ -3,8 +3,9 @@ package printers
 import (
 	"fmt"
 
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/jzelinskie/stringz"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 )
 
 func prettySubject(subj *v1.SubjectReference) string {

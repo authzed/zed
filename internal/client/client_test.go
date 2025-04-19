@@ -5,16 +5,16 @@ import (
 	"path"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/storage"
 	zedtesting "github.com/authzed/zed/internal/testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestGetTokenWithCLIOverride(t *testing.T) {
 	require := require.New(t)
-	testCert, err := os.CreateTemp("", "")
+	testCert, err := os.CreateTemp(t.TempDir(), "")
 	require.NoError(err)
 	_, err = testCert.Write([]byte("hi"))
 	require.NoError(err)
@@ -100,10 +100,9 @@ func TestGetCurrentTokenWithCLIOverrideWithoutSecretFile(t *testing.T) {
 
 	bTrue := true
 
-	tmpDir, err := os.MkdirTemp("", "")
-	require.NoError(err)
+	tmpDir := t.TempDir()
 	configPath := path.Join(tmpDir, "config.json")
-	err = os.WriteFile(configPath, []byte("{}"), 0o600)
+	err := os.WriteFile(configPath, []byte("{}"), 0o600)
 	require.NoError(err)
 
 	configStore := &storage.JSONConfigStore{ConfigPath: tmpDir}

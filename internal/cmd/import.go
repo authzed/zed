@@ -7,12 +7,13 @@ import (
 	"net/url"
 	"strings"
 
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/spicedb/pkg/tuple"
-	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/tuple"
+	"github.com/authzed/spicedb/pkg/validationfile"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/decode"

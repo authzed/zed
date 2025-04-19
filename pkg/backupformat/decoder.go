@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"io"
 
-	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/hamba/avro/v2"
 	"github.com/hamba/avro/v2/ocf"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 )
 
 func init() {

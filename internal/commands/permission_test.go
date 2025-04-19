@@ -5,11 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/authzed/spicedb/pkg/tuple"
-
-	"github.com/authzed/zed/internal/console"
-	zedtesting "github.com/authzed/zed/internal/testing"
-
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
@@ -19,8 +14,11 @@ import (
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
+	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/console"
+	zedtesting "github.com/authzed/zed/internal/testing"
 )
 
 func init() {

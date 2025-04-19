@@ -3,9 +3,9 @@ package printers
 import (
 	"strings"
 
-	"github.com/authzed/zed/internal/console"
-
 	"github.com/xlab/treeprint"
+
+	"github.com/authzed/zed/internal/console"
 )
 
 type TreePrinter struct {
