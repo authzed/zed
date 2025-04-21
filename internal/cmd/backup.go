@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -37,7 +38,7 @@ var (
 	backupCmd = &cobra.Command{
 		Use:   "backup <filename>",
 		Short: "Create, restore, and inspect permissions system backups",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		// Create used to be on the root, so add it here for back-compat.
 		RunE: backupCreateCmdFunc,
 	}
@@ -45,7 +46,7 @@ var (
 	backupCreateCmd = &cobra.Command{
 		Use:   "create <filename>",
 		Short: "Backup a permission system to a file",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE:  backupCreateCmdFunc,
 	}
 
@@ -238,7 +239,24 @@ func hasRelPrefix(rel *v1.Relationship, prefix string) bool {
 }
 
 func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
-	f, err := createBackupFile(args[0])
+	configStore, secretStore := client.DefaultStorage()
+	token, err := client.GetCurrentTokenWithCLIOverride(cmd, configStore, secretStore)
+	if err != nil {
+		return fmt.Errorf("failed to determine current zed context: %w", err)
+	}
+
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	exPath := filepath.Dir(ex)
+
+	backupFileName := filepath.Join(exPath, token.Name+".zedbackup")
+	if len(args) > 0 {
+		backupFileName = args[0]
+	}
+
+	f, err := createBackupFile(backupFileName)
 	if err != nil {
 		return err
 	}
