@@ -1,0 +1,8 @@
+---
+relationships: >-
+  resource:1#user@user:1
+assertions:
+  assertTrue:
+    - "resource:1#user@user:1"
+  assertFalse:
+    - "resource:1#user@user:2"
