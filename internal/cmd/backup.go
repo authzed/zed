@@ -101,6 +101,8 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	backupCmd.AddCommand(backupCreateCmd)
 	registerBackupCreateFlags(backupCreateCmd)
 
+	backupCreateCmd.Flags().Uint32("page-limit", 0, "include only schema and relationships with a given prefix")
+
 	backupCmd.AddCommand(backupRestoreCmd)
 	registerBackupRestoreFlags(backupRestoreCmd)
 
@@ -256,6 +258,8 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		backupFileName = args[0]
 	}
 
+	pageLimit := cobrautil.MustGetUint32(cmd, "page-limit")
+
 	f, err := createBackupFile(backupFileName)
 	if err != nil {
 		return err
@@ -300,6 +304,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	defer func(e *error) { *e = errors.Join(*e, encoder.Close()) }(&err)
 
 	relationshipStream, err := c.BulkExportRelationships(ctx, &v1.BulkExportRelationshipsRequest{
+		OptionalLimit: pageLimit,
 		Consistency: &v1.Consistency{
 			Requirement: &v1.Consistency_AtExactSnapshot{
 				AtExactSnapshot: schemaResp.ReadAt,
