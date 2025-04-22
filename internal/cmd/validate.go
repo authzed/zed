@@ -74,7 +74,17 @@ var validateCmd = &cobra.Command{
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: commands.FileExtensionCompletions("zed", "yaml", "zaml"),
 	PreRunE:           validatePreRunE,
-	RunE:              validateCmdFunc,
+	RunE: func(cmd *cobra.Command, filenames []string) error {
+		result, shouldExit, err := validateCmdFunc(cmd, filenames)
+		if err != nil {
+			return err
+		}
+		console.Print(result)
+		if shouldExit {
+			os.Exit(1)
+		}
+		return nil
+	},
 
 	// A schema that causes the parser/compiler to error will halt execution
 	// of this command with an error. In that case, we want to just display the error,
@@ -94,27 +104,30 @@ func validatePreRunE(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
+// validateCmdFunc returns the string to print to the user, whether to return a non-zero status code, and any errors.
+func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, error) {
 	// Initialize variables for multiple files
 	var (
 		totalFiles                 = len(filenames)
 		successfullyValidatedFiles = 0
+		shouldExit                 = false
+		toPrint                    = &strings.Builder{}
 	)
 
 	for _, filename := range filenames {
 		// If we're running over multiple files, print the filename for context/debugging purposes
 		if totalFiles > 1 {
-			console.Println(filename)
+			toPrint.WriteString(filename + "\n")
 		}
 
 		u, err := url.Parse(filename)
 		if err != nil {
-			return err
+			return "", false, err
 		}
 
 		decoder, err := decode.DecoderForURL(u)
 		if err != nil {
-			return err
+			return "", false, err
 		}
 
 		var parsed validationfile.ValidationFile
@@ -122,9 +135,10 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
 		if err != nil {
 			var errWithSource spiceerrors.WithSourceError
 			if errors.As(err, &errWithSource) {
-				ouputErrorWithSource(validateContents, errWithSource)
+				outputErrorWithSource(toPrint, validateContents, errWithSource)
+				shouldExit = true
 			}
-			return err
+			return "", shouldExit, err
 		}
 
 		tuples := make([]*core.RelationTuple, 0)
@@ -142,7 +156,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
 			Relationships: tuples,
 		})
 		if err != nil {
-			return err
+			return "", false, err
 		}
 		if devErrs != nil {
 			schemaOffset := 1 /* for the 'schema:' */
@@ -151,65 +165,68 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) error {
 			}
 
 			// Output errors
-			outputDeveloperErrorsWithLineOffset(validateContents, devErrs.InputErrors, schemaOffset)
+			outputDeveloperErrorsWithLineOffset(toPrint, validateContents, devErrs.InputErrors, schemaOffset)
+			return "", true, nil
 		}
 		// Run assertions
 		adevErrs, aerr := development.RunAllAssertions(devCtx, &parsed.Assertions)
 		if aerr != nil {
-			return aerr
+			return "", false, aerr
 		}
 		if adevErrs != nil {
-			outputDeveloperErrors(validateContents, adevErrs)
+			outputDeveloperErrors(toPrint, validateContents, adevErrs)
+			return toPrint.String(), true, nil
 		}
 		successfullyValidatedFiles++
 
 		// Run expected relations for all parsed files
 		_, erDevErrs, rerr := development.RunValidation(devCtx, &parsed.ExpectedRelations)
 		if rerr != nil {
-			return rerr
+			return "", false, rerr
 		}
 		if erDevErrs != nil {
-			outputDeveloperErrors(validateContents, erDevErrs)
+			outputDeveloperErrors(toPrint, validateContents, erDevErrs)
+			return toPrint.String(), true, nil
 		}
 		// Print out any warnings for all files
 		warnings, err := development.GetWarnings(ctx, devCtx)
 		if err != nil {
-			return err
+			return "", false, err
 		}
+
 		if len(warnings) > 0 {
 			for _, warning := range warnings {
-				console.Printf("%s%s\n", warningPrefix(), warning.Message)
-				outputForLine(validateContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
-				console.Printf("\n")
+				fmt.Fprintf(toPrint, "%s%s\n", warningPrefix(), warning.Message)
+				outputForLine(toPrint, validateContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
+				toPrint.WriteString("\n")
 			}
 
-			console.Print(complete())
+			toPrint.WriteString(complete())
 		} else {
-			console.Print(success())
+			toPrint.WriteString(success())
 		}
 		totalAssertions += len(parsed.Assertions.AssertTrue) + len(parsed.Assertions.AssertFalse)
 		totalRelationsValidated += len(parsed.ExpectedRelations.ValidationMap)
 
-		console.Printf(" - %d relationships loaded, %d assertions run, %d expected relations validated\n",
+		fmt.Fprintf(toPrint, " - %d relationships loaded, %d assertions run, %d expected relations validated\n",
 			len(tuples),
 			totalAssertions,
-			totalRelationsValidated,
-		)
+			totalRelationsValidated)
 	}
 
 	if totalFiles > 1 {
-		console.Printf("total files: %d, successfully validated files: %d\n", totalFiles, successfullyValidatedFiles)
+		fmt.Fprintf(toPrint, "total files: %d, successfully validated files: %d\n", totalFiles, successfullyValidatedFiles)
 	}
-	return nil
+
+	return toPrint.String(), shouldExit, nil
 }
 
-func ouputErrorWithSource(validateContents []byte, errWithSource spiceerrors.WithSourceError) {
-	console.Printf("%s%s\n", errorPrefix(), errorMessageStyle().Render(errWithSource.Error()))
-	outputForLine(validateContents, errWithSource.LineNumber, errWithSource.SourceCodeString, 0) // errWithSource.LineNumber is 1-indexed
-	os.Exit(1)
+func outputErrorWithSource(sb *strings.Builder, validateContents []byte, errWithSource spiceerrors.WithSourceError) {
+	fmt.Fprintf(sb, "%s%s\n", errorPrefix(), errorMessageStyle().Render(errWithSource.Error()))
+	outputForLine(sb, validateContents, errWithSource.LineNumber, errWithSource.SourceCodeString, 0) // errWithSource.LineNumber is 1-indexed
 }
 
-func outputForLine(validateContents []byte, oneIndexedLineNumber uint64, sourceCodeString string, oneIndexedColumnPosition uint64) {
+func outputForLine(sb *strings.Builder, validateContents []byte, oneIndexedLineNumber uint64, sourceCodeString string, oneIndexedColumnPosition uint64) {
 	lines := strings.Split(string(validateContents), "\n")
 	// These should be fine to be zero if the cast fails.
 	intLineNumber, _ := safecast.ToInt(oneIndexedLineNumber)
@@ -217,49 +234,47 @@ func outputForLine(validateContents []byte, oneIndexedLineNumber uint64, sourceC
 	errorLineNumber := intLineNumber - 1
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
-			renderLine(lines, i, sourceCodeString, errorLineNumber, intColumnPosition-1)
+			renderLine(sb, lines, i, sourceCodeString, errorLineNumber, intColumnPosition-1)
 		} else {
-			renderLine(lines, i, "", errorLineNumber, -1)
+			renderLine(sb, lines, i, "", errorLineNumber, -1)
 		}
 	}
 }
 
-func outputDeveloperErrors(validateContents []byte, devErrors []*devinterface.DeveloperError) {
-	outputDeveloperErrorsWithLineOffset(validateContents, devErrors, 0)
+func outputDeveloperErrors(sb *strings.Builder, validateContents []byte, devErrors []*devinterface.DeveloperError) {
+	outputDeveloperErrorsWithLineOffset(sb, validateContents, devErrors, 0)
 }
 
-func outputDeveloperErrorsWithLineOffset(validateContents []byte, devErrors []*devinterface.DeveloperError, lineOffset int) {
+func outputDeveloperErrorsWithLineOffset(sb *strings.Builder, validateContents []byte, devErrors []*devinterface.DeveloperError, lineOffset int) {
 	lines := strings.Split(string(validateContents), "\n")
 
 	for _, devErr := range devErrors {
-		outputDeveloperError(devErr, lines, lineOffset)
+		outputDeveloperError(sb, devErr, lines, lineOffset)
 	}
-
-	os.Exit(1)
 }
 
-func outputDeveloperError(devError *devinterface.DeveloperError, lines []string, lineOffset int) {
-	console.Printf("%s %s\n", errorPrefix(), errorMessageStyle().Render(devError.Message))
+func outputDeveloperError(sb *strings.Builder, devError *devinterface.DeveloperError, lines []string, lineOffset int) {
+	fmt.Fprintf(sb, "%s %s\n", errorPrefix(), errorMessageStyle().Render(devError.Message))
 	errorLineNumber := int(devError.Line) - 1 + lineOffset // devError.Line is 1-indexed
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
-			renderLine(lines, i, devError.Context, errorLineNumber, -1)
+			renderLine(sb, lines, i, devError.Context, errorLineNumber, -1)
 		} else {
-			renderLine(lines, i, "", errorLineNumber, -1)
+			renderLine(sb, lines, i, "", errorLineNumber, -1)
 		}
 	}
 
 	if devError.CheckResolvedDebugInformation != nil && devError.CheckResolvedDebugInformation.Check != nil {
-		console.Printf("\n  %s\n", traceStyle().Render("Explanation:"))
+		fmt.Fprintf(sb, "\n  %s\n", traceStyle().Render("Explanation:"))
 		tp := printers.NewTreePrinter()
 		printers.DisplayCheckTrace(devError.CheckResolvedDebugInformation.Check, tp, true)
-		tp.PrintIndented()
+		sb.WriteString(tp.Indented())
 	}
 
-	console.Printf("\n\n")
+	sb.WriteString("\n\n")
 }
 
-func renderLine(lines []string, index int, highlight string, highlightLineIndex int, highlightStartingColumnIndex int) {
+func renderLine(sb *strings.Builder, lines []string, index int, highlight string, highlightLineIndex int, highlightStartingColumnIndex int) {
 	if index < 0 || index >= len(lines) {
 		return
 	}
@@ -307,23 +322,21 @@ func renderLine(lines []string, index int, highlight string, highlightLineIndex 
 	lineNumberSpacer := strings.Repeat(" ", lineNumberLength-len(lineNumberStr))
 
 	if highlightColumnIndex < 0 {
-		console.Printf(" %s%s %s %s\n", lineNumberSpacer, lineNumberStyle().Render(lineNumberStr), lineDelimiter, lineContentsStyle().Render(lineContents))
+		fmt.Fprintf(sb, " %s%s %s %s\n", lineNumberSpacer, lineNumberStyle().Render(lineNumberStr), lineDelimiter, lineContentsStyle().Render(lineContents))
 	} else {
-		console.Printf(" %s%s %s %s%s%s\n",
+		fmt.Fprintf(sb, " %s%s %s %s%s%s\n",
 			lineNumberSpacer,
 			lineNumberStyle().Render(lineNumberStr),
 			lineDelimiter,
 			lineContentsStyle().Render(lineContents[0:highlightColumnIndex]),
 			highlightedSourceStyle().Render(highlight),
-			lineContentsStyle().Render(lineContents[highlightColumnIndex+len(highlight):]),
-		)
+			lineContentsStyle().Render(lineContents[highlightColumnIndex+len(highlight):]))
 
-		console.Printf(" %s %s %s%s%s\n",
+		fmt.Fprintf(sb, " %s %s %s%s%s\n",
 			noNumberSpaces,
 			lineDelimiter,
 			strings.Repeat(" ", highlightColumnIndex),
 			highlightedSourceStyle().Render("^"),
-			highlightedSourceStyle().Render(strings.Repeat("~", highlightLength)),
-		)
+			highlightedSourceStyle().Render(strings.Repeat("~", highlightLength)))
 	}
 }
