@@ -28,14 +28,14 @@ func (tp *TreePrinter) Print() {
 	console.Println(tp.String())
 }
 
-func (tp *TreePrinter) PrintIndented() {
+func (tp *TreePrinter) Indented() string {
+	var sb strings.Builder
 	lines := strings.Split(tp.String(), "\n")
-	indentedLines := make([]string, 0, len(lines))
 	for _, line := range lines {
-		indentedLines = append(indentedLines, "  "+line)
+		sb.WriteString("  " + line + "\n")
 	}
 
-	console.Println(strings.Join(indentedLines, "\n"))
+	return sb.String()
 }
 
 func (tp *TreePrinter) String() string {

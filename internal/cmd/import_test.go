@@ -24,7 +24,7 @@ func TestImportCmdHappyPath(t *testing.T) {
 		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
 		zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 	)
-	f := filepath.Join("test", "happy-path-validation-file.yaml")
+	f := filepath.Join("import-test", "happy-path-validation-file.yaml")
 
 	// Set up client
 	ctx, cancel := context.WithCancel(context.Background())
