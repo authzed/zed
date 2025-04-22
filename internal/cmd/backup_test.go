@@ -1,8 +1,9 @@
 package cmd
 
 import (
-	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,9 +16,11 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/genutil/mapz"
 	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/storage"
 	zedtesting "github.com/authzed/zed/internal/testing"
 )
 
@@ -270,16 +273,15 @@ func TestBackupParseSchemaCmdFunc(t *testing.T) {
 func TestBackupCreateCmdFunc(t *testing.T) {
 	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
 		zedtesting.StringFlag{FlagName: "prefix-filter"},
-		zedtesting.BoolFlag{FlagName: "rewrite-legacy"})
-	f := filepath.Join(os.TempDir(), uuid.NewString())
-	_, err := os.Stat(f)
-	require.Error(t, err)
-	defer func() {
-		_ = os.Remove(f)
-	}()
+		zedtesting.BoolFlag{FlagName: "rewrite-legacy"},
+		zedtesting.UintFlag32{FlagName: "page-limit"},
+		zedtesting.StringFlag{FlagName: "token"},
+		zedtesting.StringFlag{FlagName: "certificate-path"},
+		zedtesting.StringFlag{FlagName: "endpoint"},
+		zedtesting.BoolFlag{FlagName: "insecure"},
+		zedtesting.BoolFlag{FlagName: "no-verify-ca"})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		require.NoError(t, srv.Run(ctx))
@@ -288,9 +290,9 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 	require.NoError(t, err)
 
 	originalClient := client.NewClient
-	defer func() {
+	t.Cleanup(func() {
 		client.NewClient = originalClient
-	}()
+	})
 
 	client.NewClient = zedtesting.ClientFromConn(conn)
 
@@ -300,32 +302,204 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: testSchema})
 	require.NoError(t, err)
 
-	testRel := "test/resource:1#reader@test/user:1"
-	resp, err := c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{
-		Updates: []*v1.RelationshipUpdate{
-			{
-				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
-				Relationship: tuple.MustParseV1Rel(testRel),
-			},
-		},
+	update := &v1.WriteRelationshipsRequest{}
+	testRel := "test/resource:1#reader@test/user:%d"
+	expectedRels := make([]string, 0, 100)
+	for i := range 100 {
+		relString := fmt.Sprintf(testRel, i)
+		update.Updates = append(update.Updates, &v1.RelationshipUpdate{
+			Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+			Relationship: tuple.MustParseV1Rel(relString),
+		})
+		expectedRels = append(expectedRels, relString)
+	}
+	resp, err := c.WriteRelationships(ctx, update)
+	require.NoError(t, err)
+
+	t.Run("successful backup", func(t *testing.T) {
+		f := filepath.Join(t.TempDir(), uuid.NewString())
+		err = backupCreateCmdFunc(cmd, []string{f})
+		require.NoError(t, err)
+
+		validateBackup(t, f, testSchema, resp.WrittenAt, expectedRels)
+		// validate progress file is deleted after successful backup
+		require.NoFileExists(t, toLockFileName(f))
 	})
-	require.NoError(t, err)
 
-	err = backupCreateCmdFunc(cmd, []string{f})
-	require.NoError(t, err)
+	t.Run("fails if backup without progress file exists", func(t *testing.T) {
+		tempFile := filepath.Join(t.TempDir(), uuid.NewString())
+		_, err := os.Create(tempFile)
+		require.NoError(t, err)
 
-	d, closer, err := decoderFromArgs(f)
+		err = backupCreateCmdFunc(cmd, []string{tempFile})
+		require.ErrorContains(t, err, "already exists")
+	})
+
+	t.Run("derives backup file name from context if not provided", func(t *testing.T) {
+		ds := client.DefaultStorage
+		t.Cleanup(func() {
+			client.DefaultStorage = ds
+		})
+
+		cfg := storage.Config{CurrentToken: "my-test"}
+		cfgBytes, err := json.Marshal(cfg)
+		require.NoError(t, err)
+
+		testContextPath := filepath.Join(t.TempDir(), "config.json")
+		err = os.WriteFile(testContextPath, cfgBytes, 0o600)
+		require.NoError(t, err)
+
+		name := uuid.NewString()
+		client.DefaultStorage = func() (storage.ConfigStore, storage.SecretStore) {
+			return &testConfigStore{currentToken: name},
+				&testSecretStore{token: storage.Token{Name: name}}
+		}
+		err = backupCreateCmdFunc(cmd, nil)
+		require.NoError(t, err)
+
+		currentPath, err := os.Executable()
+		require.NoError(t, err)
+		exPath := filepath.Dir(currentPath)
+		expectedBackupFile := filepath.Join(exPath, name+".zedbackup")
+		require.FileExists(t, expectedBackupFile)
+		validateBackup(t, expectedBackupFile, testSchema, resp.WrittenAt, expectedRels)
+	})
+
+	t.Run("truncates progress marker if it existed but backup did not", func(t *testing.T) {
+		streamClient, err := c.BulkExportRelationships(ctx, &v1.BulkExportRelationshipsRequest{
+			Consistency: &v1.Consistency{
+				Requirement: &v1.Consistency_AtExactSnapshot{
+					AtExactSnapshot: resp.WrittenAt,
+				},
+			},
+			OptionalLimit: 1,
+		})
+		require.NoError(t, err)
+
+		streamResp, err := streamClient.Recv()
+		require.NoError(t, err)
+		_ = streamClient.CloseSend()
+
+		f := filepath.Join(t.TempDir(), uuid.NewString())
+		lockFileName := toLockFileName(f)
+		err = os.WriteFile(lockFileName, []byte(streamResp.AfterResultCursor.Token), 0o600)
+		require.NoError(t, err)
+
+		err = backupCreateCmdFunc(cmd, []string{f})
+		require.NoError(t, err)
+
+		// we know it did its work because it imported the 100 relationships regardless of the progress file
+		validateBackup(t, f, testSchema, resp.WrittenAt, expectedRels)
+		require.NoFileExists(t, toLockFileName(f))
+	})
+
+	t.Run("resumes backup if marker file exists", func(t *testing.T) {
+		streamClient, err := c.BulkExportRelationships(ctx, &v1.BulkExportRelationshipsRequest{
+			Consistency: &v1.Consistency{
+				Requirement: &v1.Consistency_AtExactSnapshot{
+					AtExactSnapshot: resp.WrittenAt,
+				},
+			},
+			OptionalLimit: 90,
+		})
+		require.NoError(t, err)
+
+		streamResp, err := streamClient.Recv()
+		require.NoError(t, err)
+		_ = streamClient.CloseSend()
+
+		f := filepath.Join(t.TempDir(), uuid.NewString())
+
+		// do an initial backup to have the OCF metadata in place, it will also import the 100 rels
+		err = backupCreateCmdFunc(cmd, []string{f})
+		require.NoError(t, err)
+		require.FileExists(t, f)
+
+		lockFileName := toLockFileName(f)
+		err = os.WriteFile(lockFileName, []byte(streamResp.AfterResultCursor.Token), 0o600)
+		require.NoError(t, err)
+
+		// run backup again, this time with an existing backup file and progress file
+		err = backupCreateCmdFunc(cmd, []string{f})
+		require.NoError(t, err)
+		require.NoFileExists(t, toLockFileName(f))
+
+		// we know it did its work because we created a progress file at relationship 90, so we will get
+		// a backup with 100 rels from the original import + the last 10 rels repeated again (110 in total)
+		validationFunc := func(t *testing.T, expected, received []string) {
+			require.Len(t, received, 110)
+			receivedSet := mapz.NewSet(received...)
+			expectedSet := mapz.NewSet(expected...)
+
+			require.Equal(t, 100, receivedSet.Len())
+			require.True(t, receivedSet.Equal(expectedSet))
+
+			for i, s := range received[100:] {
+				require.Equal(t, fmt.Sprintf(testRel, i+90), s)
+			}
+		}
+		validateBackupWithFunc(t, f, testSchema, resp.WrittenAt, expectedRels, validationFunc)
+	})
+}
+
+type testConfigStore struct {
+	storage.ConfigStore
+	currentToken string
+}
+
+func (tcs testConfigStore) Get() (storage.Config, error) {
+	return storage.Config{CurrentToken: tcs.currentToken}, nil
+}
+
+func (tcs testConfigStore) Exists() (bool, error) {
+	return true, nil
+}
+
+type testSecretStore struct {
+	storage.SecretStore
+	token storage.Token
+}
+
+func (tss testSecretStore) Get() (storage.Secrets, error) {
+	return storage.Secrets{Tokens: []storage.Token{tss.token}}, nil
+}
+
+func validateBackup(t *testing.T, backupFileName string, schema string, token *v1.ZedToken, expected []string) {
+	t.Helper()
+
+	f := func(t *testing.T, expected, received []string) {
+		require.ElementsMatch(t, expected, received)
+	}
+
+	validateBackupWithFunc(t, backupFileName, schema, token, expected, f)
+}
+
+func validateBackupWithFunc(t *testing.T, backupFileName string, schema string, token *v1.ZedToken, expected []string,
+	validateRels func(t *testing.T, expected, received []string),
+) {
+	t.Helper()
+
+	d, closer, err := decoderFromArgs(backupFileName)
 	require.NoError(t, err)
-	defer func() {
+	t.Cleanup(func() {
 		_ = d.Close()
 		_ = closer.Close()
-	}()
+	})
 
-	require.Equal(t, testSchema, d.Schema())
-	rel, err := d.Next()
-	require.NoError(t, err)
-	require.Equal(t, testRel, tuple.MustV1StringRelationship(rel))
-	require.Equal(t, resp.WrittenAt.Token, d.ZedToken().Token)
+	require.Equal(t, schema, d.Schema())
+	require.Equal(t, token.Token, d.ZedToken().Token)
+	var received []string
+	for {
+		rel, err := d.Next()
+		if rel == nil {
+			break
+		}
+
+		require.NoError(t, err)
+		received = append(received, tuple.MustV1StringRelationship(rel))
+	}
+
+	validateRels(t, expected, received)
 }
 
 func TestBackupRestoreCmdFunc(t *testing.T) {
@@ -340,8 +514,7 @@ func TestBackupRestoreCmdFunc(t *testing.T) {
 	)
 	backupName := createTestBackup(t, testSchema, testRelationships)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		require.NoError(t, srv.Run(ctx))

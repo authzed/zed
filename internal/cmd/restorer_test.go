@@ -157,7 +157,7 @@ func TestRestorer(t *testing.T) {
 			}
 
 			r := newRestorer(testSchema, d, c, tt.prefixFilter, tt.batchSize, tt.batchesPerTransaction, tt.conflictStrategy, tt.disableRetryErrors, 0*time.Second)
-			err = r.restoreFromDecoder(context.Background())
+			err = r.restoreFromDecoder(t.Context())
 			if expectsError != nil || (expectedConflicts > 0 && tt.conflictStrategy == Fail) {
 				require.ErrorIs(err, expectsError)
 				return

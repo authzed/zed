@@ -127,6 +127,6 @@ func CreateTestCobraCommandWithFlagValue(t *testing.T, flagAndValues ...any) *co
 		}
 	}
 
-	c.SetContext(context.Background())
+	c.SetContext(t.Context())
 	return &c
 }

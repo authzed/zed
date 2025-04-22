@@ -162,7 +162,9 @@ func tokenFromCli(cmd *cobra.Command) (storage.Token, error) {
 }
 
 // DefaultStorage returns the default configured config store and secret store.
-func DefaultStorage() (storage.ConfigStore, storage.SecretStore) {
+var DefaultStorage = defaultStorage
+
+func defaultStorage() (storage.ConfigStore, storage.SecretStore) {
 	var home string
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 		home = filepath.Join(xdg, "zed")
