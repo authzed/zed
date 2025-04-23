@@ -1,0 +1,6 @@
+import "./composable-schema-user.zed"
+
+definition resource {
+  relation and: user
+  permission viewer = and
+}

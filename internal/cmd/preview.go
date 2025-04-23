@@ -47,7 +47,7 @@ var schemaCompileCmd = &cobra.Command{
 	Write to stdout:
 		zed preview schema compile root.zed
 	Write to an output file:
-		zed preview schema compile --out compiled.zed
+		zed preview schema compile root.zed --out compiled.zed
 	`,
 	ValidArgsFunction: commands.FileExtensionCompletions("zed"),
 	RunE:              schemaCompileCmdFunc,
