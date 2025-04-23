@@ -152,6 +152,20 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				"3 |  }\n " +
 				"4 | \n\n\n",
 		},
+		`missing_relation_in_yaml_fails`: {
+			files: []string{
+				filepath.Join("validate-test", "missing-relation.yaml"),
+			},
+			expectNonZeroStatusCode: true,
+			expectStr: "error:  relation/permission `write` not found under definition `test`                   \n" +
+				"  6 |   definition user {}\n" +
+				"  7 |   definition test {\n" +
+				"  8 |     relation viewer: user\n" +
+				"  9 >     permission view = write\n" +
+				"    >                       ^~~~~\n" +
+				" 10 |   }\n" +
+				" 11 | \n\n\n",
+		},
 		// TODO: https://github.com/authzed/zed/issues/487
 		//`url_passes`: {
 		//	files: []string{
