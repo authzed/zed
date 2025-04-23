@@ -166,7 +166,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 
 			// Output errors
 			outputDeveloperErrorsWithLineOffset(toPrint, validateContents, devErrs.InputErrors, schemaOffset)
-			return "", true, nil
+			return toPrint.String(), true, nil
 		}
 		// Run assertions
 		adevErrs, aerr := development.RunAllAssertions(devCtx, &parsed.Assertions)

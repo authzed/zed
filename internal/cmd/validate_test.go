@@ -140,6 +140,18 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			},
 			expectErr: "Get \"https://unknown-url\": dial tcp: lookup unknown-url",
 		},
+		`missing_relation_fails`: {
+			files: []string{
+				filepath.Join("validate-test", "missing-relation.zed"),
+			},
+			expectNonZeroStatusCode: true,
+			expectStr: "error:  relation/permission `write` not found under definition `test`                   \n" +
+				" 1 |  definition test {\n" +
+				" 2 >   permission view = write\n" +
+				"   >                     ^~~~~\n " +
+				"3 |  }\n " +
+				"4 | \n\n\n",
+		},
 		// TODO: https://github.com/authzed/zed/issues/487
 		//`url_passes`: {
 		//	files: []string{
@@ -162,9 +174,12 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			res, shouldError, err := validateCmdFunc(cmd, tc.files)
 			if tc.expectErr == "" {
 				require.NoError(err)
+				require.Equal(stripDuration(tc.expectStr), stripDuration(res))
+			} else {
+				require.Error(err)
+				require.Contains(err.Error(), tc.expectErr)
 			}
 			require.Equal(tc.expectNonZeroStatusCode, shouldError)
-			require.Equal(stripDuration(tc.expectStr), stripDuration(res))
 		})
 	}
 }
