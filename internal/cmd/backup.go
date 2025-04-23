@@ -39,6 +39,16 @@ const (
 	doNotReturnIfExists = false
 )
 
+// cobraRunEFunc is the signature of a cobra.Command.RunE function.
+type cobraRunEFunc = func(cmd *cobra.Command, args []string) (err error)
+
+// withErrorHandling is a wrapper that centralizes error handling, instead of having to scatter it around the command logic.
+func withErrorHandling(f cobraRunEFunc) cobraRunEFunc {
+	return func(cmd *cobra.Command, args []string) (err error) {
+		return addSizeErrInfo(f(cmd, args))
+	}
+}
+
 var (
 	backupCmd = &cobra.Command{
 		Use:   "backup <filename>",
@@ -52,7 +62,7 @@ var (
 		Use:   "create <filename>",
 		Short: "Backup a permission system to a file",
 		Args:  cobra.MaximumNArgs(1),
-		RunE:  backupCreateCmdFunc,
+		RunE:  withErrorHandling(backupCreateCmdFunc),
 	}
 
 	backupRestoreCmd = &cobra.Command{
@@ -314,6 +324,11 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	defer func(e *error) { *e = errors.Join(*e, encoder.Close()) }(&err)
+
+	if zedToken == nil && cursor == nil {
+		return errors.New("malformed existing backup, consider recreating it")
+	}
+
 	req := &v1.BulkExportRelationshipsRequest{
 		OptionalLimit:  pageLimit,
 		OptionalCursor: cursor,
@@ -331,21 +346,33 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	ctx := cmd.Context()
 	relationshipStream, err := c.BulkExportRelationships(ctx, req)
 	if err != nil {
-		return fmt.Errorf("error exporting relationships: %w", addSizeErrInfo(err))
+		return fmt.Errorf("error exporting relationships: %w", err)
 	}
 
 	relationshipReadStart := time.Now()
 	tick := time.Tick(5 * time.Second)
 	bar := console.CreateProgressBar("processing backup")
 	var relsFilteredOut, relsProcessed uint64
+	defer func() {
+		_ = bar.Finish()
+
+		evt := log.Info().
+			Uint64("filtered", relsFilteredOut).
+			Uint64("processed", relsProcessed).
+			Uint64("throughput", perSec(relsProcessed, time.Since(relationshipReadStart))).
+			Stringer("elapsed", time.Since(relationshipReadStart).Round(time.Second))
+		if isCanceled(err) {
+			evt.Msg("backup canceled - resume by restarting the backup command")
+		} else if err != nil {
+			evt.Msg("backup failed")
+		} else {
+			evt.Msg("finished backup")
+		}
+	}()
+
 	for {
 		if err := ctx.Err(); err != nil {
-			_ = bar.Finish()
 			if isCanceled(err) {
-				log.Info().
-					Uint64("filtered", relsFilteredOut).
-					Uint64("processed", relsProcessed).
-					Msg("backup canceled - resume by restarting the backup command")
 				return context.Canceled
 			}
 
@@ -354,17 +381,12 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 
 		relsResp, err := relationshipStream.Recv()
 		if err != nil {
-			_ = bar.Finish()
 			if isCanceled(err) {
-				log.Info().
-					Uint64("filtered", relsFilteredOut).
-					Uint64("processed", relsProcessed).
-					Msg("backup canceled - resume by restarting the backup command")
 				return context.Canceled
 			}
 
 			if !errors.Is(err, io.EOF) {
-				return fmt.Errorf("error receiving relationships: %w", addSizeErrInfo(err))
+				return fmt.Errorf("error receiving relationships: %w", err)
 			}
 			break
 		}
@@ -391,6 +413,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 						Uint64("filtered", relsFilteredOut).
 						Uint64("processed", relsProcessed).
 						Uint64("throughput", perSec(relsProcessed, time.Since(relationshipReadStart))).
+						Stringer("elapsed", time.Since(relationshipReadStart).Round(time.Second)).
 						Msg("backup progress")
 				default:
 				}
@@ -401,16 +424,6 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 			return err
 		}
 	}
-
-	totalTime := time.Since(relationshipReadStart)
-	_ = bar.Finish()
-
-	log.Info().
-		Uint64("processed", relsProcessed).
-		Uint64("filtered", relsFilteredOut).
-		Uint64("throughput", perSec(relsProcessed, totalTime)).
-		Stringer("duration", totalTime).
-		Msg("finished backup")
 
 	backupCompleted = true
 	return nil
@@ -423,7 +436,7 @@ func encoderForNewBackup(cmd *cobra.Command, c client.Client, backupFile *os.Fil
 
 	schemaResp, err := c.ReadSchema(cmd.Context(), &v1.ReadSchemaRequest{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("error reading schema: %w", addSizeErrInfo(err))
+		return nil, nil, fmt.Errorf("error reading schema: %w", err)
 	}
 	if schemaResp.ReadAt == nil {
 		return nil, nil, fmt.Errorf("`backup` is not supported on this version of SpiceDB")
@@ -486,9 +499,9 @@ func openProgressFile(backupFileName string, backupAlreadyExisted bool) (*os.Fil
 	// if a backup existed
 	var fileMode int
 	readCursor, err := os.ReadFile(progressFileName)
-	if os.IsNotExist(err) && backupAlreadyExisted {
+	if backupAlreadyExisted && (os.IsNotExist(err) || len(readCursor) == 0) {
 		return nil, nil, fmt.Errorf("backup file %s already exists", backupFileName)
-	} else if err == nil && backupAlreadyExisted {
+	} else if backupAlreadyExisted && err == nil {
 		cursor = &v1.Cursor{
 			Token: string(readCursor),
 		}
@@ -847,8 +860,8 @@ func addSizeErrInfo(err error) error {
 		return fmt.Errorf("%w: set flag --max-message-size=bytecounthere to increase the maximum allowable size", err)
 	}
 
-	necessaryByteCount, err := strconv.Atoi(matches[1])
-	if err != nil {
+	necessaryByteCount, atoiErr := strconv.Atoi(matches[1])
+	if atoiErr != nil {
 		return fmt.Errorf("%w: set flag --max-message-size=bytecounthere to increase the maximum allowable size", err)
 	}
 
