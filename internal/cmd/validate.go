@@ -71,7 +71,7 @@ var validateCmd = &cobra.Command{
 
 	From a devtools instance:
 		zed validate https://localhost:8443/download`,
-	Args:              cobra.MinimumNArgs(1),
+	Args:              commands.ValidationWrapper(cobra.MinimumNArgs(1)),
 	ValidArgsFunction: commands.FileExtensionCompletions("zed", "yaml", "zaml"),
 	PreRunE:           validatePreRunE,
 	RunE: func(cmd *cobra.Command, filenames []string) error {

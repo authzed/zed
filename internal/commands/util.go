@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -95,4 +96,28 @@ func InjectRequestID(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+// ValidationError is used to wrap errors that are cobra validation errors. It should be used to
+// wrap the Command.PositionalArgs function in order to be able to determine if the error is a validation error.
+// This is used to determine if an error should print the usage string. Unfortunately Cobra parameter parsing
+// and parameter validation are handled differently, and the latter does not trigger calling Command.FlagErrorFunc
+type ValidationError struct {
+	error
+}
+
+func (ve ValidationError) Is(err error) bool {
+	var validationError ValidationError
+	return errors.As(err, &validationError)
+}
+
+// ValidationWrapper is used to be able to determine if an error is a validation error.
+func ValidationWrapper(f cobra.PositionalArgs) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if err := f(cmd, args); err != nil {
+			return ValidationError{error: err}
+		}
+
+		return nil
+	}
 }

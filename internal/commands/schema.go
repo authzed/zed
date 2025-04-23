@@ -34,7 +34,7 @@ var (
 	schemaReadCmd = &cobra.Command{
 		Use:               "read",
 		Short:             "Read the schema of a permissions system",
-		Args:              cobra.ExactArgs(0),
+		Args:              ValidationWrapper(cobra.ExactArgs(0)),
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE:              schemaReadCmdFunc,
 	}

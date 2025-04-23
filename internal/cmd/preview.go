@@ -41,7 +41,7 @@ var schemaCmd = &cobra.Command{
 
 var schemaCompileCmd = &cobra.Command{
 	Use:   "compile <file>",
-	Args:  cobra.ExactArgs(1),
+	Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
 	Short: "Compile a schema that uses extended syntax into one that can be written to SpiceDB",
 	Example: `
 	Write to stdout:
