@@ -38,12 +38,10 @@ type Func func(out interface{}) ([]byte, bool, error)
 // Some URLs have special handling to dereference to the actual file.
 func DecoderForURL(u *url.URL) (d Func, err error) {
 	switch s := u.Scheme; s {
-	case "file":
+	case "", "file":
 		d = fileDecoder(u)
 	case "http", "https":
 		d = httpDecoder(u)
-	case "":
-		d = fileDecoder(u)
 	default:
 		err = fmt.Errorf("%s scheme not supported", s)
 	}
