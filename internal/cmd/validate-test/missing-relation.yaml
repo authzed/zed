@@ -1,0 +1,10 @@
+---
+relationships: >-
+  test:1#viewer@user:1
+# notice how schema isn't the first section of the yaml
+schema: |-
+  definition user {}
+  definition test {
+    relation viewer: user
+    permission view = write
+  }

@@ -159,7 +159,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			return "", false, err
 		}
 		if devErrs != nil {
-			schemaOffset := 1 /* for the 'schema:' */
+			schemaOffset := parsed.Schema.SourcePosition.LineNumber
 			if isOnlySchema {
 				schemaOffset = 0
 			}
