@@ -67,7 +67,7 @@ func TestConcurrentBatchOrdering(t *testing.T) {
 				return nil
 			}
 
-			err := ConcurrentBatch(context.Background(), len(tt.items), batchSize, workers, fn)
+			err := ConcurrentBatch(t.Context(), len(tt.items), batchSize, workers, fn)
 			require.NoError(err)
 
 			got := make([]batch, len(gotCh))
@@ -133,7 +133,7 @@ func TestConcurrentBatch(t *testing.T) {
 				atomic.AddInt64(&calls, 1)
 				return nil
 			}
-			err := ConcurrentBatch(context.Background(), len(tt.items), tt.batchSize, tt.workers, fn)
+			err := ConcurrentBatch(t.Context(), len(tt.items), tt.batchSize, tt.workers, fn)
 
 			require.NoError(err)
 			require.Equal(tt.wantCalls, int(calls))

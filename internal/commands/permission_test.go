@@ -103,7 +103,7 @@ func TestCheckErrorWithInvalidDebugInformation(t *testing.T) {
 }
 
 func TestLookupResourcesCommand(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {

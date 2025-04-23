@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 
@@ -27,8 +26,7 @@ func TestImportCmdHappyPath(t *testing.T) {
 	f := filepath.Join("import-test", "happy-path-validation-file.yaml")
 
 	// Set up client
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		require.NoError(srv.Run(ctx))

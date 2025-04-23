@@ -11,6 +11,20 @@ import (
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 )
 
+func NewEncoderForExisting(w io.Writer) (*Encoder, error) {
+	avroSchema, err := avroSchemaV1()
+	if err != nil {
+		return nil, fmt.Errorf("unable to create avro schema: %w", err)
+	}
+
+	enc, err := ocf.NewEncoder(avroSchema, w, ocf.WithCodec(ocf.Snappy))
+	if err != nil {
+		return nil, fmt.Errorf("unable to create encoder: %w", err)
+	}
+
+	return &Encoder{enc}, nil
+}
+
 func NewEncoder(w io.Writer, schema string, token *v1.ZedToken) (*Encoder, error) {
 	avroSchema, err := avroSchemaV1()
 	if err != nil {

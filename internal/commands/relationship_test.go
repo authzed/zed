@@ -670,7 +670,7 @@ func (m *mockClient) WriteRelationships(_ context.Context, in *v1.WriteRelations
 }
 
 func TestBulkDeleteForcing(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
@@ -720,7 +720,7 @@ func TestBulkDeleteForcing(t *testing.T) {
 }
 
 func TestBulkDeleteManyForcing(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
@@ -762,7 +762,7 @@ func TestBulkDeleteManyForcing(t *testing.T) {
 }
 
 func TestBulkDeleteNotForcing(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {

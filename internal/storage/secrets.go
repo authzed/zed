@@ -69,7 +69,7 @@ type SecretStore interface {
 	Put(s Secrets) error
 }
 
-// Returns an empty token if no token exists.
+// GetTokenIfExists returns an empty token if no token exists.
 func GetTokenIfExists(name string, ss SecretStore) (Token, error) {
 	secrets, err := ss.Get()
 	if err != nil {
