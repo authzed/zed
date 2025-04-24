@@ -129,14 +129,14 @@ var permissionCmd = &cobra.Command{
 var checkBulkCmd = &cobra.Command{
 	Use:   "bulk <resource:id#permission@subject:id> <resource:id#permission@subject:id> ...",
 	Short: "Check a permissions in bulk exists for a resource-subject pairs",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  ValidationWrapper(cobra.MinimumNArgs(1)),
 	RunE:  checkBulkCmdFunc,
 }
 
 var checkCmd = &cobra.Command{
 	Use:               "check <resource:id> <permission> <subject:id>",
 	Short:             "Check that a permission exists for a subject",
-	Args:              cobra.ExactArgs(3),
+	Args:              ValidationWrapper(cobra.ExactArgs(3)),
 	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectID),
 	RunE:              checkCmdFunc,
 }
@@ -144,7 +144,7 @@ var checkCmd = &cobra.Command{
 var expandCmd = &cobra.Command{
 	Use:               "expand <permission> <resource:id>",
 	Short:             "Expand the structure of a permission",
-	Args:              cobra.ExactArgs(2),
+	Args:              ValidationWrapper(cobra.ExactArgs(2)),
 	ValidArgsFunction: cobra.NoFileCompletions,
 	RunE:              expandCmdFunc,
 }
@@ -152,7 +152,7 @@ var expandCmd = &cobra.Command{
 var lookupResourcesCmd = &cobra.Command{
 	Use:               "lookup-resources <type> <permission> <subject:id>",
 	Short:             "Enumerates resources of a given type for which the subject has permission",
-	Args:              cobra.ExactArgs(3),
+	Args:              ValidationWrapper(cobra.ExactArgs(3)),
 	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
 	RunE:              lookupResourcesCmdFunc,
 }
@@ -160,7 +160,7 @@ var lookupResourcesCmd = &cobra.Command{
 var lookupCmd = &cobra.Command{
 	Use:               "lookup <type> <permission> <subject:id>",
 	Short:             "Enumerates the resources of a given type for which the subject has permission",
-	Args:              cobra.ExactArgs(3),
+	Args:              ValidationWrapper(cobra.ExactArgs(3)),
 	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
 	RunE:              lookupResourcesCmdFunc,
 	Deprecated:        "prefer lookup-resources",
@@ -170,7 +170,7 @@ var lookupCmd = &cobra.Command{
 var lookupSubjectsCmd = &cobra.Command{
 	Use:               "lookup-subjects <resource:id> <permission> <subject_type#optional_subject_relation>",
 	Short:             "Enumerates the subjects of a given type for which the subject has permission on the resource",
-	Args:              cobra.ExactArgs(3),
+	Args:              ValidationWrapper(cobra.ExactArgs(3)),
 	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
 	RunE:              lookupSubjectsCmdFunc,
 }

@@ -41,7 +41,7 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 
 var schemaWriteCmd = &cobra.Command{
 	Use:               "write <file?>",
-	Args:              cobra.MaximumNArgs(1),
+	Args:              commands.ValidationWrapper(cobra.MaximumNArgs(1)),
 	Short:             "Write a schema file (.zed or stdin) to the current permissions system",
 	ValidArgsFunction: commands.FileExtensionCompletions("zed"),
 	RunE:              schemaWriteCmdFunc,
@@ -50,7 +50,7 @@ var schemaWriteCmd = &cobra.Command{
 var schemaCopyCmd = &cobra.Command{
 	Use:               "copy <src context> <dest context>",
 	Short:             "Copy a schema from one context into another",
-	Args:              cobra.ExactArgs(2),
+	Args:              commands.ValidationWrapper(cobra.ExactArgs(2)),
 	ValidArgsFunction: ContextGet,
 	RunE:              schemaCopyCmdFunc,
 }
@@ -58,7 +58,7 @@ var schemaCopyCmd = &cobra.Command{
 var schemaDiffCmd = &cobra.Command{
 	Use:   "diff <before file> <after file>",
 	Short: "Diff two schema files",
-	Args:  cobra.ExactArgs(2),
+	Args:  commands.ValidationWrapper(cobra.ExactArgs(2)),
 	RunE:  schemaDiffCmdFunc,
 }
 

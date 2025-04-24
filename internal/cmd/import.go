@@ -16,6 +16,7 @@ import (
 	"github.com/authzed/spicedb/pkg/validationfile"
 
 	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/commands"
 	"github.com/authzed/zed/internal/decode"
 	"github.com/authzed/zed/internal/grpcutil"
 )
@@ -60,7 +61,7 @@ var importCmd = &cobra.Command{
 	With schema definition prefix:
 		zed import --schema-definition-prefix=mypermsystem file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
 `,
-	Args: cobra.ExactArgs(1),
+	Args: commands.ValidationWrapper(cobra.ExactArgs(1)),
 	RunE: importCmdFunc,
 }
 

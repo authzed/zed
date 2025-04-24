@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/jzelinskie/cobrautil/v2"
@@ -42,7 +43,15 @@ func init() {
 	log.Logger = l
 }
 
-// This function is utilised to generate docs for zed
+var flagError = flagErrorFunc
+
+func flagErrorFunc(cmd *cobra.Command, err error) error {
+	cmd.Println(err)
+	cmd.Println(cmd.UsageString())
+	return errParsing
+}
+
+// InitialiseRootCmd This function is utilised to generate docs for zed
 func InitialiseRootCmd(zl *cobrazerolog.Builder) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "zed",
@@ -54,12 +63,10 @@ func InitialiseRootCmd(zl *cobrazerolog.Builder) *cobra.Command {
 			commands.InjectRequestID,
 		),
 		SilenceErrors: true,
-		SilenceUsage:  false,
+		SilenceUsage:  true,
 	}
-	rootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		cmd.Println(err)
-		cmd.Println(cmd.UsageString())
-		return errParsing
+	rootCmd.SetFlagErrorFunc(func(command *cobra.Command, err error) error {
+		return flagError(command, err)
 	})
 
 	zl.RegisterFlags(rootCmd.PersistentFlags())
@@ -92,7 +99,7 @@ func InitialiseRootCmd(zl *cobrazerolog.Builder) *cobra.Command {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:               "use <context>",
 		Short:             "Alias for `zed context use`",
-		Args:              cobra.MaximumNArgs(1),
+		Args:              commands.ValidationWrapper(cobra.MaximumNArgs(1)),
 		RunE:              contextUseCmdFunc,
 		ValidArgsFunction: ContextGet,
 	})
@@ -119,6 +126,12 @@ func InitialiseRootCmd(zl *cobrazerolog.Builder) *cobra.Command {
 }
 
 func Run() {
+	if err := runWithoutExit(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func runWithoutExit() error {
 	zl := cobrazerolog.New(cobrazerolog.WithPreRunLevel(zerolog.DebugLevel))
 
 	rootCmd := InitialiseRootCmd(zl)
@@ -141,11 +154,34 @@ func Run() {
 		}
 	}()
 
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		if !errors.Is(err, errParsing) {
-			log.Err(err).Msg("terminated with errors")
-		}
+	return handleError(rootCmd, rootCmd.ExecuteContext(ctx))
+}
 
-		os.Exit(1)
+func handleError(command *cobra.Command, err error) error {
+	if err == nil {
+		return nil
 	}
+	// this snippet of code is taken from Command.ExecuteC in order to determine the command that was ultimately
+	// parsed. This is necessary to be able to print the proper command-specific usage
+	var findErr error
+	var cmdToExecute *cobra.Command
+	args := os.Args[1:]
+	if command.TraverseChildren {
+		cmdToExecute, _, findErr = command.Traverse(args)
+	} else {
+		cmdToExecute, _, findErr = command.Find(args)
+	}
+	if findErr != nil {
+		cmdToExecute = command
+	}
+
+	if errors.Is(err, commands.ValidationError{}) {
+		_ = flagError(cmdToExecute, err)
+	} else if err != nil && strings.Contains(err.Error(), "unknown command") {
+		_ = flagError(cmdToExecute, err)
+	} else if !errors.Is(err, errParsing) {
+		log.Err(err).Msg("terminated with errors")
+	}
+
+	return err
 }

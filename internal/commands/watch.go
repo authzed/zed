@@ -45,7 +45,7 @@ func RegisterWatchRelationshipCmd(parentCmd *cobra.Command) *cobra.Command {
 var watchCmd = &cobra.Command{
 	Use:        "watch [object_types, ...] [start_cursor]",
 	Short:      "Watches the stream of relationship updates from the server",
-	Args:       cobra.RangeArgs(0, 2),
+	Args:       ValidationWrapper(cobra.RangeArgs(0, 2)),
 	RunE:       watchCmdFunc,
 	Deprecated: "deprecated; please use `zed watch relationships` instead",
 }
@@ -53,7 +53,7 @@ var watchCmd = &cobra.Command{
 var watchRelationshipsCmd = &cobra.Command{
 	Use:   "watch [object_types, ...] [start_cursor]",
 	Short: "Watches the stream of relationship updates from the server",
-	Args:  cobra.RangeArgs(0, 2),
+	Args:  ValidationWrapper(cobra.RangeArgs(0, 2)),
 	RunE:  watchCmdFunc,
 }
 

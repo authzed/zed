@@ -53,7 +53,7 @@ var (
 	backupCmd = &cobra.Command{
 		Use:   "backup <filename>",
 		Short: "Create, restore, and inspect permissions system backups",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  commands.ValidationWrapper(cobra.MaximumNArgs(1)),
 		// Create used to be on the root, so add it here for back-compat.
 		RunE: withErrorHandling(backupCreateCmdFunc),
 	}
@@ -61,21 +61,21 @@ var (
 	backupCreateCmd = &cobra.Command{
 		Use:   "create <filename>",
 		Short: "Backup a permission system to a file",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  commands.ValidationWrapper(cobra.MaximumNArgs(1)),
 		RunE:  withErrorHandling(backupCreateCmdFunc),
 	}
 
 	backupRestoreCmd = &cobra.Command{
 		Use:   "restore <filename>",
 		Short: "Restore a permission system from a file",
-		Args:  commands.StdinOrExactArgs(1),
+		Args:  commands.ValidationWrapper(commands.StdinOrExactArgs(1)),
 		RunE:  backupRestoreCmdFunc,
 	}
 
 	backupParseSchemaCmd = &cobra.Command{
 		Use:   "parse-schema <filename>",
 		Short: "Extract the schema from a backup file",
-		Args:  cobra.ExactArgs(1),
+		Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return backupParseSchemaCmdFunc(cmd, os.Stdout, args)
 		},
@@ -84,7 +84,7 @@ var (
 	backupParseRevisionCmd = &cobra.Command{
 		Use:   "parse-revision <filename>",
 		Short: "Extract the revision from a backup file",
-		Args:  cobra.ExactArgs(1),
+		Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return backupParseRevisionCmdFunc(cmd, os.Stdout, args)
 		},
@@ -93,7 +93,7 @@ var (
 	backupParseRelsCmd = &cobra.Command{
 		Use:   "parse-relationships <filename>",
 		Short: "Extract the relationships from a backup file",
-		Args:  cobra.ExactArgs(1),
+		Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return backupParseRelsCmdFunc(cmd, os.Stdout, args)
 		},
@@ -102,7 +102,7 @@ var (
 	backupRedactCmd = &cobra.Command{
 		Use:   "redact <filename>",
 		Short: "Redact a backup file to remove sensitive information",
-		Args:  cobra.ExactArgs(1),
+		Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return backupRedactCmdFunc(cmd, args)
 		},
@@ -129,7 +129,7 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	restoreCmd := &cobra.Command{
 		Use:    "restore <filename>",
 		Short:  "Restore a permission system from a backup file",
-		Args:   cobra.MaximumNArgs(1),
+		Args:   commands.ValidationWrapper(cobra.MaximumNArgs(1)),
 		RunE:   backupRestoreCmdFunc,
 		Hidden: true,
 	}
