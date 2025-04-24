@@ -13,9 +13,11 @@ import (
 	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 
+	composable "github.com/authzed/spicedb/pkg/composableschemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/development"
 	core "github.com/authzed/spicedb/pkg/proto/core/v1"
 	devinterface "github.com/authzed/spicedb/pkg/proto/developer/v1"
+	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
 	"github.com/authzed/spicedb/pkg/validationfile"
 
@@ -47,6 +49,7 @@ var (
 
 func registerValidateCmd(cmd *cobra.Command) {
 	validateCmd.Flags().Bool("force-color", false, "force color code output even in non-tty environments")
+	validateCmd.Flags().String("schema-type", "", "force validation according to specific schema syntax (\"\", \"composable\", \"standard\")")
 	cmd.AddCommand(validateCmd)
 }
 
@@ -92,6 +95,8 @@ var validateCmd = &cobra.Command{
 	SilenceUsage: true,
 }
 
+var validSchemaTypes = []string{"", "standard", "composable"}
+
 func validatePreRunE(cmd *cobra.Command, _ []string) error {
 	// Override lipgloss's autodetection of whether it's in a terminal environment
 	// and display things in color anyway. This can be nice in CI environments that
@@ -99,6 +104,17 @@ func validatePreRunE(cmd *cobra.Command, _ []string) error {
 	setForceColor := cobrautil.MustGetBool(cmd, "force-color")
 	if setForceColor {
 		lipgloss.SetColorProfile(termenv.ANSI256)
+	}
+
+	schemaType := cobrautil.MustGetString(cmd, "schema-type")
+	schemaTypeValid := false
+	for _, validType := range validSchemaTypes {
+		if schemaType == validType {
+			schemaTypeValid = true
+		}
+	}
+	if !schemaTypeValid {
+		return fmt.Errorf("schema-type must be one of \"\", \"standard\", \"composable\". received: %s", schemaType)
 	}
 
 	return nil
@@ -112,6 +128,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		successfullyValidatedFiles = 0
 		shouldExit                 = false
 		toPrint                    = &strings.Builder{}
+		schemaType                 = cobrautil.MustGetString(cmd, "schema-type")
 	)
 
 	for _, filename := range filenames {
@@ -132,13 +149,43 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 
 		var parsed validationfile.ValidationFile
 		validateContents, isOnlySchema, err := decoder(&parsed)
-		if err != nil {
-			var errWithSource spiceerrors.WithSourceError
-			if errors.As(err, &errWithSource) {
-				outputErrorWithSource(toPrint, validateContents, errWithSource)
-				shouldExit = true
+		standardErrors, composableErrs, otherErrs := classifyErrors(err)
+
+		switch schemaType {
+		case "standard":
+			if standardErrors != nil {
+				var errWithSource spiceerrors.WithSourceError
+				if errors.As(standardErrors, &errWithSource) {
+					outputErrorWithSource(toPrint, validateContents, errWithSource)
+					shouldExit = true
+				}
+				return "", shouldExit, standardErrors
 			}
-			return "", shouldExit, err
+		case "composable":
+			if composableErrs != nil {
+				var errWithSource spiceerrors.WithSourceError
+				if errors.As(composableErrs, &errWithSource) {
+					outputErrorWithSource(toPrint, validateContents, errWithSource)
+					shouldExit = true
+				}
+				return "", shouldExit, composableErrs
+			}
+		default:
+			// By default, validate will attempt to validate a schema first according to composable schema rules,
+			// then standard schema rules,
+			// and if both fail it will show the errors from composable schema.
+			if composableErrs != nil && standardErrors != nil {
+				var errWithSource spiceerrors.WithSourceError
+				if errors.As(composableErrs, &errWithSource) {
+					outputErrorWithSource(toPrint, validateContents, errWithSource)
+					shouldExit = true
+				}
+				return "", shouldExit, composableErrs
+			}
+		}
+
+		if otherErrs != nil {
+			return "", false, otherErrs
 		}
 
 		tuples := make([]*core.RelationTuple, 0)
@@ -179,7 +226,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		}
 		successfullyValidatedFiles++
 
-		// Run expected relations for all parsed files
+		// Run expected relations for file
 		_, erDevErrs, rerr := development.RunValidation(devCtx, &parsed.ExpectedRelations)
 		if rerr != nil {
 			return "", false, rerr
@@ -188,7 +235,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			outputDeveloperErrors(toPrint, validateContents, erDevErrs)
 			return toPrint.String(), true, nil
 		}
-		// Print out any warnings for all files
+		// Print out any warnings for file
 		warnings, err := development.GetWarnings(ctx, devCtx)
 		if err != nil {
 			return "", false, err
@@ -339,4 +386,29 @@ func renderLine(sb *strings.Builder, lines []string, index int, highlight string
 			highlightedSourceStyle().Render("^"),
 			highlightedSourceStyle().Render(strings.Repeat("~", highlightLength)))
 	}
+}
+
+// classifyErrors returns errors from the composable DSL, the standard DSL, and any other parsing errors.
+func classifyErrors(err error) (error, error, error) {
+	if err == nil {
+		return nil, nil, nil
+	}
+	var standardErr compiler.BaseCompilerError
+	var composableErr composable.BaseCompilerError
+	var retStandard, retComposable, allOthers error
+
+	ok := errors.As(err, &standardErr)
+	if ok {
+		retStandard = standardErr
+	}
+	ok = errors.As(err, &composableErr)
+	if ok {
+		retComposable = composableErr
+	}
+
+	if retStandard == nil && retComposable == nil {
+		allOthers = err
+	}
+
+	return retStandard, retComposable, allOthers
 }

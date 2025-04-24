@@ -165,7 +165,7 @@ schema:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			block := validationfile.ValidationFile{}
-			isOnlySchema, err := unmarshalAsYAMLOrSchema(tt.in, &block)
+			isOnlySchema, err := unmarshalAsYAMLOrSchema("", tt.in, &block)
 			require.Equal(t, tt.wantErr, err != nil)
 			require.Equal(t, tt.isOnlySchema, isOnlySchema)
 			if !tt.wantErr {

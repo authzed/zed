@@ -15,6 +15,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 
+	composable "github.com/authzed/spicedb/pkg/composableschemadsl/compiler"
+	"github.com/authzed/spicedb/pkg/composableschemadsl/generator"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/input"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
@@ -101,7 +103,7 @@ func directHTTPDecoder(u *url.URL) Func {
 			return nil, false, err
 		}
 
-		isOnlySchema, err := unmarshalAsYAMLOrSchema(data, out)
+		isOnlySchema, err := unmarshalAsYAMLOrSchema("", data, out)
 		return data, isOnlySchema, err
 	}
 }
@@ -139,21 +141,23 @@ func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, filename stri
 			return false, err
 		}
 	}
-	return unmarshalAsYAMLOrSchema(data, out)
+	return unmarshalAsYAMLOrSchema(filename, data, out)
 }
 
-func unmarshalAsYAMLOrSchema(data []byte, out interface{}) (bool, error) {
+func unmarshalAsYAMLOrSchema(filename string, data []byte, out interface{}) (bool, error) {
+	inputString := string(data)
+
 	// Check for indications of a schema-only file.
-	if !strings.Contains(string(data), "schema:") && !strings.Contains(string(data), "relationships:") {
-		if err := compileSchemaFromData(data, out); err != nil {
+	if !strings.Contains(inputString, "schema:") && !strings.Contains(inputString, "relationships:") {
+		if err := compileSchemaFromData(filename, inputString, out); err != nil {
 			return false, err
 		}
 		return true, nil
 	}
 
-	if !strings.Contains(string(data), "schema:") && !strings.Contains(string(data), "schemaFile:") {
+	if !strings.Contains(inputString, "schema:") && !strings.Contains(inputString, "schemaFile:") {
 		// If there is no schema and no schemaFile and it doesn't compile then it must be yaml with missing fields
-		if err := compileSchemaFromData(data, out); err != nil {
+		if err := compileSchemaFromData(filename, inputString, out); err != nil {
 			return false, errors.New("either schema or schemaFile must be present")
 		}
 		return true, nil
@@ -166,22 +170,46 @@ func unmarshalAsYAMLOrSchema(data []byte, out interface{}) (bool, error) {
 	return false, nil
 }
 
-func compileSchemaFromData(data []byte, out interface{}) error {
-	compiled, serr := compiler.Compile(compiler.InputSchema{
-		Source:       input.Source("schema"),
-		SchemaString: string(data),
-	}, compiler.AllowUnprefixedObjectType())
-	if serr != nil {
-		return serr
-	}
+// compileSchemaFromData attempts to compile using the old DSL and the new composable DSL,
+// but prefers the new DSL.
+// It returns the errors returned by both compilations.
+func compileSchemaFromData(filename, schemaString string, out interface{}) error {
+	var (
+		standardCompileErr   error
+		composableCompiled   *composable.CompiledSchema
+		composableCompileErr error
+		vfile                validationfile.ValidationFile
+	)
 
-	// If that succeeds, return the compiled schema.
-	vfile := *out.(*validationfile.ValidationFile)
+	vfile = *out.(*validationfile.ValidationFile)
 	vfile.Schema = blocks.ParsedSchema{
-		CompiledSchema: compiled,
-		Schema:         string(data),
 		SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
 	}
+
+	_, standardCompileErr = compiler.Compile(compiler.InputSchema{
+		Source:       input.Source("schema"),
+		SchemaString: schemaString,
+	}, compiler.AllowUnprefixedObjectType())
+
+	if standardCompileErr == nil {
+		vfile.Schema.Schema = schemaString
+	}
+
+	inputSourceFolder := filepath.Dir(filename)
+	composableCompiled, composableCompileErr = composable.Compile(composable.InputSchema{
+		SchemaString: schemaString,
+	}, composable.AllowUnprefixedObjectType(), composable.SourceFolder(inputSourceFolder))
+
+	if composableCompileErr == nil {
+		compiledSchemaString, _, err := generator.GenerateSchema(composableCompiled.OrderedDefinitions)
+		if err != nil {
+			return fmt.Errorf("could not generate string schema: %w", err)
+		}
+		vfile.Schema.Schema = compiledSchemaString
+	}
+
+	err := errors.Join(standardCompileErr, composableCompileErr)
+
 	*out.(*validationfile.ValidationFile) = vfile
-	return nil
+	return err
 }
