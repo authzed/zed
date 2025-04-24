@@ -21,7 +21,7 @@ archives:
       - "LICENSE"
     format_overrides:
       - goos: "windows"
-        formats: ["zip"]
+        format: "zip"
 
 chocolateys:
   - name: "zed"
