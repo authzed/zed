@@ -10,10 +10,10 @@ import (
 	zedtesting "github.com/authzed/zed/internal/testing"
 )
 
-var durationRegex = regexp.MustCompile(`\([\d.]*µs\)`)
+var durationRegex = regexp.MustCompile(`\([\d.]*[µmn]s\)`)
 
 func stripDuration(s string) string {
-	return durationRegex.ReplaceAllString(s, "(Xµs)")
+	return durationRegex.ReplaceAllString(s, "(Xs)")
 }
 
 func TestValidate(t *testing.T) {
