@@ -8,13 +8,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/mitchellh/go-homedir"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/proxy"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -32,6 +35,12 @@ type Client interface {
 	v1.WatchServiceClient
 	v1.ExperimentalServiceClient
 }
+
+const (
+	defaultRetryExponentialBackoff = 100 * time.Millisecond
+	defaultMaxRetryAttemptDuration = 2 * time.Second
+	defaultRetryJitterFraction     = 0.5
+)
 
 // NewClient defines an (overridable) means of creating a new client.
 var (
@@ -191,17 +200,33 @@ func certOption(token storage.Token) (opt grpc.DialOption, err error) {
 
 // DialOptsFromFlags returns the dial options from the CLI-specified flags.
 func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOption, error) {
-	interceptors := []grpc.UnaryClientInterceptor{
+	maxRetries := cobrautil.MustGetUint(cmd, "max-retries")
+	retryOpts := []retry.CallOption{
+		retry.WithBackoff(retry.BackoffExponentialWithJitterBounded(defaultRetryExponentialBackoff,
+			defaultRetryJitterFraction, defaultMaxRetryAttemptDuration)),
+		retry.WithCodes(codes.ResourceExhausted, codes.Unavailable, codes.Aborted, codes.Unknown, codes.Internal),
+		retry.WithMax(maxRetries),
+		retry.WithOnRetryCallback(func(_ context.Context, attempt uint, err error) {
+			log.Error().Err(err).Uint("attempt", attempt).Msg("retrying gRPC call")
+		}),
+	}
+	unaryInterceptors := []grpc.UnaryClientInterceptor{
 		zgrpcutil.LogDispatchTrailers,
+		retry.UnaryClientInterceptor(retryOpts...),
+	}
+
+	streamInterceptors := []grpc.StreamClientInterceptor{
+		zgrpcutil.StreamLogDispatchTrailers,
+		retry.StreamClientInterceptor(retryOpts...),
 	}
 
 	if !cobrautil.MustGetBool(cmd, "skip-version-check") {
-		interceptors = append(interceptors, zgrpcutil.CheckServerVersion)
+		unaryInterceptors = append(unaryInterceptors, zgrpcutil.CheckServerVersion)
 	}
 
 	opts := []grpc.DialOption{
-		grpc.WithChainUnaryInterceptor(interceptors...),
-		grpc.WithChainStreamInterceptor(zgrpcutil.StreamLogDispatchTrailers),
+		grpc.WithChainUnaryInterceptor(unaryInterceptors...),
+		grpc.WithChainStreamInterceptor(streamInterceptors...),
 	}
 
 	proxyAddr := cobrautil.MustGetString(cmd, "proxy")

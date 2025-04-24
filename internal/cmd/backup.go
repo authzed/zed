@@ -55,7 +55,7 @@ var (
 		Short: "Create, restore, and inspect permissions system backups",
 		Args:  cobra.MaximumNArgs(1),
 		// Create used to be on the root, so add it here for back-compat.
-		RunE: backupCreateCmdFunc,
+		RunE: withErrorHandling(backupCreateCmdFunc),
 	}
 
 	backupCreateCmd = &cobra.Command{
@@ -116,8 +116,6 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	backupCmd.AddCommand(backupCreateCmd)
 	registerBackupCreateFlags(backupCreateCmd)
 
-	backupCreateCmd.Flags().Uint32("page-limit", 0, "defines the number of relationships to be read by requested page during backup")
-
 	backupCmd.AddCommand(backupRestoreCmd)
 	registerBackupRestoreFlags(backupRestoreCmd)
 
@@ -160,6 +158,7 @@ func registerBackupRestoreFlags(cmd *cobra.Command) {
 func registerBackupCreateFlags(cmd *cobra.Command) {
 	cmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
 	cmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
+	cmd.Flags().Uint32("page-limit", 0, "defines the number of relationships to be read by requested page during backup")
 }
 
 func createBackupFile(filename string, returnIfExists bool) (*os.File, bool, error) {
