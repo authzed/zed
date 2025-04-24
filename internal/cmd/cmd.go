@@ -76,6 +76,7 @@ func InitialiseRootCmd(zl *cobrazerolog.Builder) *cobra.Command {
 	rootCmd.PersistentFlags().String("request-id", "", "optional id to send along with SpiceDB requests for tracing")
 	rootCmd.PersistentFlags().Int("max-message-size", 0, "maximum size *in bytes* (defaults to 4_194_304 bytes ~= 4MB) of a gRPC message that can be sent or received by zed")
 	rootCmd.PersistentFlags().String("proxy", "", "specify a SOCKS5 proxy address")
+	rootCmd.PersistentFlags().Uint("max-retries", 10, "maximum number of sequential retries to attempt when a request fails")
 	_ = rootCmd.PersistentFlags().MarkHidden("debug") // This cannot return its error.
 
 	versionCmd := &cobra.Command{

@@ -1,11 +1,21 @@
 package client_test
 
 import (
+	"context"
+	"net"
 	"os"
 	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/grpc/test/bufconn"
+
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/authzed-go/v1"
+	"github.com/authzed/grpcutil"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/storage"
@@ -117,4 +127,54 @@ func TestGetCurrentTokenWithCLIOverrideWithoutSecretFile(t *testing.T) {
 	require.Equal("t1", token.APIToken)
 	require.Equal("e1", token.Endpoint)
 	require.Equal(&bTrue, token.Insecure)
+}
+
+type fakeSchemaServer struct {
+	v1.UnimplementedSchemaServiceServer
+	testFunc func()
+}
+
+func (fss *fakeSchemaServer) ReadSchema(_ context.Context, _ *v1.ReadSchemaRequest) (*v1.ReadSchemaResponse, error) {
+	fss.testFunc()
+	return nil, status.Error(codes.Unavailable, "")
+}
+
+func TestRetries(t *testing.T) {
+	ctx := t.Context()
+	var callCount uint
+	lis := bufconn.Listen(1024 * 1024)
+	s := grpc.NewServer()
+
+	fakeServer := &fakeSchemaServer{testFunc: func() {
+		callCount++
+	}}
+	v1.RegisterSchemaServiceServer(s, fakeServer)
+
+	go func() {
+		_ = s.Serve(lis)
+	}()
+	t.Cleanup(s.Stop)
+
+	secure := true
+	retries := uint(2)
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.BoolFlag{FlagName: "skip-version-check", FlagValue: true, Changed: true},
+		zedtesting.UintFlag{FlagName: "max-retries", FlagValue: retries, Changed: true},
+		zedtesting.StringFlag{FlagName: "proxy", FlagValue: "", Changed: true},
+		zedtesting.StringFlag{FlagName: "hostname-override", FlagValue: "", Changed: true},
+		zedtesting.IntFlag{FlagName: "max-message-size", FlagValue: 1000, Changed: true},
+	)
+	dialOpts, err := client.DialOptsFromFlags(cmd, storage.Token{Insecure: &secure})
+	require.NoError(t, err)
+
+	dialOpts = append(dialOpts, grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+		return lis.Dial()
+	}))
+
+	c, err := authzed.NewClient("passthrough://bufnet", dialOpts...)
+	require.NoError(t, err)
+
+	_, err = c.ReadSchema(ctx, &v1.ReadSchemaRequest{})
+	grpcutil.RequireStatus(t, codes.Unavailable, err)
+	require.Equal(t, retries, callCount)
 }
