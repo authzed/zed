@@ -55,8 +55,8 @@ func flagErrorFunc(cmd *cobra.Command, err error) error {
 func InitialiseRootCmd(zl *cobrazerolog.Builder) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "zed",
-		Short: "SpiceDB client, by AuthZed",
-		Long:  "A command-line client for managing SpiceDB clusters, built by AuthZed",
+		Short: "SpiceDB CLI, built by AuthZed",
+		Long:  "A command-line client for managing SpiceDB clusters.",
 		PersistentPreRunE: cobrautil.CommandStack(
 			zl.RunE(),
 			SyncFlagsCmdFunc,

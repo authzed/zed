@@ -77,8 +77,8 @@ func main() {
 func buildRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "zed",
-		Short: "SpiceDB client, by AuthZed",
-		Long:  "A command-line client for managing SpiceDB clusters, built by AuthZed",
+		Short: "SpiceDB CLI, by AuthZed",
+		Long:  "A command-line client for managing SpiceDB clusters.",
 	}
 
 	// Register shared commands.
