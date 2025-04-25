@@ -43,8 +43,8 @@ jobs:
           mkdir -p docs-repo/$(dirname $TARGET_DOCS_FILE)
           cp -v $GENERATED_DOCS_FILE docs-repo/$TARGET_DOCS_FILE
           cd docs-repo
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
+          git config user.name "authzedbot"
+          git config user.email "infrastructure+authzedapprover@authzed.com"
           git add $TARGET_DOCS_FILE
           if ! git diff --cached --exit-code; then
             git commit -m "Update generated docs"
