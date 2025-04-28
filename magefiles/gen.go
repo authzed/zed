@@ -8,6 +8,7 @@ import (
 
 	"github.com/jzelinskie/cobrautil/v2/cobrazerolog"
 	"github.com/magefile/mage/mg"
+	"github.com/magefile/mage/sh"
 
 	"github.com/authzed/zed/internal/cmd"
 )
@@ -31,4 +32,13 @@ func (g Gen) Docs() error {
 	rootCmd := cmd.InitialiseRootCmd(cobrazerolog.New())
 
 	return GenCustomMarkdownTree(rootCmd, targetDir)
+}
+
+// DocsForPublish generates a markdown file for publishing in the docs website.
+func (g Gen) DocsForPublish() error {
+	if err := g.Docs(); err != nil {
+		return err
+	}
+
+	return sh.RunV("bash", "-c", "cat docs/getting-started.md <(echo -e '\\n') docs/zed.md > docs/merged.md")
 }
