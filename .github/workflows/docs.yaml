@@ -42,20 +42,7 @@ jobs:
         run: |
           mkdir -p docs-repo/$(dirname $TARGET_DOCS_FILE)
           cp -v $GENERATED_DOCS_FILE docs-repo/$TARGET_DOCS_FILE
-          cd docs-repo
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add $TARGET_DOCS_FILE
-          if ! git diff --cached --exit-code; then
-            git commit -m "Update generated docs"
-            echo "CHANGES_DETECTED=true" >> $GITHUB_ENV
-          else
-            echo "No changes detected"
-            echo "CHANGES_DETECTED=false" >> $GITHUB_ENV
-          fi
-      - name: "Create pull request"
-        if: |
-          env.CHANGES_DETECTED == 'true'
+      - name: "Create commit & pull request"
         uses: "peter-evans/create-pull-request@v7"
         with:
           token: "${{ secrets.PAT_TO_PUSH_TO_DOCS }}"
