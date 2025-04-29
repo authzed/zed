@@ -10,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/selector"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/mitchellh/go-homedir"
 	"github.com/rs/zerolog/log"
@@ -40,6 +42,8 @@ const (
 	defaultRetryExponentialBackoff = 100 * time.Millisecond
 	defaultMaxRetryAttemptDuration = 2 * time.Second
 	defaultRetryJitterFraction     = 0.5
+	bulkImportRoute                = "/authzed.api.v1.ExperimentalService/BulkImportRelationships"
+	importBulkRoute                = "/authzed.api.v1.PermissionsService/ImportBulkRelationships"
 )
 
 // NewClient defines an (overridable) means of creating a new client.
@@ -198,6 +202,17 @@ func certOption(token storage.Token) (opt grpc.DialOption, err error) {
 	return grpcutil.WithSystemCerts(verification)
 }
 
+func isNoneOf(routes ...string) func(_ context.Context, c interceptors.CallMeta) bool {
+	return func(_ context.Context, c interceptors.CallMeta) bool {
+		for _, route := range routes {
+			if route == c.FullMethod() {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 // DialOptsFromFlags returns the dial options from the CLI-specified flags.
 func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOption, error) {
 	maxRetries := cobrautil.MustGetUint(cmd, "max-retries")
@@ -217,7 +232,7 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 
 	streamInterceptors := []grpc.StreamClientInterceptor{
 		zgrpcutil.StreamLogDispatchTrailers,
-		retry.StreamClientInterceptor(retryOpts...),
+		selector.StreamClientInterceptor(retry.StreamClientInterceptor(retryOpts...), selector.MatchFunc(isNoneOf(bulkImportRoute, importBulkRoute))),
 	}
 
 	if !cobrautil.MustGetBool(cmd, "skip-version-check") {
