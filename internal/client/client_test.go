@@ -131,12 +131,24 @@ func TestGetCurrentTokenWithCLIOverrideWithoutSecretFile(t *testing.T) {
 
 type fakeSchemaServer struct {
 	v1.UnimplementedSchemaServiceServer
+	v1.UnimplementedExperimentalServiceServer
+	v1.UnimplementedPermissionsServiceServer
 	testFunc func()
 }
 
 func (fss *fakeSchemaServer) ReadSchema(_ context.Context, _ *v1.ReadSchemaRequest) (*v1.ReadSchemaResponse, error) {
 	fss.testFunc()
 	return nil, status.Error(codes.Unavailable, "")
+}
+
+func (fss *fakeSchemaServer) BulkImportRelationships(grpc.ClientStreamingServer[v1.BulkImportRelationshipsRequest, v1.BulkImportRelationshipsResponse]) error {
+	fss.testFunc()
+	return status.Errorf(codes.Aborted, "")
+}
+
+func (fss *fakeSchemaServer) ImportBulkRelationships(grpc.ClientStreamingServer[v1.ImportBulkRelationshipsRequest, v1.ImportBulkRelationshipsResponse]) error {
+	fss.testFunc()
+	return status.Errorf(codes.Aborted, "")
 }
 
 func TestRetries(t *testing.T) {
@@ -177,4 +189,58 @@ func TestRetries(t *testing.T) {
 	_, err = c.ReadSchema(ctx, &v1.ReadSchemaRequest{})
 	grpcutil.RequireStatus(t, codes.Unavailable, err)
 	require.Equal(t, retries, callCount)
+}
+
+func TestDoesNotRetryBackupRestore(t *testing.T) {
+	ctx := t.Context()
+	var callCount uint
+	lis := bufconn.Listen(1024 * 1024)
+	s := grpc.NewServer()
+
+	fakeServer := &fakeSchemaServer{testFunc: func() {
+		callCount++
+	}}
+	v1.RegisterPermissionsServiceServer(s, fakeServer)
+	v1.RegisterExperimentalServiceServer(s, fakeServer)
+
+	go func() {
+		_ = s.Serve(lis)
+	}()
+	t.Cleanup(s.Stop)
+
+	secure := true
+	retries := uint(2)
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.BoolFlag{FlagName: "skip-version-check", FlagValue: true, Changed: true},
+		zedtesting.UintFlag{FlagName: "max-retries", FlagValue: retries, Changed: true},
+		zedtesting.StringFlag{FlagName: "proxy", FlagValue: "", Changed: true},
+		zedtesting.StringFlag{FlagName: "hostname-override", FlagValue: "", Changed: true},
+		zedtesting.IntFlag{FlagName: "max-message-size", FlagValue: 1000, Changed: true},
+	)
+	dialOpts, err := client.DialOptsFromFlags(cmd, storage.Token{Insecure: &secure})
+	require.NoError(t, err)
+
+	dialOpts = append(dialOpts, grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+		return lis.Dial()
+	}))
+
+	c, err := authzed.NewClientWithExperimentalAPIs("passthrough://bufnet", dialOpts...)
+	require.NoError(t, err)
+
+	ibc, err := c.ImportBulkRelationships(ctx)
+	require.NoError(t, err)
+	err = ibc.SendMsg(&v1.ImportBulkRelationshipsRequest{})
+	require.NoError(t, err)
+	_, err = ibc.CloseAndRecv()
+	grpcutil.RequireStatus(t, codes.Aborted, err)
+	require.Equal(t, uint(1), callCount)
+
+	callCount = 0
+	bic, err := c.BulkImportRelationships(ctx)
+	require.NoError(t, err)
+	err = bic.SendMsg(&v1.BulkImportRelationshipsRequest{})
+	require.NoError(t, err)
+	_, err = bic.CloseAndRecv()
+	grpcutil.RequireStatus(t, codes.Aborted, err)
+	require.Equal(t, uint(1), callCount)
 }
