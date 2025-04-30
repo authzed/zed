@@ -4,6 +4,7 @@
 [![YouTube](https://img.shields.io/youtube/channel/views/UCFeSgZf0rPqQteiTQNGgTPg?color=%23F40203&logo=youtube&style=flat-square&label=YouTube "Authzed YouTube Channel")](https://www.youtube.com/channel/UCFeSgZf0rPqQteiTQNGgTPg)
 [![Discord Server](https://img.shields.io/discord/844600078504951838?color=7289da&logo=discord "Discord Server")](https://authzed.com/discord)
 [![Twitter](https://img.shields.io/badge/twitter-%40authzed-1D8EEE?logo=twitter "@authzed on Twitter")](https://twitter.com/authzed)
+[![Docker Pulls](https://img.shields.io/docker/pulls/authzed/zed?color=%23448CE6&style=flat-square)](https://hub.docker.com/r/authzed/zed/tags)
 
 A command-line client for managing [SpiceDB].
 
@@ -13,9 +14,9 @@ zed features include:
 
 - Context switching that stores credentials securely in your OS keychain
 - Check, Expand, Lookup Resources, Lookup Subjects commands for Permissions
-- Create, Read, Touch, Delete, Bulk-Delete commands for Relationships
-- Read, Write, Validate, Import, Copy commands for Schemas
-- Experimental Backup and Restore commands
+- Create, Read, Watch, Touch, Delete, Bulk-Delete commands for Relationships
+- Read, Write, Validate, Import, Copy and Compile commands for Schemas
+- Backup and Restore commands
 
 Have questions? Ask in our [Discord].
 
@@ -41,22 +42,49 @@ Binary releases are available for Linux, macOS, and Windows on AMD64 and ARM64 a
 
 [Homebrew] users for both macOS and Linux can install the latest binary releases of zed using the official tap:
 
-```command
+```sh
 brew install authzed/tap/zed
 ```
 
 [Debian-based Linux] users can install zed packages by adding a new APT source:
 
-```command
-sudo apt update && sudo apt install -y curl ca-certificates gpg
-curl https://apt.fury.io/authzed/gpg.key | sudo apt-key add -
-sudo sh -c 'echo "deb https://apt.fury.io/authzed/ * *" > /etc/apt/sources.list.d/fury.list'
-sudo apt update && sudo apt install -y zed
+First, download the public signing key for the repository:
+
+```sh
+# In releases older than Debian 12 and Ubuntu 22.04, the folder `/etc/apt/keyrings` does not exist by default, and it should be created before the curl command.
+# sudo mkdir -p -m 755 /etc/apt/keyrings
+
+curl -sS https://pkg.authzed.com/apt/gpg.key | sudo gpg --dearmor --yes -o /etc/apt/keyrings/authzed.gpg
+```
+
+Then add the list file for the repository:
+
+```sh
+echo "deb [signed-by=/etc/apt/keyrings/authzed.gpg] https://pkg.authzed.com/apt/ * *"  | sudo tee /etc/apt/sources.list.d/authzed.list
+sudo chmod 644 /etc/apt/sources.list.d/authzed.list  # helps tools such as command-not-found to work correctly
+
+```
+
+Alternatively, if you want to use the new `deb822`-style `authzed.sources` format, put the following in `/etc/apt/sources.list.d/authzed.sources`:
+
+```yaml
+Types: deb
+URIs: https://pkg.authzed.com/apt/
+Suites: *
+Components: *
+Signed-By: /etc/apt/keyrings/authzed.gpg
+```
+
+Once you've defined the sources and updated your apt cache, it can be installed just like any other package:
+
+```sh
+sudo apt update
+sudo apt install -y zed
 ```
 
 [RPM-based Linux] users can install zed packages by adding a new YUM repository:
 
-```command
+```sh
 sudo cat << EOF >> /etc/yum.repos.d/Authzed-Fury.repo
 [authzed-fury]
 name=AuthZed Fury Repository
@@ -70,6 +98,36 @@ sudo dnf install -y zed
 [homebrew]: https://docs.authzed.com/spicedb/installing#brew
 [Debian-based Linux]: https://en.wikipedia.org/wiki/List_of_Linux_distributions#Debian-based
 [RPM-based Linux]: https://en.wikipedia.org/wiki/List_of_Linux_distributions#RPM-based
+
+### Other methods
+
+#### Docker
+
+Container images are available for AMD64 and ARM64 architectures on the following registries:
+
+- [authzed/zed](https://hub.docker.com/r/authzed/zed)
+- [ghcr.io/authzed/zed](https://github.com/authzed/zed/pkgs/container/zed)
+- [quay.io/authzed/zed](https://quay.io/authzed/zed)
+
+You can pull down the latest stable release:
+
+```sh
+docker pull authzed/zed
+```
+
+Afterward, you can run it with `docker run`:
+
+```sh
+docker run --rm authzed/zed version
+```
+
+### Build from Source
+
+```sh
+git clone git@github.com:authzed/zed.git
+cd zed
+go build ./cmd/zed
+```
 
 ### Creating a context
 

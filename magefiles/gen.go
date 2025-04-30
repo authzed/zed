@@ -20,8 +20,8 @@ func (g Gen) All() error {
 	return nil
 }
 
-// Generate markdown files for zed
-func (Gen) Docs() error {
+// Docs Generate documentation in markdown format
+func (g Gen) Docs() error {
 	targetDir := "docs"
 
 	if err := os.MkdirAll(targetDir, os.ModePerm); err != nil {
