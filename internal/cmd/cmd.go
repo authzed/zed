@@ -57,6 +57,13 @@ func InitialiseRootCmd(zl *cobrazerolog.Builder) *cobra.Command {
 		Use:   "zed",
 		Short: "SpiceDB CLI, built by AuthZed",
 		Long:  "A command-line client for managing SpiceDB clusters.",
+		Example: `
+zed context list
+zed context set dev localhost:80 testpresharedkey --insecure
+zed context set prod grpc.authzed.com:443 tc_zed_my_laptop_deadbeefdeadbeefdeadbeefdeadbeef
+zed context use dev
+zed permission check --explain document:firstdoc writer user:emilia
+`,
 		PersistentPreRunE: cobrautil.CommandStack(
 			zl.RunE(),
 			SyncFlagsCmdFunc,

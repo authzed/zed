@@ -47,7 +47,7 @@ var watchCmd = &cobra.Command{
 	Short:      "Watches the stream of relationship updates from the server",
 	Args:       ValidationWrapper(cobra.RangeArgs(0, 2)),
 	RunE:       watchCmdFunc,
-	Deprecated: "deprecated; please use `zed watch relationships` instead",
+	Deprecated: "please use `zed relationships watch` instead",
 }
 
 var watchRelationshipsCmd = &cobra.Command{
