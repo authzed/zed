@@ -20,5 +20,5 @@ var previewCmd = &cobra.Command{
 var schemaCmd = &cobra.Command{
 	Use:        "schema <subcommand>",
 	Short:      "Manage schema for a permissions system",
-	Deprecated: "`zed schema compile` is now out of preview",
+	Deprecated: "please use `zed schema compile`",
 }
