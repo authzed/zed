@@ -39,7 +39,6 @@ zed permission check --explain document:firstdoc writer user:emilia
 * [zed context](#zed-context)	 - Manage configurations for connecting to SpiceDB deployments
 * [zed import](#zed-import)	 - Imports schema and relationships from a file or url
 * [zed permission](#zed-permission)	 - Query the permissions in a permissions system
-* [zed preview](#zed-preview)	 - Experimental commands that have been made available for preview
 * [zed relationship](#zed-relationship)	 - Query and mutate the relationships in a permissions system
 * [zed schema](#zed-schema)	 - Manage schema for a permissions system
 * [zed use](#zed-use)	 - Alias for `zed context use`
@@ -775,108 +774,6 @@ zed permission lookup-subjects <resource:id> <permission> <subject_type#optional
 
 
 
-## Reference: `zed preview`
-
-Experimental commands that have been made available for preview
-
-### Options Inherited From Parent Flags
-
-```
-      --certificate-path string     path to certificate authority used to verify secure connections
-      --endpoint string             spicedb gRPC API endpoint
-      --hostname-override string    override the hostname used in the connection to the endpoint
-      --insecure                    connect over a plaintext connection
-      --log-format string           format of logs ("auto", "console", "json") (default "auto")
-      --log-level string            verbosity of logging ("trace", "debug", "info", "warn", "error") (default "info")
-      --max-message-size int        maximum size *in bytes* (defaults to 4_194_304 bytes ~= 4MB) of a gRPC message that can be sent or received by zed
-      --max-retries uint            maximum number of sequential retries to attempt when a request fails (default 10)
-      --no-verify-ca                do not attempt to verify the server's certificate chain and host name
-      --permissions-system string   permissions system to query
-      --proxy string                specify a SOCKS5 proxy address
-      --request-id string           optional id to send along with SpiceDB requests for tracing
-      --skip-version-check          if true, no version check is performed against the server
-      --token string                token used to authenticate to SpiceDB
-```
-
-### Children commands
-
-* [zed preview schema](#zed-preview-schema)	 - Manage schema for a permissions system
-
-
-## Reference: `zed preview schema`
-
-Manage schema for a permissions system
-
-### Options Inherited From Parent Flags
-
-```
-      --certificate-path string     path to certificate authority used to verify secure connections
-      --endpoint string             spicedb gRPC API endpoint
-      --hostname-override string    override the hostname used in the connection to the endpoint
-      --insecure                    connect over a plaintext connection
-      --log-format string           format of logs ("auto", "console", "json") (default "auto")
-      --log-level string            verbosity of logging ("trace", "debug", "info", "warn", "error") (default "info")
-      --max-message-size int        maximum size *in bytes* (defaults to 4_194_304 bytes ~= 4MB) of a gRPC message that can be sent or received by zed
-      --max-retries uint            maximum number of sequential retries to attempt when a request fails (default 10)
-      --no-verify-ca                do not attempt to verify the server's certificate chain and host name
-      --permissions-system string   permissions system to query
-      --proxy string                specify a SOCKS5 proxy address
-      --request-id string           optional id to send along with SpiceDB requests for tracing
-      --skip-version-check          if true, no version check is performed against the server
-      --token string                token used to authenticate to SpiceDB
-```
-
-### Children commands
-
-* [zed preview schema compile](#zed-preview-schema-compile)	 - Compile a schema that uses extended syntax into one that can be written to SpiceDB
-
-
-## Reference: `zed preview schema compile`
-
-Compile a schema that uses extended syntax into one that can be written to SpiceDB
-
-```
-zed preview schema compile <file> [flags]
-```
-
-### Examples
-
-```
-
-	Write to stdout:
-		zed preview schema compile root.zed
-	Write to an output file:
-		zed preview schema compile root.zed --out compiled.zed
-	
-```
-
-### Options
-
-```
-      --out string   output filepath; omitting writes to stdout
-```
-
-### Options Inherited From Parent Flags
-
-```
-      --certificate-path string     path to certificate authority used to verify secure connections
-      --endpoint string             spicedb gRPC API endpoint
-      --hostname-override string    override the hostname used in the connection to the endpoint
-      --insecure                    connect over a plaintext connection
-      --log-format string           format of logs ("auto", "console", "json") (default "auto")
-      --log-level string            verbosity of logging ("trace", "debug", "info", "warn", "error") (default "info")
-      --max-message-size int        maximum size *in bytes* (defaults to 4_194_304 bytes ~= 4MB) of a gRPC message that can be sent or received by zed
-      --max-retries uint            maximum number of sequential retries to attempt when a request fails (default 10)
-      --no-verify-ca                do not attempt to verify the server's certificate chain and host name
-      --permissions-system string   permissions system to query
-      --proxy string                specify a SOCKS5 proxy address
-      --request-id string           optional id to send along with SpiceDB requests for tracing
-      --skip-version-check          if true, no version check is performed against the server
-      --token string                token used to authenticate to SpiceDB
-```
-
-
-
 ## Reference: `zed relationship`
 
 Query and mutate the relationships in a permissions system
@@ -1168,10 +1065,57 @@ Manage schema for a permissions system
 
 ### Children commands
 
+* [zed schema compile](#zed-schema-compile)	 - Compile a schema that uses extended syntax into one that can be written to SpiceDB
 * [zed schema copy](#zed-schema-copy)	 - Copy a schema from one context into another
 * [zed schema diff](#zed-schema-diff)	 - Diff two schema files
 * [zed schema read](#zed-schema-read)	 - Read the schema of a permissions system
 * [zed schema write](#zed-schema-write)	 - Write a schema file (.zed or stdin) to the current permissions system
+
+
+## Reference: `zed schema compile`
+
+Compile a schema that uses extended syntax into one that can be written to SpiceDB
+
+```
+zed schema compile <file> [flags]
+```
+
+### Examples
+
+```
+
+	Write to stdout:
+		zed preview schema compile root.zed
+	Write to an output file:
+		zed preview schema compile root.zed --out compiled.zed
+	
+```
+
+### Options
+
+```
+      --out string   output filepath; omitting writes to stdout
+```
+
+### Options Inherited From Parent Flags
+
+```
+      --certificate-path string     path to certificate authority used to verify secure connections
+      --endpoint string             spicedb gRPC API endpoint
+      --hostname-override string    override the hostname used in the connection to the endpoint
+      --insecure                    connect over a plaintext connection
+      --log-format string           format of logs ("auto", "console", "json") (default "auto")
+      --log-level string            verbosity of logging ("trace", "debug", "info", "warn", "error") (default "info")
+      --max-message-size int        maximum size *in bytes* (defaults to 4_194_304 bytes ~= 4MB) of a gRPC message that can be sent or received by zed
+      --max-retries uint            maximum number of sequential retries to attempt when a request fails (default 10)
+      --no-verify-ca                do not attempt to verify the server's certificate chain and host name
+      --permissions-system string   permissions system to query
+      --proxy string                specify a SOCKS5 proxy address
+      --request-id string           optional id to send along with SpiceDB requests for tracing
+      --skip-version-check          if true, no version check is performed against the server
+      --token string                token used to authenticate to SpiceDB
+```
+
 
 
 ## Reference: `zed schema copy`

@@ -38,8 +38,7 @@ jobs:
 
       - name: "Sync documentation changes"
         run: |
-          mkdir -p docs-repo/$(dirname $TARGET_DOCS_FILE)
-          cp -v merged.md docs-repo/$TARGET_DOCS_FILE
+          cp -v docs/merged.md docs-repo/$TARGET_DOCS_FILE
       - name: "Create commit & pull request"
         uses: "peter-evans/create-pull-request@v7"
         with:
