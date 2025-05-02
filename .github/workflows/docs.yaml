@@ -7,9 +7,7 @@ on:  # yamllint disable-line rule:truthy
 
 env:
   DOCS_REPO: "authzed/docs"
-  DOCS_BRANCH: "main"
-  GENERATED_DOCS_FILE: "docs/zed.md"
-  TARGET_DOCS_FILE: "pages/zed/zed.md"
+  TARGET_DOCS_FILE: "pages/spicedb/getting-started/installing-zed.mdx"
   CHANGES_DETECTED: false
 
 permissions:
@@ -28,7 +26,7 @@ jobs:
       - uses: "authzed/actions/setup-mage@main"
 
       - name: "Generate Documentation"
-        run: "mage gen:docs"
+        run: "mage gen:docsForPublish"
 
       - name: "Checkout docs repository"
         uses: "actions/checkout@v4"
@@ -41,7 +39,7 @@ jobs:
       - name: "Sync documentation changes"
         run: |
           mkdir -p docs-repo/$(dirname $TARGET_DOCS_FILE)
-          cp -v $GENERATED_DOCS_FILE docs-repo/$TARGET_DOCS_FILE
+          cp -v merged.md docs-repo/$TARGET_DOCS_FILE
       - name: "Create commit & pull request"
         uses: "peter-evans/create-pull-request@v7"
         with:

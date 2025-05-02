@@ -60,12 +60,13 @@ func genMarkdownTreeCustom(cmd *cobra.Command, f *os.File) error {
 
 func collectCommandContent(cmd *cobra.Command, commandContents *[]CommandContent) {
 	buf := new(bytes.Buffer)
+
 	name := cmd.CommandPath()
 
-	buf.WriteString("## " + name + "\n\n")
-	buf.WriteString(cmd.Short + "\n\n")
-	if len(cmd.Long) > 0 {
-		buf.WriteString("### Synopsis\n\n")
+	buf.WriteString("## Reference: `" + name + "`\n\n")
+	if len(cmd.Short) > 0 && len(cmd.Long) == 0 {
+		buf.WriteString(cmd.Short + "\n\n")
+	} else if len(cmd.Short) > 0 {
 		buf.WriteString(cmd.Long + "\n\n")
 	}
 
@@ -82,29 +83,21 @@ func collectCommandContent(cmd *cobra.Command, commandContents *[]CommandContent
 		fmt.Println("Error printing options:", err)
 	}
 
-	if hasSeeAlso(cmd) {
-		buf.WriteString("### SEE ALSO\n\n")
-		if cmd.HasParent() {
-			parent := cmd.Parent()
-			pname := parent.CommandPath()
-			pname = strings.ReplaceAll(strings.ReplaceAll(pname, "_", "-"), " ", "-")
+	children := cmd.Commands()
+	sort.Sort(byName(children))
 
-			buf.WriteString(fmt.Sprintf("* [%s](#%s)\t - %s\n", pname, pname, parent.Short))
-		}
-
-		children := cmd.Commands()
-		sort.Sort(byName(children))
-
-		for _, child := range children {
-			if !child.IsAvailableCommand() || child.IsAdditionalHelpTopicCommand() {
-				continue
-			}
-			cname := name + " " + child.Name()
-			link := strings.ReplaceAll(strings.ReplaceAll(cname, "_", "-"), " ", "-")
-			buf.WriteString(fmt.Sprintf("* [%s](#%s)\t - %s\n", cname, link, child.Short))
-		}
-		buf.WriteString("\n\n")
+	if len(children) > 0 {
+		buf.WriteString("### Children commands\n\n")
 	}
+	for _, child := range children {
+		if !child.IsAvailableCommand() || child.IsAdditionalHelpTopicCommand() {
+			continue
+		}
+		cname := name + " " + child.Name()
+		link := strings.ReplaceAll(strings.ReplaceAll(cname, "_", "-"), " ", "-")
+		buf.WriteString(fmt.Sprintf("* [%s](#%s)\t - %s\n", cname, link, child.Short))
+	}
+	buf.WriteString("\n\n")
 
 	*commandContents = append(*commandContents, CommandContent{
 		Name:    name,

@@ -29,6 +29,8 @@ jobs:
       - uses: "actions/checkout@v4"
       - uses: "authzed/actions/yaml-lint@main"
       - uses: "authzed/actions/markdown-lint@main"
+        with:
+          args: "--ignore docs/zed.md" # auto-generated
 
   codeql:
     name: "Analyze with CodeQL"
