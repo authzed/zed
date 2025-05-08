@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"fmt"
 	"path/filepath"
 	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/gookit/color"
 
 	zedtesting "github.com/authzed/zed/internal/testing"
 )
@@ -14,6 +16,14 @@ var durationRegex = regexp.MustCompile(`\([\d.]*[µmn]s\)`)
 
 func stripDuration(s string) string {
 	return durationRegex.ReplaceAllString(s, "(Xs)")
+}
+
+func TestMain(m *testing.M) {
+	// Disable color output in tests
+	fmt.Println("Disabling color")
+	color.Disable()
+
+	m.Run()
 }
 
 func TestValidatePreRun(t *testing.T) {
@@ -59,6 +69,8 @@ func TestValidatePreRun(t *testing.T) {
 func TestValidate(t *testing.T) {
 	t.Parallel()
 
+	fmt.Println("term color level before tests")
+	fmt.Println(color.TermColorLevel().String())
 	testCases := map[string]struct {
 		schemaTypeFlag          string
 		files                   []string
@@ -293,4 +305,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			require.Equal(tc.expectNonZeroStatusCode, shouldError)
 		})
 	}
+
+	fmt.Println("term color level after tests")
+	fmt.Println(color.TermColorLevel().String())
 }

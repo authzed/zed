@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -42,6 +43,60 @@ func TestImportCmdHappyPath(t *testing.T) {
 	client.NewClient = zedtesting.ClientFromConn(conn)
 
 	c, err := zedtesting.ClientFromConn(conn)(cmd)
+	require.NoError(err)
+
+	// Run the import and assert we don't have errors
+	err = importCmdFunc(cmd, []string{f})
+	require.NoError(err)
+
+	// Run a check with full consistency to see whether the relationships
+	// and schema are written
+	resp, err := c.CheckPermission(ctx, &v1.CheckPermissionRequest{
+		Consistency: fullyConsistent,
+		Subject:     &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "1"}},
+		Permission:  "view",
+		Resource:    &v1.ObjectReference{ObjectType: "resource", ObjectId: "1"},
+	})
+	require.NoError(err)
+	require.Equal(resp.Permissionship, v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION)
+}
+
+func TestImportCmdRelationsOnly(t *testing.T) {
+	require := require.New(t)
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "schema-definition-prefix"},
+		zedtesting.BoolFlag{FlagName: "schema", FlagValue: false},
+		zedtesting.BoolFlag{FlagName: "relationships", FlagValue: true},
+		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
+		zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
+	)
+	f := filepath.Join("import-test", "relations-only-validation-file.yaml")
+
+	// Set up client
+	ctx := t.Context()
+	srv := zedtesting.NewTestServer(ctx, t)
+	go func() {
+		require.NoError(srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(err)
+
+	originalClient := client.NewClient
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	client.NewClient = zedtesting.ClientFromConn(conn)
+
+	c, err := zedtesting.ClientFromConn(conn)(cmd)
+	require.NoError(err)
+
+	// Write the schema out-of-band so that the import is hitting a realized schema
+	schemaBytes, err := os.ReadFile(filepath.Join("import-test", "relations-only-schema.zed"))
+	require.NoError(err)
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{
+		Schema: string(schemaBytes),
+	})
 	require.NoError(err)
 
 	// Run the import and assert we don't have errors
