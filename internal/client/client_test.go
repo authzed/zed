@@ -26,6 +26,10 @@ func TestGetTokenWithCLIOverride(t *testing.T) {
 	require := require.New(t)
 	testCert, err := os.CreateTemp(t.TempDir(), "")
 	require.NoError(err)
+	t.Cleanup(func() {
+		_ = testCert.Close()
+		_ = os.Remove(testCert.Name())
+	})
 	_, err = testCert.Write([]byte("hi"))
 	require.NoError(err)
 	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,

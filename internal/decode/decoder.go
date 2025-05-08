@@ -124,7 +124,7 @@ func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, filename stri
 		// NOTE: This does not allow for yaml files to transitively reference
 		// each other's schemaFile fields.
 		// TODO: enable this behavior
-		schemaPath := filepath.Join(path.Dir(filename), validationFile.SchemaFile)
+		schemaPath := filepath.Join(filepath.Dir(filename), validationFile.SchemaFile)
 
 		if !filepath.IsLocal(schemaPath) {
 			// We want to prevent access of files that are outside of the folder

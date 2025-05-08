@@ -3,6 +3,7 @@ package cmd
 import (
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,10 @@ var durationRegex = regexp.MustCompile(`\([\d.]*[µmn]s\)`)
 
 func stripDuration(s string) string {
 	return durationRegex.ReplaceAllString(s, "(Xs)")
+}
+
+func normalizeNewlines(s string) string {
+	return strings.ReplaceAll(s, "\r\n", "\n")
 }
 
 func TestValidatePreRun(t *testing.T) {
@@ -83,9 +88,9 @@ func TestValidate(t *testing.T) {
 				filepath.Join("validate-test", "standard-validation.yaml"),
 				filepath.Join("validate-test", "external-schema.yaml"),
 			},
-			expectStr: `validate-test/standard-validation.yaml
+			expectStr: filepath.Join("validate-test", "standard-validation.yaml") + `
 Success! - 1 relationships loaded, 2 assertions run, 0 expected relations validated
-validate-test/external-schema.yaml
+` + filepath.Join("validate-test", "external-schema.yaml") + `
 Success! - 1 relationships loaded, 2 assertions run, 0 expected relations validated
 total files: 2, successfully validated files: 2
 `,
@@ -285,7 +290,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			res, shouldError, err := validateCmdFunc(cmd, tc.files)
 			if tc.expectErr == "" {
 				require.NoError(err)
-				require.Equal(stripDuration(tc.expectStr), stripDuration(res))
+				require.Equal(normalizeNewlines(stripDuration(tc.expectStr)), normalizeNewlines(stripDuration(res)))
 			} else {
 				require.Error(err)
 				require.Contains(err.Error(), tc.expectErr)

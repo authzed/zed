@@ -215,6 +215,7 @@ func TestWriteRelationshipsArgs(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
+		_ = f.Close()
 		_ = os.Remove(f.Name())
 	})
 
@@ -263,6 +264,7 @@ func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
+		_ = tty.Close()
 		_ = os.Remove(tty.Name())
 	})
 
@@ -306,12 +308,6 @@ func TestWriteRelationshipCmdFuncArgsTakePrecedence(t *testing.T) {
 	fi := fileFromStrings(t, []string{
 		"resource:1 viewer user:3",
 	})
-	defer func() {
-		require.NoError(t, fi.Close())
-	}()
-	t.Cleanup(func() {
-		_ = os.Remove(fi.Name())
-	})
 
 	originalClient := client.NewClient
 	client.NewClient = mock
@@ -349,12 +345,6 @@ func TestWriteRelationshipCmdFuncFromStdin(t *testing.T) {
 	fi := fileFromStrings(t, []string{
 		"resource:1 viewer user:1",
 		"resource:1 viewer user:2",
-	})
-	defer func() {
-		require.NoError(t, fi.Close())
-	}()
-	t.Cleanup(func() {
-		_ = os.Remove(fi.Name())
 	})
 
 	originalClient := client.NewClient
@@ -399,12 +389,6 @@ func TestWriteRelationshipCmdFuncFromStdinBatch(t *testing.T) {
 	fi := fileFromStrings(t, []string{
 		`resource:1 viewer user:1[cav:{"letters": ["a", "b", "c"]}]`,
 		`resource:1 viewer user:2[cav:{"letters": ["a", "b", "c"]}]`,
-	})
-	defer func() {
-		require.NoError(t, fi.Close())
-	}()
-	t.Cleanup(func() {
-		_ = os.Remove(fi.Name())
 	})
 
 	originalClient := client.NewClient
@@ -491,12 +475,6 @@ func TestWriteRelationshipCmdFuncWithExpirationTime(t *testing.T) {
 		`resource:1 viewer user:1`,
 		`resource:1 viewer user:2`,
 	})
-	defer func() {
-		require.NoError(t, fi.Close())
-	}()
-	t.Cleanup(func() {
-		_ = os.Remove(fi.Name())
-	})
 
 	originalClient := client.NewClient
 	client.NewClient = mock
@@ -541,12 +519,6 @@ func TestWriteRelationshipCmdFuncFromStdinBatchWithExpirationTime(t *testing.T) 
 		`resource:1 viewer user:1`,
 		`resource:1 viewer user:2`,
 	})
-	defer func() {
-		require.NoError(t, fi.Close())
-	}()
-	t.Cleanup(func() {
-		_ = os.Remove(fi.Name())
-	})
 
 	originalClient := client.NewClient
 	client.NewClient = mock
@@ -565,14 +537,17 @@ func TestWriteRelationshipCmdFuncFromStdinBatchWithExpirationTime(t *testing.T) 
 	require.NoError(t, err)
 }
 
+// fileFromStrings creates a file with the given strings, and returns a file handle.
+// When the test is done, the file is closed and removed.
 func fileFromStrings(t *testing.T, strings []string) *os.File {
 	t.Helper()
 
 	fi, err := os.CreateTemp(t.TempDir(), "spicedb-")
 	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, fi.Close())
-	}()
+	t.Cleanup(func() {
+		_ = fi.Close()
+		_ = os.Remove(fi.Name())
+	})
 
 	for _, data := range strings {
 		_, err = fi.WriteString(data + "\n")
@@ -582,6 +557,9 @@ func fileFromStrings(t *testing.T, strings []string) *os.File {
 
 	file, err := os.Open(fi.Name())
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		file.Close()
+	})
 	return file
 }
 
