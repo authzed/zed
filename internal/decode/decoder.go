@@ -197,7 +197,7 @@ func UnmarshalYAMLValidationFile(contents []byte) (*validationfile.ValidationFil
 
 // ValidationFileFromFilename takes a filename and a desired/expected FileType and
 // returns the decoded file.
-func ValidationFileFromFilename(filename string, fileType FileType) (decoderResult *DecoderResult, err error) {
+func ValidationFileFromFilename(filename string, fileType FileType, mustDefineSchema bool) (decoderResult *DecoderResult, err error) {
 	u, err := url.Parse(filename)
 	if err != nil {
 		return nil, err
@@ -231,7 +231,7 @@ func ValidationFileFromFilename(filename string, fileType FileType) (decoderResu
 	schemaFilePresent := parsed.SchemaFile != ""
 
 	// Ensure that either schema or schemaFile is present
-	if !schemaPresent && !schemaFilePresent {
+	if mustDefineSchema && !schemaPresent && !schemaFilePresent {
 		return nil, errors.New("either schema or schemaFile must be present")
 	}
 
