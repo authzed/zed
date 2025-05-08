@@ -1,0 +1,12 @@
+---
+# different than relations-only-schema.zed
+schema: |-
+  definition new {}
+
+  definition resource {
+    relation viewer: new
+    permission view = viewer
+  }
+
+relationships: >-
+  resource:1#user@user:1

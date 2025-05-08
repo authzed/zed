@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -69,6 +70,9 @@ func TestImportCmd(t *testing.T) {
 			}()
 			conn, err := srv.GRPCDialContext(ctx)
 			require.NoError(err)
+			t.Cleanup(func() {
+				conn.Close()
+			})
 
 			c, err := zedtesting.ClientFromConn(conn)(cmd)
 			require.NoError(err)
@@ -97,4 +101,81 @@ func TestImportCmd(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestImportCmdRelationsOnly(t *testing.T) {
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "schema-definition-prefix"},
+		zedtesting.BoolFlag{FlagName: "schema", FlagValue: false},
+		zedtesting.BoolFlag{FlagName: "relationships", FlagValue: true},
+		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
+		zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
+	)
+
+	// Set up client
+	ctx := t.Context()
+	srv := zedtesting.NewTestServer(ctx, t)
+	go func() {
+		assert.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		conn.Close()
+	})
+
+	c, err := zedtesting.ClientFromConn(conn)(cmd)
+	require.NoError(t, err)
+
+	// Write the schema out-of-band so that the import is hitting a realized schema
+	schemaBytes, err := os.ReadFile(filepath.Join("import-test", "relations-only-schema.zed"))
+	require.NoError(t, err)
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{
+		Schema: string(schemaBytes),
+	})
+	require.NoError(t, err)
+
+	t.Run("with no schema or schemaFile key in yaml", func(t *testing.T) {
+		f := filepath.Join("import-test", "relations-only-validation-file.yaml")
+		err = importCmdFunc(cmd, c, c, "", f)
+		require.NoError(t, err)
+
+		// Run a check with full consistency to see whether the relationships were written
+		resp, err := c.CheckPermission(ctx, &v1.CheckPermissionRequest{
+			Consistency: fullyConsistent,
+			Subject:     &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "1"}},
+			Permission:  "view",
+			Resource:    &v1.ObjectReference{ObjectType: "resource", ObjectId: "1"},
+		})
+		require.NoError(t, err)
+		require.Equal(t, v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION, resp.Permissionship)
+
+		// Run a ReadSchema to assert the schema was NOT written
+		schemaResp, err := c.ReadSchema(ctx, &v1.ReadSchemaRequest{})
+		require.NoError(t, err)
+		require.Contains(t, schemaResp.SchemaText, `relation user: user`)
+		require.Contains(t, schemaResp.SchemaText, `permission view = user`)
+	})
+	t.Run("with schema present should be ignored", func(t *testing.T) {
+		f := filepath.Join("import-test", "relations-only-validation-file-different-schema.yaml")
+		err = importCmdFunc(cmd, c, c, "", f)
+		require.NoError(t, err)
+
+		// Run a check with full consistency to see whether the relationships
+		// and schema are written
+		resp, err := c.CheckPermission(ctx, &v1.CheckPermissionRequest{
+			Consistency: fullyConsistent,
+			Subject:     &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "1"}},
+			Permission:  "view",
+			Resource:    &v1.ObjectReference{ObjectType: "resource", ObjectId: "1"},
+		})
+		require.NoError(t, err)
+		require.Equal(t, v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION, resp.Permissionship)
+
+		// Run a ReadSchema to assert the schema was NOT written
+		schemaResp, err := c.ReadSchema(ctx, &v1.ReadSchemaRequest{})
+		require.NoError(t, err)
+		require.Contains(t, schemaResp.SchemaText, `relation user: user`)
+		require.Contains(t, schemaResp.SchemaText, `permission view = user`)
+	})
 }
