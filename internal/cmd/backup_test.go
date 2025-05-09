@@ -173,10 +173,8 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 			backupName := createTestBackup(t, tt.schema, tt.relationships)
 			f, err := os.CreateTemp(t.TempDir(), "parse-output")
 			require.NoError(t, err)
-			defer func() {
-				_ = f.Close()
-			}()
 			t.Cleanup(func() {
+				_ = f.Close()
 				_ = os.Remove(f.Name())
 			})
 
@@ -194,10 +192,8 @@ func TestBackupParseRevisionCmdFunc(t *testing.T) {
 	backupName := createTestBackup(t, testSchema, testRelationships)
 	f, err := os.CreateTemp(t.TempDir(), "parse-output")
 	require.NoError(t, err)
-	defer func() {
-		_ = f.Close()
-	}()
 	t.Cleanup(func() {
+		_ = f.Close()
 		_ = os.Remove(f.Name())
 	})
 
@@ -254,10 +250,8 @@ func TestBackupParseSchemaCmdFunc(t *testing.T) {
 			backupName := createTestBackup(t, tt.schema, nil)
 			f, err := os.CreateTemp(t.TempDir(), "parse-output")
 			require.NoError(t, err)
-			defer func() {
-				_ = f.Close()
-			}()
 			t.Cleanup(func() {
+				_ = f.Close()
 				_ = os.Remove(f.Name())
 			})
 
@@ -328,8 +322,12 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 
 	t.Run("fails if backup without progress file exists", func(t *testing.T) {
 		tempFile := filepath.Join(t.TempDir(), uuid.NewString())
-		_, err := os.Create(tempFile)
+		f, err := os.Create(tempFile)
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = f.Close()
+			_ = os.Remove(f.Name())
+		})
 
 		err = backupCreateCmdFunc(cmd, []string{tempFile})
 		require.ErrorContains(t, err, "already exists")

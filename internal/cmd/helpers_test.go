@@ -40,13 +40,16 @@ func readLines(t *testing.T, fileName string) []string {
 	return lines
 }
 
+// createTestBackup creates a test backup file with the given schema and relationships.
+// It returns the file name of the created backup.
+// When the test is done, the file is closed and removed.
 func createTestBackup(t *testing.T, schema string, relationships []string) string {
 	t.Helper()
 
 	f, err := os.CreateTemp(t.TempDir(), "test-backup")
 	require.NoError(t, err)
-	defer f.Close()
 	t.Cleanup(func() {
+		_ = f.Close()
 		_ = os.Remove(f.Name())
 	})
 

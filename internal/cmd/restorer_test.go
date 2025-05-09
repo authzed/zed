@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -68,7 +67,6 @@ func TestRestorer(t *testing.T) {
 			require.NoError(err)
 			t.Cleanup(func() {
 				require.NoError(closer.Close())
-				require.NoError(os.Remove(backupFileName))
 			})
 
 			expectedFilteredRels := make([]string, 0, len(tt.relationships))

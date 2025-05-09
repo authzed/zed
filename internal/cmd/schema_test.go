@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/authzed/spicedb/pkg/composableschemadsl/compiler"
 
 	zedtesting "github.com/authzed/zed/internal/testing"
 )
@@ -125,14 +128,14 @@ func TestSchemaCompile(t *testing.T) {
 	testCases := map[string]struct {
 		files     []string
 		out       string
-		expectErr string
+		expectErr error
 		expectStr string
 	}{
 		`file_not_found`: {
 			files: []string{
 				filepath.Join("preview-test", "nonexistent.zed"),
 			},
-			expectErr: `no such file or directory`,
+			expectErr: fs.ErrNotExist,
 		},
 		`happy_path`: {
 			files: []string{
@@ -150,7 +153,7 @@ definition resource {
 			files: []string{
 				filepath.Join("preview-test", "composable-schema-invalid-root.zed"),
 			},
-			expectErr: "line 4, column 12: Expected identifier, found token TokenTypeKeyword",
+			expectErr: compiler.BaseCompilerError{},
 		},
 	}
 
@@ -164,14 +167,14 @@ definition resource {
 				zedtesting.StringFlag{FlagName: "out", FlagValue: tempOutFile})
 
 			err := schemaCompileCmdFunc(cmd, tc.files)
-			if tc.expectErr == "" {
+			if tc.expectErr == nil {
 				require.NoError(err)
 				tempOutString, err := os.ReadFile(tempOutFile)
 				require.NoError(err)
 				require.Equal(tc.expectStr, string(tempOutString))
 			} else {
 				require.Error(err)
-				require.Contains(err.Error(), tc.expectErr)
+				require.ErrorAs(err, &tc.expectErr)
 			}
 		})
 	}

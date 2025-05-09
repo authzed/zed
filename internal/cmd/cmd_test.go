@@ -108,6 +108,10 @@ func setupOutputForTest(t *testing.T, testFlagError func(cmd *cobra.Command, err
 	tempStdErrFileName := filepath.Join(t.TempDir(), uuid.NewString())
 	tempStdErr, err := os.Create(tempStdErrFileName)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = tempStdErr.Close()
+		_ = os.Remove(tempStdErrFileName)
+	})
 
 	os.Stderr = tempStdErr
 	return tempStdErrFileName
