@@ -85,7 +85,7 @@ sudo apt install -y zed
 [RPM-based Linux] users can install zed packages by adding a new YUM repository:
 
 ```sh
-sudo cat << EOF >> /etc/yum.repos.d/Authzed-Fury.repo
+sudo cat << EOF | sudo tee /etc/yum.repos.d/Authzed-Fury.repo
 [authzed-fury]
 name=AuthZed Fury Repository
 baseurl=https://yum.fury.io/authzed/
