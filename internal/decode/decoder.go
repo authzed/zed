@@ -182,7 +182,7 @@ func compileSchemaFromData(filename, schemaString string, out interface{}) error
 	)
 
 	vfile = *out.(*validationfile.ValidationFile)
-	vfile.Schema = blocks.ParsedSchema{
+	vfile.Schema = blocks.SchemaWithPosition{
 		SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
 	}
 
