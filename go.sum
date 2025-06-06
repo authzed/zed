@@ -680,8 +680,8 @@ github.com/authzed/ctxkey v0.0.0-20250226155515-d49f99185584 h1:mP7EpcUL90EKcf/F
 github.com/authzed/ctxkey v0.0.0-20250226155515-d49f99185584/go.mod h1:wnimjr5RPPouIhZQ3ztDBLMUKKuUroj3U9Jy0PxeaEE=
 github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b h1:wbh8IK+aMLTCey9sZasO7b6BWLAJnHHvb79fvWCXwxw=
 github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b/go.mod h1:s3qC7V7XIbiNWERv7Lfljy/Lx25/V1Qlexb0WJuA8uQ=
-github.com/authzed/spicedb v1.44.0 h1:zODUjTwt9fuAMCVkhSFqUShf5757qa84SXt1sVyni9E=
-github.com/authzed/spicedb v1.44.0/go.mod h1:mJJSFf6hVsJdKVU5HQg8ebVaaNetUAa+zFpY7RD3yeU=
+github.com/authzed/spicedb v1.44.2 h1:haVbl+9TKAPfbALOLbG2yXC1SBK/gO8r0RTMb6pUHlY=
+github.com/authzed/spicedb v1.44.2/go.mod h1:mJJSFf6hVsJdKVU5HQg8ebVaaNetUAa+zFpY7RD3yeU=
 github.com/aws/aws-sdk-go-v2 v1.36.3 h1:mJoei2CxPutQVxaATCzDUjcZEjVRdpsiiXi2o38yqWM=
 github.com/aws/aws-sdk-go-v2 v1.36.3/go.mod h1:LLXuLpgzEbD766Z5ECcRmi8AzSwfZItDtmABVkRLGzg=
 github.com/aws/aws-sdk-go-v2/config v1.29.14 h1:f+eEi/2cKCg9pqKBoAIwRGzVb70MRKqWX4dg1BDcSJM=
