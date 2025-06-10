@@ -459,6 +459,8 @@ func encoderForNewBackup(cmd *cobra.Command, c client.Client, backupFile *os.Fil
 
 	zedToken := schemaResp.ReadAt
 
+	log.Debug().Str("zed token", zedToken.Token).Msg("revision used for backup")
+
 	encoder, err := backupformat.NewEncoder(backupFile, schema, zedToken)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating backup file encoder: %w", err)
