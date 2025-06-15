@@ -111,7 +111,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 		return fmt.Errorf("unable to write schema: %w", err)
 	}
 
-	relationshipWriter, err := r.client.BulkImportRelationships(ctx)
+	relationshipWriter, err := r.client.ImportBulkRelationships(ctx)
 	if err != nil {
 		return fmt.Errorf("error creating writer stream: %w", err)
 	}
@@ -134,7 +134,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 
 		if uint(len(batch))%r.batchSize == 0 {
 			batchesToBeCommitted = append(batchesToBeCommitted, batch)
-			err := relationshipWriter.Send(&v1.BulkImportRelationshipsRequest{
+			err := relationshipWriter.Send(&v1.ImportBulkRelationshipsRequest{
 				Relationships: batch,
 			})
 			if err != nil {
@@ -145,7 +145,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 				}
 
 				// after an error
-				relationshipWriter, err = r.client.BulkImportRelationships(ctx)
+				relationshipWriter, err = r.client.ImportBulkRelationships(ctx)
 				if err != nil {
 					return fmt.Errorf("error creating new writer stream: %w", err)
 				}
@@ -168,7 +168,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 				return fmt.Errorf("error committing batches: %w", err)
 			}
 
-			relationshipWriter, err = r.client.BulkImportRelationships(ctx)
+			relationshipWriter, err = r.client.ImportBulkRelationships(ctx)
 			if err != nil {
 				return fmt.Errorf("error creating new writer stream: %w", err)
 			}
@@ -184,7 +184,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 		// underlying error that caused Send() to fail. It also gives us the opportunity to retry it
 		// in case it failed.
 		batchesToBeCommitted = append(batchesToBeCommitted, batch)
-		_ = relationshipWriter.Send(&v1.BulkImportRelationshipsRequest{Relationships: batch})
+		_ = relationshipWriter.Send(&v1.ImportBulkRelationshipsRequest{Relationships: batch})
 	}
 
 	if err := r.commitStream(ctx, relationshipWriter, batchesToBeCommitted); err != nil {
@@ -210,7 +210,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 	return nil
 }
 
-func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.ExperimentalService_BulkImportRelationshipsClient,
+func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.PermissionsService_ImportBulkRelationshipsClient,
 	batchesToBeCommitted [][]*v1.Relationship,
 ) error {
 	var numLoaded, expectedLoaded, retries uint

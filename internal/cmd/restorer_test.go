@@ -185,7 +185,7 @@ func TestRestorer(t *testing.T) {
 
 type mockClient struct {
 	client.Client
-	v1.ExperimentalService_BulkImportRelationshipsClient
+	v1.PermissionsService_ImportBulkRelationshipsClient
 	t                              *testing.T
 	schema                         string
 	remainderBatch                 bool
@@ -204,11 +204,7 @@ type mockClient struct {
 	touchErrors                    []error
 }
 
-func (m *mockClient) BulkImportRelationships(_ context.Context, _ ...grpc.CallOption) (v1.ExperimentalService_BulkImportRelationshipsClient, error) {
-	return m, nil
-}
-
-func (m *mockClient) Send(req *v1.BulkImportRelationshipsRequest) error {
+func (m *mockClient) Send(req *v1.ImportBulkRelationshipsRequest) error {
 	m.receivedBatches++
 	m.receivedRels += uint(len(req.Relationships))
 	m.lastReceivedBatch = req.Relationships
@@ -241,7 +237,7 @@ func (m *mockClient) WriteRelationships(_ context.Context, in *v1.WriteRelations
 	return &v1.WriteRelationshipsResponse{}, nil
 }
 
-func (m *mockClient) CloseAndRecv() (*v1.BulkImportRelationshipsResponse, error) {
+func (m *mockClient) CloseAndRecv() (*v1.ImportBulkRelationshipsResponse, error) {
 	m.receivedCommits++
 	lastBatch := m.lastReceivedBatch
 	defer func() { m.lastReceivedBatch = nil }()
@@ -250,7 +246,11 @@ func (m *mockClient) CloseAndRecv() (*v1.BulkImportRelationshipsResponse, error)
 		return nil, m.commitErrors[m.receivedCommits-1]
 	}
 
-	return &v1.BulkImportRelationshipsResponse{NumLoaded: uint64(len(lastBatch))}, nil
+	return &v1.ImportBulkRelationshipsResponse{NumLoaded: uint64(len(lastBatch))}, nil
+}
+
+func (m *mockClient) ImportBulkRelationships(_ context.Context, _ ...grpc.CallOption) (v1.PermissionsService_ImportBulkRelationshipsClient, error) {
+	return m, nil
 }
 
 func (m *mockClient) WriteSchema(_ context.Context, wsr *v1.WriteSchemaRequest, _ ...grpc.CallOption) (*v1.WriteSchemaResponse, error) {

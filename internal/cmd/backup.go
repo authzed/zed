@@ -328,7 +328,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		return errors.New("malformed existing backup, consider recreating it")
 	}
 
-	req := &v1.BulkExportRelationshipsRequest{
+	req := &v1.ExportBulkRelationshipsRequest{
 		OptionalLimit:  pageLimit,
 		OptionalCursor: cursor,
 	}
@@ -343,7 +343,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	ctx := cmd.Context()
-	relationshipStream, err := c.BulkExportRelationships(ctx, req)
+	relationshipStream, err := c.ExportBulkRelationships(ctx, req)
 	if err != nil {
 		return fmt.Errorf("error exporting relationships: %w", err)
 	}
@@ -467,7 +467,7 @@ func encoderForNewBackup(cmd *cobra.Command, c client.Client, backupFile *os.Fil
 	return encoder, zedToken, nil
 }
 
-func writeProgress(progressFile *os.File, relsResp *v1.BulkExportRelationshipsResponse) error {
+func writeProgress(progressFile *os.File, relsResp *v1.ExportBulkRelationshipsResponse) error {
 	err := progressFile.Truncate(0)
 	if err != nil {
 		return fmt.Errorf("unable to truncate backup progress file: %w", err)
