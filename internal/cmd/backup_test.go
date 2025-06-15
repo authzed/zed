@@ -364,7 +364,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 	})
 
 	t.Run("truncates progress marker if it existed but backup did not", func(t *testing.T) {
-		streamClient, err := c.BulkExportRelationships(ctx, &v1.BulkExportRelationshipsRequest{
+		streamClient, err := c.ExportBulkRelationships(ctx, &v1.ExportBulkRelationshipsRequest{
 			Consistency: &v1.Consistency{
 				Requirement: &v1.Consistency_AtExactSnapshot{
 					AtExactSnapshot: resp.WrittenAt,
@@ -392,7 +392,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 	})
 
 	t.Run("resumes backup if marker file exists", func(t *testing.T) {
-		streamClient, err := c.BulkExportRelationships(ctx, &v1.BulkExportRelationshipsRequest{
+		streamClient, err := c.ExportBulkRelationships(ctx, &v1.ExportBulkRelationshipsRequest{
 			Consistency: &v1.Consistency{
 				Requirement: &v1.Consistency_AtExactSnapshot{
 					AtExactSnapshot: resp.WrittenAt,
