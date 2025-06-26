@@ -4,6 +4,9 @@ go 1.24
 
 toolchain go1.24.1
 
+// 0.14.0 was published as 1.14.0 by mistake
+retract v1.14.0
+
 require (
 	github.com/99designs/keyring v1.2.2
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
