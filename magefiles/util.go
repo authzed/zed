@@ -94,8 +94,8 @@ func collectCommandContent(cmd *cobra.Command, commandContents *[]CommandContent
 			continue
 		}
 		cname := name + " " + child.Name()
-		link := strings.ReplaceAll(strings.ReplaceAll(cname, "_", "-"), " ", "-")
-		buf.WriteString(fmt.Sprintf("* [%s](#%s)\t - %s\n", cname, link, child.Short))
+		link := "reference-" + strings.ReplaceAll(strings.ReplaceAll(cname, "_", "-"), " ", "-")
+		buf.WriteString(fmt.Sprintf("- [%s](#%s)\t - %s\n", cname, link, child.Short))
 	}
 	buf.WriteString("\n\n")
 

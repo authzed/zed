@@ -35,15 +35,15 @@ zed permission check --explain document:firstdoc writer user:emilia
 
 ### Children commands
 
-* [zed backup](#zed-backup)	 - Create, restore, and inspect permissions system backups
-* [zed context](#zed-context)	 - Manage configurations for connecting to SpiceDB deployments
-* [zed import](#zed-import)	 - Imports schema and relationships from a file or url
-* [zed permission](#zed-permission)	 - Query the permissions in a permissions system
-* [zed relationship](#zed-relationship)	 - Query and mutate the relationships in a permissions system
-* [zed schema](#zed-schema)	 - Manage schema for a permissions system
-* [zed use](#zed-use)	 - Alias for `zed context use`
-* [zed validate](#zed-validate)	 - Validates the given validation file (.yaml, .zaml) or schema file (.zed)
-* [zed version](#zed-version)	 - Display zed and SpiceDB version information
+- [zed backup](#reference-zed-backup)	 - Create, restore, and inspect permissions system backups
+- [zed context](#reference-zed-context)	 - Manage configurations for connecting to SpiceDB deployments
+- [zed import](#reference-zed-import)	 - Imports schema and relationships from a file or url
+- [zed permission](#reference-zed-permission)	 - Query the permissions in a permissions system
+- [zed relationship](#reference-zed-relationship)	 - Query and mutate the relationships in a permissions system
+- [zed schema](#reference-zed-schema)	 - Manage schema for a permissions system
+- [zed use](#reference-zed-use)	 - Alias for `zed context use`
+- [zed validate](#reference-zed-validate)	 - Validates the given validation file (.yaml, .zaml) or schema file (.zed)
+- [zed version](#reference-zed-version)	 - Display zed and SpiceDB version information
 
 
 ## Reference: `zed backup`
@@ -83,12 +83,12 @@ zed backup <filename> [flags]
 
 ### Children commands
 
-* [zed backup create](#zed-backup-create)	 - Backup a permission system to a file
-* [zed backup parse-relationships](#zed-backup-parse-relationships)	 - Extract the relationships from a backup file
-* [zed backup parse-revision](#zed-backup-parse-revision)	 - Extract the revision from a backup file
-* [zed backup parse-schema](#zed-backup-parse-schema)	 - Extract the schema from a backup file
-* [zed backup redact](#zed-backup-redact)	 - Redact a backup file to remove sensitive information
-* [zed backup restore](#zed-backup-restore)	 - Restore a permission system from a file
+- [zed backup create](#reference-zed-backup-create)	 - Backup a permission system to a file
+- [zed backup parse-relationships](#reference-zed-backup-parse-relationships)	 - Extract the relationships from a backup file
+- [zed backup parse-revision](#reference-zed-backup-parse-revision)	 - Extract the revision from a backup file
+- [zed backup parse-schema](#reference-zed-backup-parse-schema)	 - Extract the schema from a backup file
+- [zed backup redact](#reference-zed-backup-redact)	 - Redact a backup file to remove sensitive information
+- [zed backup restore](#reference-zed-backup-restore)	 - Restore a permission system from a file
 
 
 ## Reference: `zed backup create`
@@ -332,10 +332,10 @@ Manage configurations for connecting to SpiceDB deployments
 
 ### Children commands
 
-* [zed context list](#zed-context-list)	 - Lists all available contexts
-* [zed context remove](#zed-context-remove)	 - Removes a context
-* [zed context set](#zed-context-set)	 - Creates or overwrite a context
-* [zed context use](#zed-context-use)	 - Sets a context as the current context
+- [zed context list](#reference-zed-context-list)	 - Lists all available contexts
+- [zed context remove](#reference-zed-context-remove)	 - Removes a context
+- [zed context set](#reference-zed-context-set)	 - Creates or overwrite a context
+- [zed context use](#reference-zed-context-use)	 - Sets a context as the current context
 
 
 ## Reference: `zed context list`
@@ -557,11 +557,11 @@ Query the permissions in a permissions system
 
 ### Children commands
 
-* [zed permission bulk](#zed-permission-bulk)	 - Check a permissions in bulk exists for a resource-subject pairs
-* [zed permission check](#zed-permission-check)	 - Check that a permission exists for a subject
-* [zed permission expand](#zed-permission-expand)	 - Expand the structure of a permission
-* [zed permission lookup-resources](#zed-permission-lookup-resources)	 - Enumerates resources of a given type for which the subject has permission
-* [zed permission lookup-subjects](#zed-permission-lookup-subjects)	 - Enumerates the subjects of a given type for which the subject has permission on the resource
+- [zed permission bulk](#reference-zed-permission-bulk)	 - Check a permissions in bulk exists for a resource-subject pairs
+- [zed permission check](#reference-zed-permission-check)	 - Check that a permission exists for a subject
+- [zed permission expand](#reference-zed-permission-expand)	 - Expand the structure of a permission
+- [zed permission lookup-resources](#reference-zed-permission-lookup-resources)	 - Enumerates resources of a given type for which the subject has permission
+- [zed permission lookup-subjects](#reference-zed-permission-lookup-subjects)	 - Enumerates the subjects of a given type for which the subject has permission on the resource
 
 
 ## Reference: `zed permission bulk`
@@ -799,12 +799,12 @@ Query and mutate the relationships in a permissions system
 
 ### Children commands
 
-* [zed relationship bulk-delete](#zed-relationship-bulk-delete)	 - Deletes relationships matching the provided pattern en masse
-* [zed relationship create](#zed-relationship-create)	 - Create a relationship for a subject
-* [zed relationship delete](#zed-relationship-delete)	 - Deletes a relationship
-* [zed relationship read](#zed-relationship-read)	 - Enumerates relationships matching the provided pattern
-* [zed relationship touch](#zed-relationship-touch)	 - Idempotently updates a relationship for a subject
-* [zed relationship watch](#zed-relationship-watch)	 - Watches the stream of relationship updates from the server
+- [zed relationship bulk-delete](#reference-zed-relationship-bulk-delete)	 - Deletes relationships matching the provided pattern en masse
+- [zed relationship create](#reference-zed-relationship-create)	 - Create a relationship for a subject
+- [zed relationship delete](#reference-zed-relationship-delete)	 - Deletes a relationship
+- [zed relationship read](#reference-zed-relationship-read)	 - Enumerates relationships matching the provided pattern
+- [zed relationship touch](#reference-zed-relationship-touch)	 - Idempotently updates a relationship for a subject
+- [zed relationship watch](#reference-zed-relationship-watch)	 - Watches the stream of relationship updates from the server
 
 
 ## Reference: `zed relationship bulk-delete`
@@ -1065,11 +1065,11 @@ Manage schema for a permissions system
 
 ### Children commands
 
-* [zed schema compile](#zed-schema-compile)	 - Compile a schema that uses extended syntax into one that can be written to SpiceDB
-* [zed schema copy](#zed-schema-copy)	 - Copy a schema from one context into another
-* [zed schema diff](#zed-schema-diff)	 - Diff two schema files
-* [zed schema read](#zed-schema-read)	 - Read the schema of a permissions system
-* [zed schema write](#zed-schema-write)	 - Write a schema file (.zed or stdin) to the current permissions system
+- [zed schema compile](#reference-zed-schema-compile)	 - Compile a schema that uses extended syntax into one that can be written to SpiceDB
+- [zed schema copy](#reference-zed-schema-copy)	 - Copy a schema from one context into another
+- [zed schema diff](#reference-zed-schema-diff)	 - Diff two schema files
+- [zed schema read](#reference-zed-schema-read)	 - Read the schema of a permissions system
+- [zed schema write](#reference-zed-schema-write)	 - Write a schema file (.zed or stdin) to the current permissions system
 
 
 ## Reference: `zed schema compile`
