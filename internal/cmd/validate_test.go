@@ -144,7 +144,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "failed-assertions.yaml"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr: `error:  Expected relation or permission document:1#viewer@user:maria to exist           
+			expectStr: `error: parse error in ` + "`document:1#viewer@user:maria`" + `, line 11, column 7: Expected relation or permission document:1#viewer@user:maria to exist           
   8 |   }
   9 | assertions:
  10 |   assertTrue:
@@ -165,7 +165,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "failed-expected-relations.yaml"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr: "error:  For object and permission/relation `document:1#viewer`, missing expected subject\n" +
+			expectStr: "error: parse error in `[user:maria] is <document:1#view>`, line 11, column 7: For object and permission/relation `document:1#viewer`, missing expected subject\n" +
 				"`user:maria`                                                                    \n " +
 				" 8 |   }\n " +
 				" 9 | validation:\n" +
@@ -191,7 +191,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "missing-relation.zed"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr: "error:  relation/permission `write` not found under definition `test`                   \n" +
+			expectStr: "error: parse error in `write`, line 2, column 20: relation/permission `write` not found under definition `test`                   \n" +
 				" 1 |  definition test {\n" +
 				" 2 >   permission view = write\n" +
 				"   >                     ^~~~~\n " +
@@ -203,7 +203,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "missing-relation.yaml"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr: "error:  relation/permission `write` not found under definition `test`                   \n" +
+			expectStr: "error: parse error in `write`, line 4, column 21: relation/permission `write` not found under definition `test`                   \n" +
 				"  6 |   definition user {}\n" +
 				"  7 |   definition test {\n" +
 				"  8 |     relation viewer: user\n" +
