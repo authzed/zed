@@ -147,7 +147,7 @@ var _ SecretStore = (*KeychainSecretStore)(nil)
 const (
 	svcName                   = "zed"
 	keyringEntryName          = svcName + " secrets"
-	envRecommendation         = "Setting the environment variable `ZED_KEYRING_PASSWORD` to your password will skip prompts.\n"
+	envRecommendation         = "If your platform doesn't have a native keychain manager (e.g. macOS, Linux+GNOME/KDE), ZED_KEYRING_PASSWORD is what's used to encrypt files on disk to store credentials. The first time you create a context, it'll prompt you to create a keyring password to encrypt that configuration. \n"
 	keyringDoesNotExistPrompt = "Keyring file does not already exist.\nEnter a new non-empty passphrase for the new keyring file: "
 	keyringPrompt             = "Enter passphrase to unlock zed keyring: "
 	emptyKeyringPasswordError = "your passphrase must not be empty"
