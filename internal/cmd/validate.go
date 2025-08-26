@@ -301,7 +301,8 @@ func outputDeveloperErrorsWithLineOffset(sb *strings.Builder, validateContents [
 }
 
 func outputDeveloperError(sb *strings.Builder, devError *devinterface.DeveloperError, lines []string, lineOffset int) {
-	fmt.Fprintf(sb, "%s %s\n", errorPrefix(), errorMessageStyle().Render(devError.Message))
+	lineContext := fmt.Sprintf("parse error in `%s`, line %d, column %d:", devError.Context, devError.Line, devError.Column)
+	fmt.Fprintf(sb, "%s%s %s\n", errorPrefix(), lineContext, errorMessageStyle().Render(devError.Message))
 	errorLineNumber := int(devError.Line) - 1 + lineOffset // devError.Line is 1-indexed
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
