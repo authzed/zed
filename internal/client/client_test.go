@@ -133,26 +133,32 @@ func TestGetCurrentTokenWithCLIOverrideWithoutSecretFile(t *testing.T) {
 	require.Equal(&bTrue, token.Insecure)
 }
 
-type fakeSchemaServer struct {
+type fakeServer struct {
 	v1.UnimplementedSchemaServiceServer
 	v1.UnimplementedExperimentalServiceServer
+	v1.UnimplementedWatchServiceServer
 	v1.UnimplementedPermissionsServiceServer
 	testFunc func()
 }
 
-func (fss *fakeSchemaServer) ReadSchema(_ context.Context, _ *v1.ReadSchemaRequest) (*v1.ReadSchemaResponse, error) {
+func (fss *fakeServer) ReadSchema(_ context.Context, _ *v1.ReadSchemaRequest) (*v1.ReadSchemaResponse, error) {
 	fss.testFunc()
 	return nil, status.Error(codes.Unavailable, "")
 }
 
-func (fss *fakeSchemaServer) BulkImportRelationships(grpc.ClientStreamingServer[v1.BulkImportRelationshipsRequest, v1.BulkImportRelationshipsResponse]) error {
+func (fss *fakeServer) BulkImportRelationships(grpc.ClientStreamingServer[v1.BulkImportRelationshipsRequest, v1.BulkImportRelationshipsResponse]) error {
 	fss.testFunc()
 	return status.Errorf(codes.Aborted, "")
 }
 
-func (fss *fakeSchemaServer) ImportBulkRelationships(grpc.ClientStreamingServer[v1.ImportBulkRelationshipsRequest, v1.ImportBulkRelationshipsResponse]) error {
+func (fss *fakeServer) ImportBulkRelationships(grpc.ClientStreamingServer[v1.ImportBulkRelationshipsRequest, v1.ImportBulkRelationshipsResponse]) error {
 	fss.testFunc()
 	return status.Errorf(codes.Aborted, "")
+}
+
+func (fss *fakeServer) Watch(*v1.WatchRequest, grpc.ServerStreamingServer[v1.WatchResponse]) error {
+	fss.testFunc()
+	return status.Errorf(codes.Unavailable, "")
 }
 
 func TestRetries(t *testing.T) {
@@ -161,7 +167,7 @@ func TestRetries(t *testing.T) {
 	lis := bufconn.Listen(1024 * 1024)
 	s := grpc.NewServer()
 
-	fakeServer := &fakeSchemaServer{testFunc: func() {
+	fakeServer := &fakeServer{testFunc: func() {
 		callCount++
 	}}
 	v1.RegisterSchemaServiceServer(s, fakeServer)
@@ -190,22 +196,25 @@ func TestRetries(t *testing.T) {
 	c, err := authzed.NewClient("passthrough://bufnet", dialOpts...)
 	require.NoError(t, err)
 
-	_, err = c.ReadSchema(ctx, &v1.ReadSchemaRequest{})
-	grpcutil.RequireStatus(t, codes.Unavailable, err)
-	require.Equal(t, retries, callCount)
+	t.Run("read_schema", func(t *testing.T) {
+		_, err = c.ReadSchema(ctx, &v1.ReadSchemaRequest{})
+		grpcutil.RequireStatus(t, codes.Unavailable, err)
+		require.Equal(t, retries, callCount)
+	})
 }
 
-func TestDoesNotRetryBackupRestore(t *testing.T) {
+func TestDoesNotRetry(t *testing.T) {
 	ctx := t.Context()
 	var callCount uint
 	lis := bufconn.Listen(1024 * 1024)
 	s := grpc.NewServer()
 
-	fakeServer := &fakeSchemaServer{testFunc: func() {
+	fakeServer := &fakeServer{testFunc: func() {
 		callCount++
 	}}
 	v1.RegisterPermissionsServiceServer(s, fakeServer)
 	v1.RegisterExperimentalServiceServer(s, fakeServer)
+	v1.RegisterWatchServiceServer(s, fakeServer)
 
 	go func() {
 		_ = s.Serve(lis)
@@ -231,20 +240,34 @@ func TestDoesNotRetryBackupRestore(t *testing.T) {
 	c, err := authzed.NewClientWithExperimentalAPIs("passthrough://bufnet", dialOpts...)
 	require.NoError(t, err)
 
-	ibc, err := c.ImportBulkRelationships(ctx)
-	require.NoError(t, err)
-	err = ibc.SendMsg(&v1.ImportBulkRelationshipsRequest{})
-	require.NoError(t, err)
-	_, err = ibc.CloseAndRecv()
-	grpcutil.RequireStatus(t, codes.Aborted, err)
-	require.Equal(t, uint(1), callCount)
+	t.Run("import_bulk", func(t *testing.T) {
+		ibc, err := c.ImportBulkRelationships(ctx)
+		require.NoError(t, err)
+		err = ibc.SendMsg(&v1.ImportBulkRelationshipsRequest{})
+		require.NoError(t, err)
+		_, err = ibc.CloseAndRecv()
+		grpcutil.RequireStatus(t, codes.Aborted, err)
+		require.Equal(t, uint(1), callCount)
+	})
 
-	callCount = 0
-	bic, err := c.BulkImportRelationships(ctx)
-	require.NoError(t, err)
-	err = bic.SendMsg(&v1.BulkImportRelationshipsRequest{})
-	require.NoError(t, err)
-	_, err = bic.CloseAndRecv()
-	grpcutil.RequireStatus(t, codes.Aborted, err)
-	require.Equal(t, uint(1), callCount)
+	t.Run("bulk_import", func(t *testing.T) {
+		callCount = 0
+		bic, err := c.BulkImportRelationships(ctx)
+		require.NoError(t, err)
+		err = bic.SendMsg(&v1.BulkImportRelationshipsRequest{})
+		require.NoError(t, err)
+		_, err = bic.CloseAndRecv()
+		grpcutil.RequireStatus(t, codes.Aborted, err)
+		require.Equal(t, uint(1), callCount)
+	})
+
+	t.Run("watch", func(t *testing.T) {
+		callCount = 0
+		watchReq, err := c.Watch(ctx, &v1.WatchRequest{})
+		require.NoError(t, err)
+		resp, err := watchReq.Recv()
+		require.Nil(t, resp)
+		grpcutil.RequireStatus(t, codes.Unavailable, err)
+		require.Equal(t, uint(1), callCount)
+	})
 }

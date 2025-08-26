@@ -44,6 +44,7 @@ const (
 	defaultRetryJitterFraction     = 0.5
 	bulkImportRoute                = "/authzed.api.v1.ExperimentalService/BulkImportRelationships"
 	importBulkRoute                = "/authzed.api.v1.PermissionsService/ImportBulkRelationships"
+	watchRoute                     = "/authzed.api.v1.WatchService/Watch"
 )
 
 // NewClient defines an (overridable) means of creating a new client.
@@ -232,7 +233,7 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 
 	streamInterceptors := []grpc.StreamClientInterceptor{
 		zgrpcutil.StreamLogDispatchTrailers,
-		selector.StreamClientInterceptor(retry.StreamClientInterceptor(retryOpts...), selector.MatchFunc(isNoneOf(bulkImportRoute, importBulkRoute))),
+		selector.StreamClientInterceptor(retry.StreamClientInterceptor(retryOpts...), selector.MatchFunc(isNoneOf(bulkImportRoute, importBulkRoute, watchRoute))),
 	}
 
 	if !cobrautil.MustGetBool(cmd, "skip-version-check") {

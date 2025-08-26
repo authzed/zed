@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -74,26 +75,27 @@ func watchCmdFunc(cmd *cobra.Command, _ []string) error {
 		relFilters = append(relFilters, relFilter)
 	}
 
-	req := &v1.WatchRequest{
-		OptionalObjectTypes:         watchObjectTypes,
-		OptionalRelationshipFilters: relFilters,
-	}
-	if watchRevision != "" {
-		req.OptionalStartCursor = &v1.ZedToken{Token: watchRevision}
-	}
-
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
 
 	signalctx, interruptCancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	defer interruptCancel()
 
-	watchStream, err := cli.Watch(ctx, req)
-	if err != nil {
-		return err
+	req := &v1.WatchRequest{
+		OptionalObjectTypes:         watchObjectTypes,
+		OptionalRelationshipFilters: relFilters,
 	}
 
 	for {
+		if watchRevision != "" {
+			req.OptionalStartCursor = &v1.ZedToken{Token: watchRevision}
+		}
+
+		watchStream, err := cli.Watch(ctx, req)
+		if err != nil {
+			return err
+		}
+
 		select {
 		case <-signalctx.Done():
 			console.Errorf("stream interrupted after program termination\n")
@@ -104,7 +106,15 @@ func watchCmdFunc(cmd *cobra.Command, _ []string) error {
 		default:
 			resp, err := watchStream.Recv()
 			if err != nil {
-				return err
+				if !strings.Contains(err.Error(), "stream timeout") && !strings.Contains(err.Error(), "RST_STREAM closed stream") {
+					return err
+				}
+				log.Trace().Err(err).Msg("error receiving from watch stream. will retry")
+				continue
+			}
+
+			if resp.ChangesThrough != nil {
+				watchRevision = resp.ChangesThrough.Token
 			}
 
 			for _, update := range resp.Updates {
