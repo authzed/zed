@@ -177,8 +177,78 @@ func TestLookupResourcesCommand(t *testing.T) {
 	cmd = testLookupResourcesCommand(t, 3)
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
-	require.Equal(t, 10, count)
-	require.EqualValues(t, []uint{3, 3, 3, 1}, receivedPageSizes)
+	// page-limit is a global maximum number of results to print, not a per-request page size
+	require.Equal(t, 3, count)
+	// callback receives the number of streamed results per request; the first request
+	// reads 4 items but only 3 are printed due to the global limit, the second reads 1 and exits
+	require.EqualValues(t, []uint{3, 1}, receivedPageSizes)
+}
+
+func TestLookupResourcesPageLimitStopsStream(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	srv := zedtesting.NewTestServer(ctx, t)
+	go func() {
+		require.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(t, err)
+
+	originalClient := client.NewClient
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	client.NewClient = zedtesting.ClientFromConn(conn)
+
+	c, err := zedtesting.ClientFromConn(conn)(nil)
+	require.NoError(t, err)
+
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: testSchema})
+	require.NoError(t, err)
+
+	// Create 15 relationships so we have more data than our page limit
+	var updates []*v1.RelationshipUpdate
+	for i := 0; i < 15; i++ {
+		updates = append(updates, &v1.RelationshipUpdate{
+			Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+			Relationship: tuple.MustParseV1Rel(fmt.Sprintf("test/resource:%d#reader@test/user:1", i)),
+		})
+	}
+
+	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{Updates: updates})
+	require.NoError(t, err)
+
+	// Override console.Println to count printed results
+	previous := console.Println
+	defer func() {
+		console.Println = previous
+	}()
+	var count int
+	console.Println = func(values ...any) {
+		count += len(values)
+	}
+
+	// Test case 1: Page limit of 5 should stop after 5 results, even though 15 are available
+	count = 0
+	cmd := testLookupResourcesCommand(t, 5)
+	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
+	require.NoError(t, err)
+	require.Equal(t, 5, count, "Should stop at page limit of 5, but got %d results", count)
+
+	// Test case 2: Page limit of 7 should stop after 7 results
+	count = 0
+	cmd = testLookupResourcesCommand(t, 7)
+	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
+	require.NoError(t, err)
+	require.Equal(t, 7, count, "Should stop at page limit of 7, but got %d results", count)
+
+	// Test case 3: Page limit of 20 (more than available) should return all 15 results
+	count = 0
+	cmd = testLookupResourcesCommand(t, 20)
+	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
+	require.NoError(t, err)
+	require.Equal(t, 15, count, "Should return all 15 results when page limit (20) is higher than available data")
 }
 
 func testLookupResourcesCommand(t *testing.T, limit uint32) *cobra.Command {
