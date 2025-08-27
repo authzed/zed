@@ -200,7 +200,9 @@ func compileSchemaFromData(filename, schemaString string, out interface{}) error
 		SchemaString: schemaString,
 	}, composable.AllowUnprefixedObjectType(), composable.SourceFolder(inputSourceFolder))
 
-	if composableCompileErr == nil {
+	// We'll only attempt to generate the composable schema string if we don't already
+	// have one from standard schema compilation
+	if composableCompileErr == nil && vfile.Schema.Schema == "" {
 		compiledSchemaString, _, err := generator.GenerateSchema(composableCompiled.OrderedDefinitions)
 		if err != nil {
 			return fmt.Errorf("could not generate string schema: %w", err)
