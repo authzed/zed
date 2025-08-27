@@ -1,0 +1,10 @@
+definition user {}
+
+definition resource {
+  relation user: user
+
+  // NOTE: This is what will throw the warning -
+  // we recommend that you don't put the resource name
+  // in the permission.
+  permission view_resource = user
+}
