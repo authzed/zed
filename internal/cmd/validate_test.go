@@ -1,15 +1,38 @@
 package cmd
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/gookit/color"
+	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/require"
 
 	zedtesting "github.com/authzed/zed/internal/testing"
 )
+
+func TestMain(m *testing.M) {
+	// Ensure that we run tests without color output.
+	// This makes test output more predictable when we want
+	// to assert about its output.
+	// setup
+	profile := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.Ascii)
+	// Also disable gookit/color, which is used in the tree printer
+	color.Disable()
+
+	// Run the tests
+	code := m.Run()
+
+	// teardown
+	lipgloss.SetColorProfile(profile)
+
+	os.Exit(code)
+}
 
 var durationRegex = regexp.MustCompile(`\([\d.]*[µmn]s\)`)
 
@@ -49,6 +72,7 @@ func TestValidatePreRun(t *testing.T) {
 			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
 				zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
 				zedtesting.StringFlag{FlagName: "schema-type", FlagValue: tc.schemaTypeFlag},
+				zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
 			)
 
 			err := validatePreRunE(cmd, []string{})
@@ -285,6 +309,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
 				zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
 				zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
+				zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
 			)
 
 			res, shouldError, err := validateCmdFunc(cmd, tc.files)
@@ -298,4 +323,33 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			require.Equal(tc.expectNonZeroStatusCode, shouldError)
 		})
 	}
+}
+
+func TestFailOnWarn(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+
+	// Run once with fail-on-warn set to false
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "schema-type", FlagValue: ""},
+		zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
+		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100}, zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
+		zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
+	)
+
+	_, shouldError, _ := validateCmdFunc(cmd, []string{filepath.Join("validate-test", "schema-with-warnings.zed")})
+	require.False(shouldError, "validation pass should not fail without fail-on-warn")
+
+	// Run again with fail-on-warn set to true
+	cmd = zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "schema-type", FlagValue: ""},
+		zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
+		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
+		zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
+		zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: true},
+	)
+
+	_, shouldError, _ = validateCmdFunc(cmd, []string{filepath.Join("validate-test", "schema-with-warnings.zed")})
+	require.True(shouldError, "validation pass should fail with fail-on-warn")
 }

@@ -49,6 +49,7 @@ var (
 
 func registerValidateCmd(cmd *cobra.Command) {
 	validateCmd.Flags().Bool("force-color", false, "force color code output even in non-tty environments")
+	validateCmd.Flags().Bool("fail-on-warn", false, "treat warnings as errors during validation")
 	validateCmd.Flags().String("schema-type", "", "force validation according to specific schema syntax (\"\", \"composable\", \"standard\")")
 	cmd.AddCommand(validateCmd)
 }
@@ -129,6 +130,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		shouldExit                 = false
 		toPrint                    = &strings.Builder{}
 		schemaType                 = cobrautil.MustGetString(cmd, "schema-type")
+		failOnWarn                 = cobrautil.MustGetBool(cmd, "fail-on-warn")
 	)
 
 	for _, filename := range filenames {
@@ -249,6 +251,9 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			}
 
 			toPrint.WriteString(complete())
+			// If we have warnings, we use the failOnWarn flag's value
+			// to decide whether to exit with an error.
+			shouldExit = failOnWarn
 		} else {
 			toPrint.WriteString(success())
 		}
