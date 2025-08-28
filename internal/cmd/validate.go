@@ -150,6 +150,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		}
 
 		var parsed validationfile.ValidationFile
+		// the decoder is also where compilation happens.
 		validateContents, isOnlySchema, err := decoder(&parsed)
 		standardErrors, composableErrs, otherErrs := classifyErrors(err)
 
@@ -208,6 +209,8 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			return "", false, err
 		}
 		if devErrs != nil {
+			// Calculate the schema offset, used for outputting errors and warnings
+			// and having them point to the right place regardless of zed vs yaml
 			schemaOffset := parsed.Schema.SourcePosition.LineNumber
 			if isOnlySchema {
 				schemaOffset = 0

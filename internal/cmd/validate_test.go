@@ -215,7 +215,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "missing-relation.zed"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr: "error: parse error in `write`, line 2, column 20: relation/permission `write` not found under definition `test`                   \n" +
+			expectStr: "error: parse error in `write`, line 2, column 21: relation/permission `write` not found under definition `test`                   \n" +
 				" 1 |  definition test {\n" +
 				" 2 >   permission view = write\n" +
 				"   >                     ^~~~~\n " +
@@ -297,6 +297,18 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 complete - 0 relationships loaded, 0 assertions run, 0 expected relations validated
 `,
 		},
+		`warnings_point_at_correct_line_in_zed`: {
+			files: []string{
+				filepath.Join("validate-test", "warnings-point-at-right-line.zed"),
+			},
+			expectStr: "warning: Permission \"delete_resource\" references parent type \"resource\" in its name; it is recommended to drop the suffix (relation-name-references-parent)\n 23 |  permission can_admin = admin\n 24 | \n 25 |  /** delete_resource allows a user to delete the resource. */\n 26 >  permission delete_resource = can_admin\n    >             ^~~~~~~~~~~~~~~\n 27 | }\n 28 | \n\ncomplete - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
+		},
+		`warnings_point_at_correct_line_in_yaml`: {
+			files: []string{
+				filepath.Join("validate-test", "warnings-point-at-right-line.yaml"),
+			},
+			expectStr: "warning: Permission \"delete_resource\" references parent type \"resource\" in its name; it is recommended to drop the suffix (relation-name-references-parent)\n 23 |     /** can_admin allows a user to administer the resource */\n 24 |     permission can_admin = admin\n 25 | \n 26 >     /** delete_resource allows a user to delete the resource. */\n    >         ^~~~~~~~~~~~~~~\n 27 |     permission delete_resource = can_admin\n 28 |   }\n\ncomplete - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
+		},
 	}
 
 	for name, tc := range testCases {
@@ -306,7 +318,6 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			require := require.New(t)
 			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
 				zedtesting.StringFlag{FlagName: "schema-type", FlagValue: tc.schemaTypeFlag},
-				zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
 				zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
 				zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 				zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},

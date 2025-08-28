@@ -1,0 +1,27 @@
+definition user {}
+
+definition organization {}
+
+definition platform {}
+
+definition resource {
+	/** platform is the platform to which the resource belongs */
+	relation platform: platform
+
+	/**
+	 * organization is the organization to which the resource belongs
+	 */
+	relation organization: organization
+
+	/** admin is a user that can administer the resource */
+	relation admin: user
+
+	/** viewer is a read-only viewer of the resource */
+	relation viewer: user
+
+	/** can_admin allows a user to administer the resource */
+	permission can_admin = admin
+
+	/** delete_resource allows a user to delete the resource. */
+	permission delete_resource = can_admin
+}
