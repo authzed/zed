@@ -1,10 +1,21 @@
 package commands
 
 import (
+	"context"
+	"net"
 	"reflect"
+	"sync"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+
+	"github.com/authzed/zed/internal/client"
+	zedtesting "github.com/authzed/zed/internal/testing"
 )
 
 func TestParseRelationshipFilter(t *testing.T) {
@@ -107,4 +118,91 @@ func TestParseRelationshipFilter(t *testing.T) {
 			t.Errorf("parseRelationshipFilter(%s) = %v, expected %v", tc.input, actual, tc.expected)
 		}
 	}
+}
+
+type mockWatchServer struct {
+	v1.UnimplementedWatchServiceServer
+	sendOnce uint
+}
+
+func (mws *mockWatchServer) Watch(_ *v1.WatchRequest, stream grpc.ServerStreamingServer[v1.WatchResponse]) error {
+	update := &v1.RelationshipUpdate{
+		Operation: v1.RelationshipUpdate_OPERATION_CREATE,
+		Relationship: &v1.Relationship{
+			Resource: &v1.ObjectReference{
+				ObjectType: "document",
+				ObjectId:   "1",
+			},
+			Relation: "viewer",
+			Subject: &v1.SubjectReference{
+				Object: &v1.ObjectReference{
+					ObjectType: "user",
+					ObjectId:   "alice",
+				},
+			},
+		},
+	}
+
+	response := &v1.WatchResponse{
+		Updates:        []*v1.RelationshipUpdate{update},
+		ChangesThrough: &v1.ZedToken{Token: "revision1"},
+	}
+
+	if mws.sendOnce == 0 {
+		mws.sendOnce++
+		return stream.Send(response)
+	}
+
+	return nil
+}
+
+func TestWatchCmdFunc(t *testing.T) {
+	lis := bufconn.Listen(1024 * 1024)
+	s := grpc.NewServer()
+
+	mockServer := &mockWatchServer{}
+	v1.RegisterWatchServiceServer(s, mockServer)
+
+	go func() {
+		_ = s.Serve(lis)
+	}()
+	t.Cleanup(s.Stop)
+
+	conn, err := grpc.NewClient("passthrough://bufnet",
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+			return lis.Dial()
+		}),
+		grpc.WithInsecure(), // nolint:staticcheck
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { conn.Close() })
+
+	client.NewClient = zedtesting.ClientFromConn(conn)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "log-level", FlagValue: "trace", Changed: true},
+	)
+	cmd.SetContext(ctx)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	watchErr := make(chan error, 1)
+
+	go func() {
+		defer wg.Done()
+		watchErr <- watchCmdFunc(cmd, []string{})
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	cancel()
+
+	wg.Wait()
+
+	err = <-watchErr
+	require.ErrorContains(t, err, "EOF")
 }
