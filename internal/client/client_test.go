@@ -145,11 +145,6 @@ func (fss *fakeSchemaServer) ReadSchema(_ context.Context, _ *v1.ReadSchemaReque
 	return nil, status.Error(codes.Unavailable, "")
 }
 
-func (fss *fakeSchemaServer) BulkImportRelationships(grpc.ClientStreamingServer[v1.BulkImportRelationshipsRequest, v1.BulkImportRelationshipsResponse]) error {
-	fss.testFunc()
-	return status.Errorf(codes.Aborted, "")
-}
-
 func (fss *fakeSchemaServer) ImportBulkRelationships(grpc.ClientStreamingServer[v1.ImportBulkRelationshipsRequest, v1.ImportBulkRelationshipsResponse]) error {
 	fss.testFunc()
 	return status.Errorf(codes.Aborted, "")
@@ -240,9 +235,9 @@ func TestDoesNotRetryBackupRestore(t *testing.T) {
 	require.Equal(t, uint(1), callCount)
 
 	callCount = 0
-	bic, err := c.BulkImportRelationships(ctx)
+	bic, err := c.ImportBulkRelationships(ctx)
 	require.NoError(t, err)
-	err = bic.SendMsg(&v1.BulkImportRelationshipsRequest{})
+	err = bic.SendMsg(&v1.ImportBulkRelationshipsRequest{})
 	require.NoError(t, err)
 	_, err = bic.CloseAndRecv()
 	grpcutil.RequireStatus(t, codes.Aborted, err)

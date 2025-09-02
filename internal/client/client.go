@@ -42,7 +42,6 @@ const (
 	defaultRetryExponentialBackoff = 100 * time.Millisecond
 	defaultMaxRetryAttemptDuration = 2 * time.Second
 	defaultRetryJitterFraction     = 0.5
-	bulkImportRoute                = "/authzed.api.v1.ExperimentalService/BulkImportRelationships"
 	importBulkRoute                = "/authzed.api.v1.PermissionsService/ImportBulkRelationships"
 )
 
@@ -232,7 +231,7 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 
 	streamInterceptors := []grpc.StreamClientInterceptor{
 		zgrpcutil.StreamLogDispatchTrailers,
-		selector.StreamClientInterceptor(retry.StreamClientInterceptor(retryOpts...), selector.MatchFunc(isNoneOf(bulkImportRoute, importBulkRoute))),
+		selector.StreamClientInterceptor(retry.StreamClientInterceptor(retryOpts...), selector.MatchFunc(isNoneOf(importBulkRoute))),
 	}
 
 	if !cobrautil.MustGetBool(cmd, "skip-version-check") {
