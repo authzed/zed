@@ -369,6 +369,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		}
 	}()
 
+	var lastResponse *v1.ExportBulkRelationshipsResponse
 	for {
 		if err := ctx.Err(); err != nil {
 			if isCanceled(err) {
@@ -384,11 +385,30 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 				return context.Canceled
 			}
 
+			if isRetryableError(err) {
+				// TODO: do we need to clean up the existing stream in some way?
+				// TODO: best way to test this?
+				// If the error is retryable, we overwrite the existing stream with a new
+				// stream based on a new request that starts at the cursor location of the
+				// last received response.
+				relationshipStream, err = c.ExportBulkRelationships(ctx, &v1.ExportBulkRelationshipsRequest{
+					OptionalLimit:  pageLimit,
+					OptionalCursor: lastResponse.AfterResultCursor,
+				})
+				log.Info().Err(err).Str("cursor token", lastResponse.AfterResultCursor.Token).Msg("encountered retryable error, resuming stream after token")
+				// Bounce to the top of the loop
+				continue
+			}
+
 			if !errors.Is(err, io.EOF) {
 				return fmt.Errorf("error receiving relationships: %w", err)
 			}
 			break
 		}
+
+		// Get a reference to the last response in case we need to retry
+		// starting at its cursor
+		lastResponse = relsResp
 
 		for _, rel := range relsResp.Relationships {
 			if hasRelPrefix(rel, prefixFilter) {

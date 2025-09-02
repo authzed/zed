@@ -43,6 +43,7 @@ const (
 	defaultMaxRetryAttemptDuration = 2 * time.Second
 	defaultRetryJitterFraction     = 0.5
 	importBulkRoute                = "/authzed.api.v1.PermissionsService/ImportBulkRelationships"
+	exportBulkRoute                = "/authzed.api.v1.PermissionsService/ExportBulkRelationships"
 )
 
 // NewClient defines an (overridable) means of creating a new client.
@@ -231,7 +232,10 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 
 	streamInterceptors := []grpc.StreamClientInterceptor{
 		zgrpcutil.StreamLogDispatchTrailers,
-		selector.StreamClientInterceptor(retry.StreamClientInterceptor(retryOpts...), selector.MatchFunc(isNoneOf(importBulkRoute))),
+		// retrying the bulk import in backup/restore logic is handled manually.
+		// retrying bulk export is also handled manually, because the default behavior is
+		// to start at the beginning of the stream, which produces duplicate values.
+		selector.StreamClientInterceptor(retry.StreamClientInterceptor(retryOpts...), selector.MatchFunc(isNoneOf(importBulkRoute, exportBulkRoute))),
 	}
 
 	if !cobrautil.MustGetBool(cmd, "skip-version-check") {
