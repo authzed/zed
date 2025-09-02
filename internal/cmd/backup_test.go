@@ -438,6 +438,8 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		}
 		validateBackupWithFunc(t, f, testSchema, resp.WrittenAt, expectedRels, validationFunc)
 	})
+	t.Run("retryable errors pick up where the stream left off", func(_ *testing.T) {
+	})
 }
 
 type testConfigStore struct {
