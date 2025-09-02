@@ -21,7 +21,7 @@ jobs:
     name: "Generate & Sync Documentation"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "actions/checkout@v4"
+      - uses: "actions/checkout@v5"
       - uses: "authzed/actions/setup-go@main"
       - uses: "authzed/actions/setup-mage@main"
 
@@ -29,7 +29,7 @@ jobs:
         run: "mage gen:docsForPublish"
 
       - name: "Checkout docs repository"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v5"
         with:
           token: "${{ secrets.GITHUB_TOKEN }}"
           repository: "${{ env.DOCS_REPO }}"

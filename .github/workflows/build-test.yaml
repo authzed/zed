@@ -12,7 +12,7 @@ jobs:
     name: "Build Binary"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "actions/checkout@v4"
+      - uses: "actions/checkout@v5"
       - uses: "authzed/actions/setup-go@main"
       - uses: "authzed/actions/go-build@main"
 
@@ -20,7 +20,7 @@ jobs:
     name: "Build Container Image"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "actions/checkout@v4"
+      - uses: "actions/checkout@v5"
       - uses: "authzed/actions/docker-build@main"
 
   unit:
@@ -31,7 +31,7 @@ jobs:
         os: ["ubuntu-latest"] # TODO(miparnisari): add "windows-latest" after fixing the tests
 
     steps:
-      - uses: "actions/checkout@v4"
+      - uses: "actions/checkout@v5"
       - uses: "authzed/actions/setup-go@main"
       - uses: "authzed/actions/go-test@main"
 
@@ -41,7 +41,7 @@ jobs:
     # see #449
     runs-on: "ubuntu-22.04"
     steps:
-      - uses: "actions/checkout@v4"
+      - uses: "actions/checkout@v5"
       - uses: "authzed/actions/setup-go@main"
         with:
           # NOTE: This needs to match the toolchain version, or else
