@@ -65,7 +65,7 @@ func consistencyFromCmd(cmd *cobra.Command) (c *v1.Consistency, err error) {
 	if c == nil {
 		c = &v1.Consistency{Requirement: &v1.Consistency_MinimizeLatency{MinimizeLatency: true}}
 	}
-	return
+	return c, err
 }
 
 func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {

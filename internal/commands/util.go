@@ -22,20 +22,20 @@ import (
 func ParseSubject(s string) (namespace, id, relation string, err error) {
 	err = stringz.SplitExact(s, ":", &namespace, &id)
 	if err != nil {
-		return
+		return namespace, id, relation, err
 	}
 	err = stringz.SplitExact(id, "#", &id, &relation)
 	if err != nil {
 		relation = ""
 		err = nil
 	}
-	return
+	return namespace, id, relation, err
 }
 
 // ParseType parses a type reference of the form `namespace#relaion`.
 func ParseType(s string) (namespace, relation string) {
 	namespace, relation, _ = strings.Cut(s, "#")
-	return
+	return namespace, relation
 }
 
 // GetCaveatContext returns the entered caveat caveat, if any.

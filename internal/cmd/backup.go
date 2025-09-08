@@ -254,7 +254,7 @@ func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) 
 		}
 	}
 
-	return
+	return filteredSchema, nil
 }
 
 func hasRelPrefix(rel *v1.Relationship, prefix string) bool {
@@ -303,7 +303,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		}
 	}(&err)
 
-	c, err := client.NewClient(cmd)
+	spiceClient, err := client.NewClient(cmd)
 	if err != nil {
 		return fmt.Errorf("unable to initialize client: %w", err)
 	}
@@ -316,7 +316,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 			return fmt.Errorf("error creating backup file encoder: %w", err)
 		}
 	} else {
-		encoder, zedToken, err = encoderForNewBackup(cmd, c, backupFile)
+		encoder, zedToken, err = encoderForNewBackup(cmd, spiceClient, backupFile)
 		if err != nil {
 			return err
 		}
@@ -343,17 +343,13 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	ctx := cmd.Context()
-	relationshipStream, err := c.ExportBulkRelationships(ctx, req)
-	if err != nil {
-		return fmt.Errorf("error exporting relationships: %w", err)
-	}
 
 	relationshipReadStart := time.Now()
 	tick := time.Tick(5 * time.Second)
-	bar := console.CreateProgressBar("processing backup")
+	progressBar := console.CreateProgressBar("processing backup")
 	var relsFilteredOut, relsProcessed uint64
 	defer func() {
-		_ = bar.Finish()
+		_ = progressBar.Finish()
 
 		evt := log.Info().
 			Uint64("filtered", relsFilteredOut).
@@ -369,48 +365,8 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		}
 	}()
 
-	var lastResponse *v1.ExportBulkRelationshipsResponse
-	for {
-		if err := ctx.Err(); err != nil {
-			if isCanceled(err) {
-				return context.Canceled
-			}
-
-			return fmt.Errorf("aborted backup: %w", err)
-		}
-
-		relsResp, err := relationshipStream.Recv()
-		if err != nil {
-			if isCanceled(err) {
-				return context.Canceled
-			}
-
-			if isRetryableError(err) {
-				// TODO: do we need to clean up the existing stream in some way?
-				// TODO: best way to test this?
-				// If the error is retryable, we overwrite the existing stream with a new
-				// stream based on a new request that starts at the cursor location of the
-				// last received response.
-				relationshipStream, err = c.ExportBulkRelationships(ctx, &v1.ExportBulkRelationshipsRequest{
-					OptionalLimit:  pageLimit,
-					OptionalCursor: lastResponse.AfterResultCursor,
-				})
-				log.Info().Err(err).Str("cursor token", lastResponse.AfterResultCursor.Token).Msg("encountered retryable error, resuming stream after token")
-				// Bounce to the top of the loop
-				continue
-			}
-
-			if !errors.Is(err, io.EOF) {
-				return fmt.Errorf("error receiving relationships: %w", err)
-			}
-			break
-		}
-
-		// Get a reference to the last response in case we need to retry
-		// starting at its cursor
-		lastResponse = relsResp
-
-		for _, rel := range relsResp.Relationships {
+	err = takeBackup(ctx, spiceClient, req, func(response *v1.ExportBulkRelationshipsResponse) error {
+		for _, rel := range response.Relationships {
 			if hasRelPrefix(rel, prefixFilter) {
 				if err := encoder.Append(rel); err != nil {
 					return fmt.Errorf("error storing relationship: %w", err)
@@ -420,7 +376,7 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 			}
 
 			relsProcessed++
-			if err := bar.Add(1); err != nil {
+			if err := progressBar.Add(1); err != nil {
 				return fmt.Errorf("error incrementing progress bar: %w", err)
 			}
 
@@ -439,12 +395,69 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 			}
 		}
 
-		if err := writeProgress(progressFile, relsResp); err != nil {
+		if err := writeProgress(progressFile, response); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	backupCompleted = true
+	return nil
+}
+
+func takeBackup(ctx context.Context, spiceClient client.Client, req *v1.ExportBulkRelationshipsRequest, processResponse func(*v1.ExportBulkRelationshipsResponse) error) error {
+	relationshipStream, err := spiceClient.ExportBulkRelationships(ctx, req)
+	if err != nil {
+		return fmt.Errorf("error exporting relationships: %w", err)
+	}
+	var lastResponse *v1.ExportBulkRelationshipsResponse
+	for {
+		if err := ctx.Err(); err != nil {
+			if isCanceled(err) {
+				return context.Canceled
+			}
+
+			return fmt.Errorf("aborted backup: %w", err)
+		}
+
+		relsResp, err := relationshipStream.Recv()
+		if err != nil {
+			if isCanceled(err) {
+				return context.Canceled
+			}
+
+			if isRetryableError(err) {
+				// TODO: best way to test this?
+				// If the error is retryable, we overwrite the existing stream with a new
+				// stream based on a new request that starts at the cursor location of the
+				// last received response.
+
+				// Clone the request to ensure that we are keeping all other fields the same
+				newReq := req.CloneVT()
+				newReq.OptionalCursor = lastResponse.AfterResultCursor
+
+				relationshipStream, err = spiceClient.ExportBulkRelationships(ctx, newReq)
+				log.Info().Err(err).Str("cursor token", lastResponse.AfterResultCursor.Token).Msg("encountered retryable error, resuming stream after token")
+				// Bounce to the top of the loop
+				continue
+			}
+
+			if !errors.Is(err, io.EOF) {
+				return fmt.Errorf("error receiving relationships: %w", err)
+			}
+			break
+		}
+
+		// Get a reference to the last response in case we need to retry
+		// starting at its cursor
+		lastResponse = relsResp
+
+		// Process the response using the provided function
+		err = processResponse(relsResp)
+		if err != nil {
 			return err
 		}
 	}
-
-	backupCompleted = true
 	return nil
 }
 

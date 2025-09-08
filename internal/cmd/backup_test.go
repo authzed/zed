@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -22,6 +25,7 @@ import (
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/storage"
 	zedtesting "github.com/authzed/zed/internal/testing"
+	"github.com/authzed/zed/pkg/backupformat"
 )
 
 func init() {
@@ -438,8 +442,6 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		}
 		validateBackupWithFunc(t, f, testSchema, resp.WrittenAt, expectedRels, validationFunc)
 	})
-	t.Run("retryable errors pick up where the stream left off", func(_ *testing.T) {
-	})
 }
 
 type testConfigStore struct {
@@ -605,4 +607,167 @@ func TestAddSizeErrInfo(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTakeBackupMockWorksAsExpected(t *testing.T) {
+	rels := []*v1.Relationship{
+		{
+			Resource: &v1.ObjectReference{
+				ObjectType: "resource",
+				ObjectId:   "foo",
+			},
+			Relation: "view",
+			Subject: &v1.SubjectReference{
+				Object: &v1.ObjectReference{
+					ObjectType: "user",
+					ObjectId:   "jim",
+				},
+			},
+		},
+	}
+	client := &mockClientForBackup{
+		t: t,
+		recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
+			func() (*v1.ExportBulkRelationshipsResponse, error) {
+				return &v1.ExportBulkRelationshipsResponse{
+					Relationships: rels,
+				}, nil
+			},
+		},
+	}
+
+	err := takeBackup(t.Context(), client, &v1.ExportBulkRelationshipsRequest{}, func(response *v1.ExportBulkRelationshipsResponse) error {
+		require.Len(t, response.Relationships, 1, "expecting 1 rel in the list")
+		return nil
+	})
+	require.NoError(t, err)
+
+	client.assertAllRecvCalls()
+}
+
+func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
+	firstRels := []*v1.Relationship{
+		{
+			Resource: &v1.ObjectReference{
+				ObjectType: "resource",
+				ObjectId:   "foo",
+			},
+			Relation: "view",
+			Subject: &v1.SubjectReference{
+				Object: &v1.ObjectReference{
+					ObjectType: "user",
+					ObjectId:   "jim",
+				},
+			},
+		},
+	}
+	cursor := &v1.Cursor{
+		Token: "an token",
+	}
+	secondRels := []*v1.Relationship{
+		{
+			Resource: &v1.ObjectReference{
+				ObjectType: "resource",
+				ObjectId:   "bar",
+			},
+			Relation: "view",
+			Subject: &v1.SubjectReference{
+				Object: &v1.ObjectReference{
+					ObjectType: "user",
+					ObjectId:   "jim",
+				},
+			},
+		},
+	}
+	client := &mockClientForBackup{
+		t: t,
+		recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
+			func() (*v1.ExportBulkRelationshipsResponse, error) {
+				return &v1.ExportBulkRelationshipsResponse{
+					Relationships: firstRels,
+					// Need to test that this cursor is supplied
+					AfterResultCursor: cursor,
+				}, nil
+			},
+			func() (*v1.ExportBulkRelationshipsResponse, error) {
+				// Return a retryable error
+				return nil, status.Error(codes.Unavailable, "i fell over")
+			},
+			func() (*v1.ExportBulkRelationshipsResponse, error) {
+				return &v1.ExportBulkRelationshipsResponse{
+					Relationships: secondRels,
+					AfterResultCursor: &v1.Cursor{
+						Token: "some other token",
+					},
+				}, nil
+			},
+		},
+		exportCalls: []func(t *testing.T, req *v1.ExportBulkRelationshipsRequest){
+			// Initial request
+			func(_ *testing.T, _ *v1.ExportBulkRelationshipsRequest) {
+			},
+			// The retried request - asserting that it's called with the cursor
+			func(t *testing.T, req *v1.ExportBulkRelationshipsRequest) {
+				require.Equal(t, req.OptionalCursor.Token, cursor.Token, "cursor token does not match expected")
+			},
+		},
+	}
+
+	actualRels := make([]*v1.Relationship, 0)
+
+	err := takeBackup(t.Context(), client, &v1.ExportBulkRelationshipsRequest{}, func(response *v1.ExportBulkRelationshipsResponse) error {
+		actualRels = append(actualRels, response.Relationships...)
+		return nil
+	})
+	require.NoError(t, err)
+
+	require.Len(t, actualRels, 2, "expecting two rels in the realized list")
+	require.Equal(t, actualRels[0].Resource.ObjectId, "foo")
+	require.Equal(t, actualRels[1].Resource.ObjectId, "bar")
+
+	client.assertAllRecvCalls()
+}
+
+type mockClientForBackup struct {
+	client.Client
+	grpc.ServerStreamingClient[v1.ExportBulkRelationshipsResponse]
+	t *testing.T
+	backupformat.Encoder
+	recvCalls     []func() (*v1.ExportBulkRelationshipsResponse, error)
+	recvCallIndex int
+	// exportCalls provides a handle on the calls made to ExportBulkRelationships,
+	// allowing for assertions to be made against those calls.
+	exportCalls      []func(t *testing.T, req *v1.ExportBulkRelationshipsRequest)
+	exportCallsIndex int
+}
+
+func (m *mockClientForBackup) Recv() (*v1.ExportBulkRelationshipsResponse, error) {
+	// If we've run through all our calls, return an EOF
+	if m.recvCallIndex == len(m.recvCalls) {
+		return nil, io.EOF
+	}
+	recvCall := m.recvCalls[m.recvCallIndex]
+	m.recvCallIndex++
+	return recvCall()
+}
+
+func (m *mockClientForBackup) ExportBulkRelationships(_ context.Context, req *v1.ExportBulkRelationshipsRequest, _ ...grpc.CallOption) (grpc.ServerStreamingClient[v1.ExportBulkRelationshipsResponse], error) {
+	if m.exportCalls == nil {
+		// If the caller doesn't supply exportCalls, pass through
+		return m, nil
+	}
+	if m.exportCallsIndex == len(m.exportCalls) {
+		// If invoked too many times, fail the test
+		m.t.FailNow()
+		return m, nil
+	}
+	exportCall := m.exportCalls[m.exportCallsIndex]
+	m.exportCallsIndex++
+	exportCall(m.t, req)
+	return m, nil
+}
+
+// assertAllRecvCalls asserts that the number of invocations is as expected
+func (m *mockClientForBackup) assertAllRecvCalls() {
+	require.Equal(m.t, len(m.recvCalls), m.recvCallIndex, "the number of provided recvCalls should match the number of invocations")
 }
