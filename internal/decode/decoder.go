@@ -47,7 +47,7 @@ func DecoderForURL(u *url.URL) (d Func, err error) {
 	default:
 		err = fmt.Errorf("%s scheme not supported", s)
 	}
-	return
+	return d, err
 }
 
 func fileDecoder(u *url.URL) Func {
