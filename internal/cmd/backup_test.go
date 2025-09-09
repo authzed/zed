@@ -662,7 +662,7 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 		},
 	}
 	cursor := &v1.Cursor{
-		Token: "an token",
+		Token: "a token",
 	}
 	secondRels := []*v1.Relationship{
 		{
@@ -704,11 +704,12 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 		},
 		exportCalls: []func(t *testing.T, req *v1.ExportBulkRelationshipsRequest){
 			// Initial request
-			func(_ *testing.T, _ *v1.ExportBulkRelationshipsRequest) {
-			},
+			func(_ *testing.T, _ *v1.ExportBulkRelationshipsRequest) {},
 			// The retried request - asserting that it's called with the cursor
 			func(t *testing.T, req *v1.ExportBulkRelationshipsRequest) {
-				require.Equal(t, req.OptionalCursor.Token, cursor.Token, "cursor token does not match expected")
+				require.NotNil(t, req)
+				require.NotNil(t, req.OptionalCursor, "cursor should be set on retry")
+				require.Equal(t, req.OptionalCursor.Token, cursor.Token, "cursor token does not match expected, got %s", req.OptionalCursor.Token)
 			},
 		},
 	}

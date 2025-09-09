@@ -422,30 +422,34 @@ func takeBackup(ctx context.Context, spiceClient client.Client, req *v1.ExportBu
 
 		relsResp, err := relationshipStream.Recv()
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
 			if isCanceled(err) {
 				return context.Canceled
 			}
 
 			if isRetryableError(err) {
-				// TODO: best way to test this?
 				// If the error is retryable, we overwrite the existing stream with a new
 				// stream based on a new request that starts at the cursor location of the
 				// last received response.
 
 				// Clone the request to ensure that we are keeping all other fields the same
 				newReq := req.CloneVT()
-				newReq.OptionalCursor = lastResponse.AfterResultCursor
+				cursorToken := "undefined"
+				if lastResponse != nil && lastResponse.AfterResultCursor != nil {
+					newReq.OptionalCursor = lastResponse.AfterResultCursor
+					cursorToken = lastResponse.AfterResultCursor.Token
+				}
 
 				relationshipStream, err = spiceClient.ExportBulkRelationships(ctx, newReq)
-				log.Info().Err(err).Str("cursor token", lastResponse.AfterResultCursor.Token).Msg("encountered retryable error, resuming stream after token")
+				log.Info().Err(err).Str("cursor-token", cursorToken).Msg("encountered retryable error, resuming after last known cursor")
 				// Bounce to the top of the loop
 				continue
 			}
 
-			if !errors.Is(err, io.EOF) {
-				return fmt.Errorf("error receiving relationships: %w", err)
-			}
-			break
+			return fmt.Errorf("error receiving relationships: %w", err)
 		}
 
 		// Get a reference to the last response in case we need to retry
@@ -458,6 +462,7 @@ func takeBackup(ctx context.Context, spiceClient client.Client, req *v1.ExportBu
 			return err
 		}
 	}
+
 	return nil
 }
 
