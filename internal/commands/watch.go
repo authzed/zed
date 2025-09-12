@@ -9,7 +9,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 
@@ -44,7 +47,7 @@ func RegisterWatchRelationshipCmd(parentCmd *cobra.Command) *cobra.Command {
 
 var watchCmd = &cobra.Command{
 	Use:        "watch [object_types, ...] [start_cursor]",
-	Short:      "Watches the stream of relationship updates from the server",
+	Short:      "Watches the stream of relationship updates and schema updates from the server",
 	Args:       ValidationWrapper(cobra.RangeArgs(0, 2)),
 	RunE:       watchCmdFunc,
 	Deprecated: "please use `zed relationships watch` instead",
@@ -52,18 +55,21 @@ var watchCmd = &cobra.Command{
 
 var watchRelationshipsCmd = &cobra.Command{
 	Use:   "watch [object_types, ...] [start_cursor]",
-	Short: "Watches the stream of relationship updates from the server",
+	Short: "Watches the stream of relationship updates and schema updates from the server",
 	Args:  ValidationWrapper(cobra.RangeArgs(0, 2)),
 	RunE:  watchCmdFunc,
 }
 
 func watchCmdFunc(cmd *cobra.Command, _ []string) error {
-	console.Printf("starting watch stream over types %v and revision %v\n", watchObjectTypes, watchRevision)
-
-	cli, err := client.NewClient(cmd)
+	client, err := client.NewClient(cmd)
 	if err != nil {
 		return err
 	}
+	return watchCmdFuncImpl(cmd, client, processResponse)
+}
+
+func watchCmdFuncImpl(cmd *cobra.Command, watchClient v1.WatchServiceClient, processResponse func(resp *v1.WatchResponse)) error {
+	console.Printf("starting watch stream over types %v and revision %v\n", watchObjectTypes, watchRevision)
 
 	relFilters := make([]*v1.RelationshipFilter, 0, len(watchRelationshipFilters))
 	for _, filter := range watchRelationshipFilters {
@@ -74,21 +80,26 @@ func watchCmdFunc(cmd *cobra.Command, _ []string) error {
 		relFilters = append(relFilters, relFilter)
 	}
 
-	req := &v1.WatchRequest{
-		OptionalObjectTypes:         watchObjectTypes,
-		OptionalRelationshipFilters: relFilters,
-	}
-	if watchRevision != "" {
-		req.OptionalStartCursor = &v1.ZedToken{Token: watchRevision}
-	}
-
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
 
 	signalctx, interruptCancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	defer interruptCancel()
 
-	watchStream, err := cli.Watch(ctx, req)
+	req := &v1.WatchRequest{
+		OptionalObjectTypes:         watchObjectTypes,
+		OptionalRelationshipFilters: relFilters,
+		OptionalUpdateKinds: []v1.WatchKind{
+			v1.WatchKind_WATCH_KIND_INCLUDE_CHECKPOINTS, // keeps connection open during quiet periods
+			v1.WatchKind_WATCH_KIND_INCLUDE_SCHEMA_UPDATES,
+		},
+	}
+
+	if watchRevision != "" {
+		req.OptionalStartCursor = &v1.ZedToken{Token: watchRevision}
+	}
+
+	watchStream, err := watchClient.Watch(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -104,40 +115,74 @@ func watchCmdFunc(cmd *cobra.Command, _ []string) error {
 		default:
 			resp, err := watchStream.Recv()
 			if err != nil {
-				return err
+				ok, err := isRetryable(err)
+				if !ok {
+					return err
+				}
+
+				log.Trace().Err(err).Msg("will retry from the last known revision " + watchRevision)
+				req.OptionalStartCursor = &v1.ZedToken{Token: watchRevision}
+				watchStream, err = watchClient.Watch(ctx, req)
+				if err != nil {
+					return err
+				}
+				continue
 			}
 
-			for _, update := range resp.Updates {
-				if watchTimestamps {
-					console.Printf("%v: ", time.Now())
-				}
-
-				switch update.Operation {
-				case v1.RelationshipUpdate_OPERATION_CREATE:
-					console.Printf("CREATED ")
-
-				case v1.RelationshipUpdate_OPERATION_DELETE:
-					console.Printf("DELETED ")
-
-				case v1.RelationshipUpdate_OPERATION_TOUCH:
-					console.Printf("TOUCHED ")
-				}
-
-				subjectRelation := ""
-				if update.Relationship.Subject.OptionalRelation != "" {
-					subjectRelation = " " + update.Relationship.Subject.OptionalRelation
-				}
-
-				console.Printf("%s:%s %s %s:%s%s\n",
-					update.Relationship.Resource.ObjectType,
-					update.Relationship.Resource.ObjectId,
-					update.Relationship.Relation,
-					update.Relationship.Subject.Object.ObjectType,
-					update.Relationship.Subject.Object.ObjectId,
-					subjectRelation,
-				)
-			}
+			processResponse(resp)
 		}
+	}
+}
+
+func isRetryable(err error) (bool, error) {
+	statusErr, ok := status.FromError(err)
+	if !ok || (statusErr.Code() != codes.Unavailable) {
+		return false, err
+	}
+	return true, nil
+}
+
+func processResponse(resp *v1.WatchResponse) {
+	if resp.ChangesThrough != nil {
+		watchRevision = resp.ChangesThrough.Token
+	}
+
+	if resp.SchemaUpdated {
+		if watchTimestamps {
+			console.Printf("%v: ", time.Now())
+		}
+		console.Println("SCHEMA UPDATED")
+	}
+
+	for _, update := range resp.Updates {
+		if watchTimestamps {
+			console.Printf("%v: ", time.Now())
+		}
+
+		switch update.Operation {
+		case v1.RelationshipUpdate_OPERATION_CREATE:
+			console.Printf("CREATED ")
+
+		case v1.RelationshipUpdate_OPERATION_DELETE:
+			console.Printf("DELETED ")
+
+		case v1.RelationshipUpdate_OPERATION_TOUCH:
+			console.Printf("TOUCHED ")
+		}
+
+		subjectRelation := ""
+		if update.Relationship.Subject.OptionalRelation != "" {
+			subjectRelation = " " + update.Relationship.Subject.OptionalRelation
+		}
+
+		console.Printf("%s:%s %s %s:%s%s\n",
+			update.Relationship.Resource.ObjectType,
+			update.Relationship.Resource.ObjectId,
+			update.Relationship.Relation,
+			update.Relationship.Subject.Object.ObjectType,
+			update.Relationship.Subject.Object.ObjectId,
+			subjectRelation,
+		)
 	}
 }
 
