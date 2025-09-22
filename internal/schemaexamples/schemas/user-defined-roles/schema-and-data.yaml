@@ -1,0 +1,141 @@
+---
+schema: |
+  definition user {}
+
+  definition project {
+  	relation issue_creator: role#member
+  	relation issue_assigner: role#member
+  	relation any_issue_resolver: role#member
+  	relation assigned_issue_resolver: role#member
+  	relation comment_creator: role#member
+  	relation comment_deleter: role#member
+  	relation role_manager: role#member
+
+  	permission create_issue = issue_creator
+  	permission create_role = role_manager
+  }
+
+  definition role {
+  	relation project: project
+  	relation member: user
+  	relation built_in_role: project
+
+  	permission delete = project->role_manager - built_in_role->role_manager
+  	permission add_user = project->role_manager
+  	permission add_permission = project->role_manager - built_in_role->role_manager
+  	permission remove_permission = project->role_manager - built_in_role->role_manager
+  }
+
+  definition issue {
+  	relation project: project
+  	relation assigned: user
+
+  	permission assign = project->issue_assigner
+  	permission resolve = (project->assigned_issue_resolver & assigned) + project->any_issue_resolver
+  	permission create_comment = project->comment_creator
+
+  	// synthetic relation
+  	permission project_comment_deleter = project->comment_deleter
+  }
+
+  definition comment {
+  	relation issue: issue
+  	permission delete = issue->project_comment_deleter
+  }
+relationships: |
+  issue:move_the_servers#project@project:pied_piper
+  issue:move_the_servers#assigned@user:gilfoyle
+
+  issue:too_slow#project@project:pied_piper
+  comment:try_middle_out#issue@issue:too_slow
+
+  role:admin#project@project:pied_piper
+  role:admin#built_in_role@project:pied_piper
+  role:developer#project@project:pied_piper
+  role:developer#built_in_role@project:pied_piper
+  role:user#project@project:pied_piper
+  role:user#built_in_role@project:pied_piper
+  role:project_manager#project@project:pied_piper
+  role:legal#project@project:pied_piper
+
+  project:pied_piper#issue_creator@role:admin#member
+  project:pied_piper#issue_creator@role:developer#member
+  project:pied_piper#issue_creator@role:user#member
+
+  project:pied_piper#issue_assigner@role:admin#member
+  project:pied_piper#issue_assigner@role:project_manager#member
+
+  project:pied_piper#any_issue_resolver@role:admin#member
+  project:pied_piper#any_issue_resolver@role:project_manager#member
+
+  project:pied_piper#assigned_issue_resolver@role:admin#member
+  project:pied_piper#assigned_issue_resolver@role:developer#member
+
+  project:pied_piper#comment_creator@role:admin#member
+  project:pied_piper#comment_creator@role:developer#member
+  project:pied_piper#comment_creator@role:user#member
+
+  project:pied_piper#comment_deleter@role:admin#member
+  project:pied_piper#comment_deleter@role:legal#member
+
+  project:pied_piper#role_manager@role:admin#member
+
+  role:admin#member@user:richard
+  role:developer#member@user:gilfoyle
+  role:user#member@user:monica
+  role:project_manager#member@user:jared
+  role:legal#member@user:ron
+assertions:
+  assertTrue: []
+  assertFalse: []
+validation:
+  comment:try_middle_out#delete:
+    - "[role:admin#member] is <project:pied_piper#comment_deleter>"
+    - "[role:legal#member] is <project:pied_piper#comment_deleter>"
+    - "[user:richard] is <role:admin#member>"
+    - "[user:ron] is <role:legal#member>"
+  issue:move_the_servers#assign:
+    - "[role:admin#member] is <project:pied_piper#issue_assigner>"
+    - "[role:project_manager#member] is <project:pied_piper#issue_assigner>"
+    - "[user:jared] is <role:project_manager#member>"
+    - "[user:richard] is <role:admin#member>"
+  issue:move_the_servers#resolve:
+    - "[role:admin#member] is <project:pied_piper#any_issue_resolver>"
+    - "[role:project_manager#member] is <project:pied_piper#any_issue_resolver>"
+    - "[user:gilfoyle] is <issue:move_the_servers#assigned>/<role:developer#member>"
+    - "[user:jared] is <role:project_manager#member>"
+    - "[user:richard] is <role:admin#member>"
+  issue:too_slow#assign:
+    - "[role:admin#member] is <project:pied_piper#issue_assigner>"
+    - "[role:project_manager#member] is <project:pied_piper#issue_assigner>"
+    - "[user:jared] is <role:project_manager#member>"
+    - "[user:richard] is <role:admin#member>"
+  issue:too_slow#create_comment:
+    - "[role:admin#member] is <project:pied_piper#comment_creator>"
+    - "[role:developer#member] is <project:pied_piper#comment_creator>"
+    - "[role:user#member] is <project:pied_piper#comment_creator>"
+    - "[user:gilfoyle] is <role:developer#member>"
+    - "[user:monica] is <role:user#member>"
+    - "[user:richard] is <role:admin#member>"
+  issue:too_slow#resolve:
+    - "[role:admin#member] is <project:pied_piper#any_issue_resolver>"
+    - "[role:project_manager#member] is <project:pied_piper#any_issue_resolver>"
+    - "[user:jared] is <role:project_manager#member>"
+    - "[user:richard] is <role:admin#member>"
+  project:pied_piper#create_issue:
+    - "[role:admin#member] is <project:pied_piper#issue_creator>"
+    - "[role:developer#member] is <project:pied_piper#issue_creator>"
+    - "[role:user#member] is <project:pied_piper#issue_creator>"
+    - "[user:gilfoyle] is <role:developer#member>"
+    - "[user:monica] is <role:user#member>"
+    - "[user:richard] is <role:admin#member>"
+  role:admin#add_user:
+    - "[role:admin#member] is <project:pied_piper#role_manager>"
+    - "[user:richard] is <role:admin#member>"
+  role:admin#delete: []
+  role:project_manager#add_user:
+    - "[role:admin#member] is <project:pied_piper#role_manager>"
+    - "[user:richard] is <role:admin#member>"
+  role:project_manager#delete:
+    - "[role:admin#member] is <project:pied_piper#role_manager>"
+    - "[user:richard] is <role:admin#member>"

@@ -117,6 +117,7 @@ zed permission check --explain document:firstdoc writer user:emilia
 	registerValidateCmd(rootCmd)
 	registerBackupCmd(rootCmd)
 	registerPreviewCmd(rootCmd)
+	registerMCPCmd(rootCmd)
 
 	// Register shared commands.
 	commands.RegisterPermissionCmd(rootCmd)

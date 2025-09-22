@@ -1,0 +1,52 @@
+---
+schema: |-
+  /**
+   * user represents a user that can be granted role(s)
+   */
+  definition user {}
+
+  /**
+   * document represents a document protected by Authzed.
+   */
+  definition document {
+      /**
+       * writer indicates that the user is a writer on the document.
+       */
+      relation writer: user
+
+      /**
+       * reader indicates that the user is a reader on the document.
+       */
+      relation reader: user
+
+      /**
+       * edit indicates that the user has permission to edit the document.
+       */
+      permission edit = writer
+
+      /**
+       * view indicates that the user has permission to view the document, if they
+       * are a `reader` *or* have `edit` permission.
+       */
+      permission view = reader + edit
+  }
+
+relationships: |-
+  document:firstdoc#writer@user:tom
+  document:firstdoc#reader@user:fred
+  document:seconddoc#reader@user:tom
+
+assertions:
+  assertTrue:
+    - "document:firstdoc#view@user:tom"
+    - "document:firstdoc#view@user:fred"
+    - "document:seconddoc#view@user:tom"
+  assertFalse:
+    - "document:seconddoc#view@user:fred"
+
+validation:
+  document:firstdoc#view:
+    - "[user:tom] is <document:firstdoc#writer>"
+    - "[user:fred] is <document:firstdoc#reader>"
+  document:seconddoc#view:
+    - "[user:tom] is <document:seconddoc#reader>"

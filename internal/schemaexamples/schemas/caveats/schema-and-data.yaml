@@ -1,0 +1,37 @@
+---
+schema: |-
+  definition user {}
+
+  /**
+   * only allowed on tuesdays. `day_of_week` can be provided either at the time
+   * the relationship is written, or in the CheckPermission API call.
+   */
+  caveat only_on_tuesday(day_of_week string) {
+    day_of_week == 'tuesday'
+  }
+
+  definition document {
+      /**
+       * reader indicates that the user is a reader on the document, either directly
+       * or only on tuesday.
+       */
+      relation reader: user | user with only_on_tuesday
+
+      permission view = reader
+  }
+relationships: |-
+  document:firstdoc#reader@user:fred
+  document:firstdoc#reader@user:tom[only_on_tuesday]
+assertions:
+  assertTrue:
+    - 'document:firstdoc#view@user:tom with {"day_of_week": "tuesday"}'
+    - "document:firstdoc#view@user:fred"
+  assertCaveated:
+    - "document:firstdoc#view@user:tom"
+  assertFalse:
+    - 'document:firstdoc#view@user:tom with {"day_of_week": "wednesday"}'
+validation:
+  document:firstdoc#view:
+    - "[user:fred] is <document:firstdoc#reader>"
+    - "[user:tom[...]] is <document:firstdoc#reader>"
+  document:seconddoc#view: []
