@@ -1,4 +1,3 @@
-<!-- markdownlint-disable-next-line MD041 -->
 import { Callout } from 'nextra/components'
 
 # Installing Zed
