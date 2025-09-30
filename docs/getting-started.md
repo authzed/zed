@@ -1,3 +1,4 @@
+<!-- markdownlint-disable-next-line MD041 -->
 import { Callout } from 'nextra/components'
 
 # Installing Zed
@@ -28,7 +29,7 @@ sudo chmod 644 /etc/apt/sources.list.d/authzed.list  # helps tools such as comma
 
 Alternatively, if you want to use the new `deb822`-style `authzed.sources` format, put the following in `/etc/apt/sources.list.d/authzed.sources`:
 
-```
+```sh
 Types: deb
 URIs: https://pkg.authzed.com/apt/
 Suites: *
@@ -122,4 +123,3 @@ go build ./cmd/zed
 You can find more commands for tasks such as testing, linting in the repository's [CONTRIBUTING.md].
 
 [CONTRIBUTING.md]: https://github.com/authzed/zed/blob/main/CONTRIBUTING.md
-
