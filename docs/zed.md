@@ -539,7 +539,7 @@ MCP (Model Context Protocol) server commands.
 	
 The MCP server provides tooling and resources for developing and debugging SpiceDB schema and relationships. The server runs an in-memory development instance of SpiceDB and does not connect to a running instance of SpiceDB.
 
-To use with Claude Code, run "zed mcp run" to start the SpiceDB Dev MCP server and then run "claude mcp add --transport http spicedb http://localhost:9999/mcp" to add the server to your Claude Code integrations.
+To use with Claude Code, run "zed mcp experimental-run" to start the SpiceDB Dev MCP server and then run "claude mcp add --transport http spicedb http://localhost:9999/mcp" to add the server to your Claude Code integrations.
 
 
 ### Options Inherited From Parent Flags
@@ -563,15 +563,15 @@ To use with Claude Code, run "zed mcp run" to start the SpiceDB Dev MCP server a
 
 ### Children commands
 
-- [zed mcp run](#reference-zed-mcp-run)	 - Run the MCP server
+- [zed mcp experimental-run](#reference-zed-mcp-experimental-run)	 - Run the Experimental MCP server
 
 
-## Reference: `zed mcp run`
+## Reference: `zed mcp experimental-run`
 
-Run the MCP server
+Run the Experimental MCP server
 
 ```
-zed mcp run [flags]
+zed mcp experimental-run [flags]
 ```
 
 ### Options
