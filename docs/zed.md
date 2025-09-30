@@ -38,6 +38,7 @@ zed permission check --explain document:firstdoc writer user:emilia
 - [zed backup](#reference-zed-backup)	 - Create, restore, and inspect permissions system backups
 - [zed context](#reference-zed-context)	 - Manage configurations for connecting to SpiceDB deployments
 - [zed import](#reference-zed-import)	 - Imports schema and relationships from a file or url
+- [zed mcp](#reference-zed-mcp)	 - MCP (Model Context Protocol) server commands
 - [zed permission](#reference-zed-permission)	 - Query the permissions in a permissions system
 - [zed relationship](#reference-zed-relationship)	 - Query and mutate the relationships in a permissions system
 - [zed schema](#reference-zed-schema)	 - Manage schema for a permissions system
@@ -532,6 +533,74 @@ zed import <url> [flags]
 
 
 
+## Reference: `zed mcp`
+
+MCP (Model Context Protocol) server commands.
+	
+The MCP server provides tooling and resources for developing and debugging SpiceDB schema and relationships. The server runs an in-memory development instance of SpiceDB and does not connect to a running instance of SpiceDB.
+
+To use with Claude Code, run "zed mcp experimental-run" to start the SpiceDB Dev MCP server and then run "claude mcp add --transport http spicedb http://localhost:9999/mcp" to add the server to your Claude Code integrations.
+
+
+### Options Inherited From Parent Flags
+
+```
+      --certificate-path string     path to certificate authority used to verify secure connections
+      --endpoint string             spicedb gRPC API endpoint
+      --hostname-override string    override the hostname used in the connection to the endpoint
+      --insecure                    connect over a plaintext connection
+      --log-format string           format of logs ("auto", "console", "json") (default "auto")
+      --log-level string            verbosity of logging ("trace", "debug", "info", "warn", "error") (default "info")
+      --max-message-size int        maximum size *in bytes* (defaults to 4_194_304 bytes ~= 4MB) of a gRPC message that can be sent or received by zed
+      --max-retries uint            maximum number of sequential retries to attempt when a request fails (default 10)
+      --no-verify-ca                do not attempt to verify the server's certificate chain and host name
+      --permissions-system string   permissions system to query
+      --proxy string                specify a SOCKS5 proxy address
+      --request-id string           optional id to send along with SpiceDB requests for tracing
+      --skip-version-check          if true, no version check is performed against the server
+      --token string                token used to authenticate to SpiceDB
+```
+
+### Children commands
+
+- [zed mcp experimental-run](#reference-zed-mcp-experimental-run)	 - Run the Experimental MCP server
+
+
+## Reference: `zed mcp experimental-run`
+
+Run the Experimental MCP server
+
+```
+zed mcp experimental-run [flags]
+```
+
+### Options
+
+```
+  -p, --port int   port for the HTTP streaming server (default 9999)
+```
+
+### Options Inherited From Parent Flags
+
+```
+      --certificate-path string     path to certificate authority used to verify secure connections
+      --endpoint string             spicedb gRPC API endpoint
+      --hostname-override string    override the hostname used in the connection to the endpoint
+      --insecure                    connect over a plaintext connection
+      --log-format string           format of logs ("auto", "console", "json") (default "auto")
+      --log-level string            verbosity of logging ("trace", "debug", "info", "warn", "error") (default "info")
+      --max-message-size int        maximum size *in bytes* (defaults to 4_194_304 bytes ~= 4MB) of a gRPC message that can be sent or received by zed
+      --max-retries uint            maximum number of sequential retries to attempt when a request fails (default 10)
+      --no-verify-ca                do not attempt to verify the server's certificate chain and host name
+      --permissions-system string   permissions system to query
+      --proxy string                specify a SOCKS5 proxy address
+      --request-id string           optional id to send along with SpiceDB requests for tracing
+      --skip-version-check          if true, no version check is performed against the server
+      --token string                token used to authenticate to SpiceDB
+```
+
+
+
 ## Reference: `zed permission`
 
 Query the permissions in a permissions system
@@ -804,7 +873,7 @@ Query and mutate the relationships in a permissions system
 - [zed relationship delete](#reference-zed-relationship-delete)	 - Deletes a relationship
 - [zed relationship read](#reference-zed-relationship-read)	 - Enumerates relationships matching the provided pattern
 - [zed relationship touch](#reference-zed-relationship-touch)	 - Idempotently updates a relationship for a subject
-- [zed relationship watch](#reference-zed-relationship-watch)	 - Watches the stream of relationship updates from the server
+- [zed relationship watch](#reference-zed-relationship-watch)	 - Watches the stream of relationship updates and schema updates from the server
 
 
 ## Reference: `zed relationship bulk-delete`
@@ -1004,7 +1073,7 @@ zed relationship touch <resource:id> <relation> <subject:id#optional_subject_rel
 
 ## Reference: `zed relationship watch`
 
-Watches the stream of relationship updates from the server
+Watches the stream of relationship updates and schema updates from the server
 
 ```
 zed relationship watch [object_types, ...] [start_cursor] [flags]
