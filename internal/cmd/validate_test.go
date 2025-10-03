@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-var durationRegex = regexp.MustCompile(`\([\d.]*[µmn]s\)`)
+var durationRegex = regexp.MustCompile(`\([\d.]*[µmn]?s\)`)
 
 func stripDuration(s string) string {
 	return durationRegex.ReplaceAllString(s, "(Xs)")
