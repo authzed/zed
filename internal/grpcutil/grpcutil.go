@@ -36,55 +36,59 @@ func CheckServerVersion(
 	invoker grpc.UnaryInvoker,
 	callOpts ...grpc.CallOption,
 ) error {
-	var headerMD metadata.MD
+	var headerMD, trailerMD metadata.MD
 	ctx = requestmeta.AddRequestHeaders(ctx, requestmeta.RequestServerVersion)
-	err := invoker(ctx, method, req, reply, cc, append(callOpts, grpc.Header(&headerMD))...)
+	err := invoker(ctx, method, req, reply, cc, append(callOpts, grpc.Header(&headerMD), grpc.Trailer(&trailerMD))...)
 	if err != nil {
 		return err
 	}
 
 	once.Do(func() {
-		version := headerMD.Get(string(responsemeta.ServerVersion))
-		if len(version) == 0 {
-			log.Debug().Msg("error reading server version response header; it may be disabled on the server")
-		} else if len(version) == 1 {
-			currentVersion := version[0]
+		versionFromHeader := headerMD.Get(string(responsemeta.ServerVersion))
+		versionFromTrailer := trailerMD.Get(string(responsemeta.ServerVersion))
+		currentVersion := ""
+		if len(versionFromHeader) == 0 && len(versionFromTrailer) == 0 {
+			log.Debug().Msg("error reading server version response header and trailer; it may be disabled on the server")
+		} else if len(versionFromHeader) == 1 {
+			currentVersion = versionFromHeader[0]
+		} else if len(versionFromTrailer) == 1 {
+			currentVersion = versionFromTrailer[0]
+		}
 
-			// If there is a build on the version, then do not compare.
-			if semver.Build(currentVersion) != "" {
-				log.Debug().Str("this-version", currentVersion).Msg("received build version of SpiceDB")
+		// If there is a build on the version, then do not compare.
+		if semver.Build(currentVersion) != "" {
+			log.Debug().Str("this-version", currentVersion).Msg("received build version of SpiceDB")
+			return
+		}
+
+		rctx, cancel := context.WithTimeout(ctx, time.Second*2)
+		defer cancel()
+
+		state, _, release, cerr := releases.CheckIsLatestVersion(rctx, func() (string, error) {
+			return currentVersion, nil
+		}, releases.GetLatestRelease)
+		if cerr != nil {
+			log.Debug().Err(cerr).Msg("error looking up currently released version")
+		} else {
+			switch state {
+			case releases.UnreleasedVersion:
+				log.Warn().Str("version", currentVersion).Msg("not calling a released version of SpiceDB")
 				return
-			}
 
-			rctx, cancel := context.WithTimeout(ctx, time.Second*2)
-			defer cancel()
+			case releases.UpdateAvailable:
+				log.Warn().Str("this-version", currentVersion).Str("latest-released-version", release.Version).Msgf("the version of SpiceDB being called is out of date. See: %s", release.ViewURL)
+				return
 
-			state, _, release, cerr := releases.CheckIsLatestVersion(rctx, func() (string, error) {
-				return currentVersion, nil
-			}, releases.GetLatestRelease)
-			if cerr != nil {
-				log.Debug().Err(cerr).Msg("error looking up currently released version")
-			} else {
-				switch state {
-				case releases.UnreleasedVersion:
-					log.Warn().Str("version", currentVersion).Msg("not calling a released version of SpiceDB")
-					return
+			case releases.UpToDate:
+				log.Debug().Str("latest-released-version", release.Version).Msg("the version of SpiceDB being called is the latest released version")
+				return
 
-				case releases.UpdateAvailable:
-					log.Warn().Str("this-version", currentVersion).Str("latest-released-version", release.Version).Msgf("the version of SpiceDB being called is out of date. See: %s", release.ViewURL)
-					return
+			case releases.Unknown:
+				log.Warn().Str("unknown-released-version", release.Version).Msg("unable to check for a new SpiceDB version")
+				return
 
-				case releases.UpToDate:
-					log.Debug().Str("latest-released-version", release.Version).Msg("the version of SpiceDB being called is the latest released version")
-					return
-
-				case releases.Unknown:
-					log.Warn().Str("unknown-released-version", release.Version).Msg("unable to check for a new SpiceDB version")
-					return
-
-				default:
-					panic("Unknown state for CheckAndLogRunE")
-				}
+			default:
+				panic("Unknown state for CheckAndLogRunE")
 			}
 		}
 	})
