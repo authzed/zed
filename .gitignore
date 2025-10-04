@@ -5,3 +5,4 @@ docs/merged.md
 # Local-only files
 go.work
 go.work.sum
+coverage.txt

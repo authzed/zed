@@ -33,7 +33,15 @@ jobs:
     steps:
       - uses: "actions/checkout@v5"
       - uses: "authzed/actions/setup-go@main"
-      - uses: "authzed/actions/go-test@main"
+      - name: "Unit tests with coverage"
+        run: "go run mage.go test:runWithCoverage"
+      - name: "Upload coverage to Codecov"
+        uses: "codecov/codecov-action@v5.5.1"
+        with:
+          files: "./coverage.txt"
+          verbose: true
+          token: "${{ secrets.CODECOV_TOKEN }}"
+          fail_ci_if_error: false
 
   development:
     name: "WASM Tests"
