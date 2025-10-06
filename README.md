@@ -5,6 +5,7 @@
 [![Discord Server](https://img.shields.io/discord/844600078504951838?color=7289da&logo=discord "Discord Server")](https://authzed.com/discord)
 [![Twitter](https://img.shields.io/badge/twitter-%40authzed-1D8EEE?logo=twitter "@authzed on Twitter")](https://twitter.com/authzed)
 [![Docker Pulls](https://img.shields.io/docker/pulls/authzed/zed?color=%23448CE6&style=flat-square)](https://hub.docker.com/r/authzed/zed/tags)
+[![Codecov](https://img.shields.io/codecov/c/github/authzed/zed)](https://app.codecov.io/gh/authzed/zed)
 
 A command-line client for managing [SpiceDB].
 
