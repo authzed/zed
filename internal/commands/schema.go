@@ -68,7 +68,7 @@ func schemaReadCmdFunc(cmd *cobra.Command, _ []string) error {
 }
 
 // ReadSchema calls read schema for the client and returns the schema found.
-func ReadSchema(ctx context.Context, client client.Client) (string, error) {
+func ReadSchema(ctx context.Context, client v1.SchemaServiceClient) (string, error) {
 	request := &v1.ReadSchemaRequest{}
 	log.Trace().Interface("request", request).Msg("requesting schema read")
 

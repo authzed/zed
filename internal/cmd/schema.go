@@ -30,6 +30,16 @@ import (
 	"github.com/authzed/zed/internal/console"
 )
 
+type termChecker interface {
+	IsTerminal(fd int) bool
+}
+
+type realTermChecker struct{}
+
+func (rtc *realTermChecker) IsTerminal(fd int) bool {
+	return term.IsTerminal(fd)
+}
+
 func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 	schemaCmd.AddCommand(schemaCopyCmd)
 	schemaCopyCmd.Flags().Bool("json", false, "output as JSON")
@@ -50,7 +60,19 @@ var schemaWriteCmd = &cobra.Command{
 	Args:              commands.ValidationWrapper(cobra.MaximumNArgs(1)),
 	Short:             "Write a schema file (.zed or stdin) to the current permissions system",
 	ValidArgsFunction: commands.FileExtensionCompletions("zed"),
-	RunE:              schemaWriteCmdFunc,
+	Example: `
+	Write from a file:
+		zed schema write schema.zed
+	Write from stdin:
+		cat schema.zed | zed schema write
+`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := client.NewClient(cmd)
+		if err != nil {
+			return err
+		}
+		return schemaWriteCmdImpl(cmd, args, client, &realTermChecker{})
+	},
 }
 
 var schemaCopyCmd = &cobra.Command{
@@ -79,7 +101,9 @@ var schemaCompileCmd = &cobra.Command{
 		zed preview schema compile root.zed --out compiled.zed
 	`,
 	ValidArgsFunction: commands.FileExtensionCompletions("zed"),
-	RunE:              schemaCompileCmdFunc,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return schemaCompileCmdFunc(cmd, args, &realTermChecker{})
+	},
 }
 
 func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {
@@ -196,19 +220,16 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
-	intFd, err := safecast.ToInt(uint(os.Stdout.Fd()))
+func schemaWriteCmdImpl(cmd *cobra.Command, args []string, client v1.SchemaServiceClient, terminalChecker termChecker) error {
+	stdInFd, err := safecast.ToInt(uint(os.Stdin.Fd()))
 	if err != nil {
 		return err
-	}
-	if len(args) == 0 && term.IsTerminal(intFd) {
-		return fmt.Errorf("must provide file path or contents via stdin")
 	}
 
-	client, err := client.NewClient(cmd)
-	if err != nil {
-		return err
+	if len(args) == 0 && terminalChecker.IsTerminal(stdInFd) {
+		return errors.New("must provide file path or contents via stdin")
 	}
+
 	var schemaBytes []byte
 	switch len(args) {
 	case 1:
@@ -246,18 +267,17 @@ func schemaWriteCmdFunc(cmd *cobra.Command, args []string) error {
 
 	resp, err := client.WriteSchema(cmd.Context(), request)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to write schema")
+		return fmt.Errorf("failed to write schema: %w", err)
 	}
 	log.Trace().Interface("response", resp).Msg("wrote schema")
 
 	if cobrautil.MustGetBool(cmd, "json") {
 		prettyProto, err := commands.PrettyProto(resp)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to convert schema to JSON")
+			return fmt.Errorf("failed to convert schema to JSON: %w", err)
 		}
 
 		console.Println(string(prettyProto))
-		return nil
 	}
 
 	return nil
@@ -287,7 +307,7 @@ func rewriteSchema(existingSchemaText string, definitionPrefix string) (string, 
 // If specifiedPrefix is non-empty, it is returned immediately.
 // If existingSchema is non-nil, it is parsed for the prefix.
 // Otherwise, the client is used to retrieve the existing schema (if any), and the prefix is retrieved from there.
-func determinePrefixForSchema(ctx context.Context, specifiedPrefix string, client client.Client, existingSchema *string) (string, error) {
+func determinePrefixForSchema(ctx context.Context, specifiedPrefix string, client v1.SchemaServiceClient, existingSchema *string) (string, error) {
 	if specifiedPrefix != "" {
 		return specifiedPrefix, nil
 	}
@@ -340,14 +360,14 @@ func determinePrefixForSchema(ctx context.Context, specifiedPrefix string, clien
 
 // Compiles an input schema written in the new composable schema syntax
 // and produces it as a fully-realized schema
-func schemaCompileCmdFunc(cmd *cobra.Command, args []string) error {
+func schemaCompileCmdFunc(cmd *cobra.Command, args []string, termChecker termChecker) error {
 	stdOutFd, err := safecast.ToInt(uint(os.Stdout.Fd()))
 	if err != nil {
 		return err
 	}
 	outputFilepath := cobrautil.MustGetString(cmd, "out")
-	if outputFilepath == "" && !term.IsTerminal(stdOutFd) {
-		return fmt.Errorf("must provide stdout or output file path")
+	if outputFilepath == "" && !termChecker.IsTerminal(stdOutFd) {
+		return errors.New("must provide stdout or output file path")
 	}
 
 	inputFilepath := args[0]
