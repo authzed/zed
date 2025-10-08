@@ -1,5 +1,5 @@
 ---
-name: "Release for Windows"
+name: "Release for Windows" # TODO why is this separate from release.yaml?
 on:  # yamllint disable-line rule:truthy
   push:
     tags:
@@ -29,9 +29,24 @@ jobs:
           distribution: "goreleaser-pro"
           # NOTE: keep in sync with goreleaser version in other job.
           # github actions don't allow yaml anchors.
-          version: "v2.3.2"
+          version: "v2.12.5"
           args: "release --clean --config=.goreleaser.windows.yml"
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           GORELEASER_KEY: "${{ secrets.GORELEASER_KEY }}"
           CHOCOLATEY_API_KEY: "${{ secrets.CHOCOLATEY_API_KEY }}"
+      - name: "Notify in Slack if failure"
+        if: "${{ failure() }}"
+        uses: "slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a" # v2.1.1
+        with:
+          webhook: "${{ secrets.SLACK_BUILDS_WEBHOOK_URL }}"
+          webhook-type: "incoming-webhook"
+          payload: |
+            text: "Release failure."
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: |
+                    :x: @eng-oss Release failure. Please take a look.
+                    *Repository:* <${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}>

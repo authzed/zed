@@ -21,9 +21,9 @@ archives:
       - "LICENSE"
     format_overrides:
       - goos: "windows"
-        format: "zip"
+        formats: ["zip"]
 
-chocolatey:
+chocolateys:
   - name: "zed"
     package_source_url: "https://github.com/authzed/zed/releases"
     owners: "AuthZed, Inc"
