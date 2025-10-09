@@ -38,6 +38,7 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 		Args:              ValidationWrapper(StdinOrExactArgs(3)),
 		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
 		RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE, os.Stdin),
+		Aliases:           []string{"write"},
 		Example: `
   zed relationship create document:budget view user:anne --expiration-time "2025-12-31T23:59:59Z"
   zed relationship create document:budget view user:anne --caveat ip_address:'{"ip": "192.168.0.1"}
@@ -104,8 +105,6 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 
 	relationshipCmd.AddCommand(readCmd)
 	readCmd.Flags().Bool("json", false, "output as JSON")
-	readCmd.Flags().String("revision", "", "optional revision at which to check")
-	_ = readCmd.Flags().MarkHidden("revision")
 	readCmd.Flags().String("subject-filter", "", "optional subject filter")
 	readCmd.Flags().Uint32("page-limit", 100, "limit of relations returned per page")
 	registerConsistencyFlags(readCmd.Flags())
@@ -114,8 +113,6 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	bulkDeleteCmd.Flags().Bool("force", false, "force deletion of all elements in batches defined by <optional-limit>")
 	bulkDeleteCmd.Flags().String("subject-filter", "", "optional subject filter")
 	bulkDeleteCmd.Flags().Uint32("optional-limit", 1000, "the max amount of elements to delete. If you want to delete all in batches of size <optional-limit>, set --force to true")
-	bulkDeleteCmd.Flags().Bool("estimate-count", true, "estimate the count of relationships to be deleted")
-	_ = bulkDeleteCmd.Flags().MarkDeprecated("estimate-count", "no longer used, make use of --optional-limit instead")
 	return relationshipCmd
 }
 
