@@ -38,7 +38,7 @@ func (rtc *realTermChecker) IsTerminal(fd int) bool {
 	return term.IsTerminal(fd)
 }
 
-func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) *cobra.Command {
+func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 	schemaWriteCmd := &cobra.Command{
 		Use:               "write <file?>",
 		Args:              commands.ValidationWrapper(cobra.MaximumNArgs(1)),
@@ -105,8 +105,6 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) *cobra.Command {
 
 	schemaCmd.AddCommand(schemaCompileCmd)
 	schemaCompileCmd.Flags().String("out", "", "output filepath; omitting writes to stdout")
-
-	return schemaCompileCmd
 }
 
 func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {
