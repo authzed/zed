@@ -66,8 +66,6 @@ func TestCheckErrorWithDebugInformation(t *testing.T) {
 	}()
 
 	cmd := &cobra.Command{}
-	cmd.Flags().String("revision", "", "optional revision at which to check")
-	_ = cmd.Flags().MarkHidden("revision")
 	cmd.Flags().Bool("explain", false, "requests debug information from SpiceDB and prints out a trace of the requests")
 	cmd.Flags().Bool("schema", false, "requests debug information from SpiceDB and prints out the schema used")
 	cmd.Flags().Bool("error-on-no-permission", false, "if true, zed will return exit code 1 if subject does not have unconditional permission")
@@ -91,8 +89,6 @@ func TestCheckErrorWithInvalidDebugInformation(t *testing.T) {
 	}()
 
 	cmd := &cobra.Command{}
-	cmd.Flags().String("revision", "", "optional revision at which to check")
-	_ = cmd.Flags().MarkHidden("revision")
 	cmd.Flags().Bool("explain", false, "requests debug information from SpiceDB and prints out a trace of the requests")
 	cmd.Flags().Bool("schema", false, "requests debug information from SpiceDB and prints out the schema used")
 	cmd.Flags().Bool("error-on-no-permission", false, "if true, zed will return exit code 1 if subject does not have unconditional permission")
