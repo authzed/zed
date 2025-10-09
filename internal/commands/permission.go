@@ -47,14 +47,6 @@ func consistencyFromCmd(cmd *cobra.Command) (c *v1.Consistency, err error) {
 		c = &v1.Consistency{Requirement: &v1.Consistency_AtLeastAsFresh{AtLeastAsFresh: &v1.ZedToken{Token: atLeast}}}
 	}
 
-	// Deprecated (hidden) flag.
-	if revision := cobrautil.MustGetStringExpanded(cmd, "revision"); revision != "" {
-		if c != nil {
-			return nil, ErrMultipleConsistencies
-		}
-		c = &v1.Consistency{Requirement: &v1.Consistency_AtLeastAsFresh{AtLeastAsFresh: &v1.ZedToken{Token: revision}}}
-	}
-
 	if exact := cobrautil.MustGetStringExpanded(cmd, "consistency-at-exactly"); exact != "" {
 		if c != nil {
 			return nil, ErrMultipleConsistencies
@@ -73,8 +65,6 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 
 	permissionCmd.AddCommand(checkCmd)
 	checkCmd.Flags().Bool("json", false, "output as JSON")
-	checkCmd.Flags().String("revision", "", "optional revision at which to check")
-	_ = checkCmd.Flags().MarkHidden("revision")
 	checkCmd.Flags().Bool("explain", false, "requests debug information from SpiceDB and prints out a trace of the requests")
 	checkCmd.Flags().Bool("schema", false, "requests debug information from SpiceDB and prints out the schema used")
 	checkCmd.Flags().Bool("error-on-no-permission", false, "if true, zed will return exit code 1 if subject does not have unconditional permission")
@@ -82,7 +72,6 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	registerConsistencyFlags(checkCmd.Flags())
 
 	permissionCmd.AddCommand(checkBulkCmd)
-	checkBulkCmd.Flags().String("revision", "", "optional revision at which to check")
 	checkBulkCmd.Flags().Bool("json", false, "output as JSON")
 	checkBulkCmd.Flags().Bool("explain", false, "requests debug information from SpiceDB and prints out a trace of the requests")
 	checkBulkCmd.Flags().Bool("schema", false, "requests debug information from SpiceDB and prints out the schema used")
@@ -90,21 +79,10 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 
 	permissionCmd.AddCommand(expandCmd)
 	expandCmd.Flags().Bool("json", false, "output as JSON")
-	expandCmd.Flags().String("revision", "", "optional revision at which to check")
 	registerConsistencyFlags(expandCmd.Flags())
-
-	// NOTE: `lookup` is an alias of `lookup-resources` (below)
-	// and must have the same list of flags in order for it to work.
-	permissionCmd.AddCommand(lookupCmd)
-	lookupCmd.Flags().Bool("json", false, "output as JSON")
-	lookupCmd.Flags().String("revision", "", "optional revision at which to check")
-	lookupCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
-	lookupCmd.Flags().Uint32("page-limit", 0, "limit of relations returned per page")
-	registerConsistencyFlags(lookupCmd.Flags())
 
 	permissionCmd.AddCommand(lookupResourcesCmd)
 	lookupResourcesCmd.Flags().Bool("json", false, "output as JSON")
-	lookupResourcesCmd.Flags().String("revision", "", "optional revision at which to check")
 	lookupResourcesCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
 	lookupResourcesCmd.Flags().Uint32("page-limit", 0, "limit of relations returned per page")
 	lookupResourcesCmd.Flags().String("cursor", "", "resume pagination from a specific cursor token")
@@ -113,7 +91,6 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 
 	permissionCmd.AddCommand(lookupSubjectsCmd)
 	lookupSubjectsCmd.Flags().Bool("json", false, "output as JSON")
-	lookupSubjectsCmd.Flags().String("revision", "", "optional revision at which to check")
 	lookupSubjectsCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
 	registerConsistencyFlags(lookupSubjectsCmd.Flags())
 
@@ -155,16 +132,6 @@ var lookupResourcesCmd = &cobra.Command{
 	Args:              ValidationWrapper(cobra.ExactArgs(3)),
 	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
 	RunE:              lookupResourcesCmdFunc,
-}
-
-var lookupCmd = &cobra.Command{
-	Use:               "lookup <type> <permission> <subject:id>",
-	Short:             "Enumerates the resources of a given type for which the subject has permission",
-	Args:              ValidationWrapper(cobra.ExactArgs(3)),
-	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
-	RunE:              lookupResourcesCmdFunc,
-	Deprecated:        "prefer lookup-resources",
-	Hidden:            true,
 }
 
 var lookupSubjectsCmd = &cobra.Command{
