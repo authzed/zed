@@ -128,7 +128,7 @@ var permissionCmd = &cobra.Command{
 
 var checkBulkCmd = &cobra.Command{
 	Use:   "bulk <resource:id#permission@subject:id> <resource:id#permission@subject:id> ...",
-	Short: "Check a permissions in bulk exists for a resource-subject pairs",
+	Short: "Check permissions in bulk exist for resource-subject pairs",
 	Args:  ValidationWrapper(cobra.MinimumNArgs(1)),
 	RunE:  checkBulkCmdFunc,
 }
@@ -151,7 +151,7 @@ var expandCmd = &cobra.Command{
 
 var lookupResourcesCmd = &cobra.Command{
 	Use:               "lookup-resources <type> <permission> <subject:id>",
-	Short:             "Enumerates resources of a given type for which the subject has permission",
+	Short:             "Enumerates the resources of a given type for which the subject has permission",
 	Args:              ValidationWrapper(cobra.ExactArgs(3)),
 	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
 	RunE:              lookupResourcesCmdFunc,
