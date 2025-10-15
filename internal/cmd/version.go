@@ -3,10 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/gookit/color"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/mattn/go-isatty"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -63,18 +65,41 @@ func versionCmdFunc(cmd *cobra.Command, _ []string) error {
 		_, err := client.GetCurrentTokenWithCLIOverride(cmd, configStore, secretStore)
 
 		if err == nil {
-			spiceClient, err := client.NewClient(cmd)
-			if err != nil {
-				return err
+			// Temporarily disable retries for version check to avoid noisy error logs
+			// when SpiceDB is unavailable
+			userSetRetries := cmd.Flags().Changed("max-retries")
+			var originalValue uint
+
+			if !userSetRetries {
+				originalValue, _ = cmd.Flags().GetUint("max-retries")
+				_ = cmd.Flags().Set("max-retries", "0")
 			}
-			serverVersion, err := getServerVersion(cmd, spiceClient)
-			if err != nil {
-				return err
+
+			spiceClient, err := client.NewClient(cmd)
+
+			// Restore original max-retries value and Changed state
+			if !userSetRetries {
+				_ = cmd.Flags().Set("max-retries", strconv.FormatUint(uint64(originalValue), 10))
+				cmd.Flags().Lookup("max-retries").Changed = false
 			}
 
 			blue := color.FgLightBlue.Render
 			fmt.Print(blue("service: "))
-			console.Println(serverVersion)
+
+			if err != nil {
+				// Log at debug level and continue with unknown version
+				log.Debug().Err(err).Msg("failed to connect to SpiceDB")
+				console.Println("(unknown)")
+			} else {
+				serverVersion, err := getServerVersion(cmd, spiceClient)
+				if err != nil {
+					// Log at debug level and continue with unknown version
+					log.Debug().Err(err).Msg("failed to get server version")
+					console.Println("(unknown)")
+				} else {
+					console.Println(serverVersion)
+				}
+			}
 		}
 	}
 
