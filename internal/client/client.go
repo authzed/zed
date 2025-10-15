@@ -148,7 +148,7 @@ func tokenFromCli(cmd *cobra.Command) (storage.Token, error) {
 	if certPath != "" {
 		certBytes, err = os.ReadFile(certPath)
 		if err != nil {
-			return storage.Token{}, fmt.Errorf("failed to read ceritficate: %w", err)
+			return storage.Token{}, fmt.Errorf("failed to read certificate: %w", err)
 		}
 	}
 
