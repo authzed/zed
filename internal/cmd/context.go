@@ -141,7 +141,7 @@ func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 	if certPath != "" {
 		certBytes, err = os.ReadFile(certPath)
 		if err != nil {
-			return fmt.Errorf("failed to read ceritficate: %w", err)
+			return fmt.Errorf("failed to read certificate: %w", err)
 		}
 	}
 
