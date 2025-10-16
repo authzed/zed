@@ -57,8 +57,6 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	bulkDeleteCmd.Flags().Bool("force", false, "force deletion of all elements in batches defined by <optional-limit>")
 	bulkDeleteCmd.Flags().String("subject-filter", "", "optional subject filter")
 	bulkDeleteCmd.Flags().Uint32("optional-limit", 1000, "the max amount of elements to delete. If you want to delete all in batches of size <optional-limit>, set --force to true")
-	bulkDeleteCmd.Flags().Bool("estimate-count", true, "estimate the count of relationships to be deleted")
-	_ = bulkDeleteCmd.Flags().MarkDeprecated("estimate-count", "no longer used, make use of --optional-limit instead")
 	return relationshipCmd
 }
 
