@@ -16,54 +16,52 @@ import (
 )
 
 func registerContextCmd(rootCmd *cobra.Command) {
-	rootCmd.AddCommand(contextCmd)
+	contextCmd := &cobra.Command{
+		Use:     "context <subcommand>",
+		Short:   "Manage configurations for connecting to SpiceDB deployments",
+		Aliases: []string{"ctx"},
+	}
 
+	contextListCmd := &cobra.Command{
+		Use:               "list",
+		Short:             "Lists all available contexts",
+		Aliases:           []string{"ls"},
+		Args:              commands.ValidationWrapper(cobra.ExactArgs(0)),
+		ValidArgsFunction: cobra.NoFileCompletions,
+		RunE:              contextListCmdFunc,
+	}
+
+	contextSetCmd := &cobra.Command{
+		Use:               "set <name> <endpoint> <api-token>",
+		Short:             "Creates or overwrite a context",
+		Args:              commands.ValidationWrapper(cobra.ExactArgs(3)),
+		ValidArgsFunction: cobra.NoFileCompletions,
+		RunE:              contextSetCmdFunc,
+	}
+
+	contextRemoveCmd := &cobra.Command{
+		Use:               "remove <system>",
+		Short:             "Removes a context",
+		Aliases:           []string{"rm"},
+		Args:              commands.ValidationWrapper(cobra.ExactArgs(1)),
+		ValidArgsFunction: ContextGet,
+		RunE:              contextRemoveCmdFunc,
+	}
+
+	contextUseCmd := &cobra.Command{
+		Use:               "use <system>",
+		Short:             "Sets a context as the current context",
+		Args:              commands.ValidationWrapper(cobra.MaximumNArgs(1)),
+		ValidArgsFunction: ContextGet,
+		RunE:              contextUseCmdFunc,
+	}
+
+	rootCmd.AddCommand(contextCmd)
 	contextCmd.AddCommand(contextListCmd)
 	contextListCmd.Flags().Bool("reveal-tokens", false, "display secrets in results")
-
 	contextCmd.AddCommand(contextSetCmd)
 	contextCmd.AddCommand(contextRemoveCmd)
 	contextCmd.AddCommand(contextUseCmd)
-}
-
-var contextCmd = &cobra.Command{
-	Use:     "context <subcommand>",
-	Short:   "Manage configurations for connecting to SpiceDB deployments",
-	Aliases: []string{"ctx"},
-}
-
-var contextListCmd = &cobra.Command{
-	Use:               "list",
-	Short:             "Lists all available contexts",
-	Aliases:           []string{"ls"},
-	Args:              commands.ValidationWrapper(cobra.ExactArgs(0)),
-	ValidArgsFunction: cobra.NoFileCompletions,
-	RunE:              contextListCmdFunc,
-}
-
-var contextSetCmd = &cobra.Command{
-	Use:               "set <name> <endpoint> <api-token>",
-	Short:             "Creates or overwrite a context",
-	Args:              commands.ValidationWrapper(cobra.ExactArgs(3)),
-	ValidArgsFunction: cobra.NoFileCompletions,
-	RunE:              contextSetCmdFunc,
-}
-
-var contextRemoveCmd = &cobra.Command{
-	Use:               "remove <system>",
-	Short:             "Removes a context",
-	Aliases:           []string{"rm"},
-	Args:              commands.ValidationWrapper(cobra.ExactArgs(1)),
-	ValidArgsFunction: ContextGet,
-	RunE:              contextRemoveCmdFunc,
-}
-
-var contextUseCmd = &cobra.Command{
-	Use:               "use <system>",
-	Short:             "Sets a context as the current context",
-	Args:              commands.ValidationWrapper(cobra.MaximumNArgs(1)),
-	ValidArgsFunction: ContextGet,
-	RunE:              contextUseCmdFunc,
 }
 
 func ContextGet(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {

@@ -116,7 +116,6 @@ zed permission check --explain document:firstdoc writer user:emilia
 	registerImportCmd(rootCmd)
 	registerValidateCmd(rootCmd)
 	registerBackupCmd(rootCmd)
-	registerPreviewCmd(rootCmd)
 	registerMCPCmd(rootCmd)
 
 	// Register shared commands.
@@ -128,7 +127,8 @@ zed permission check --explain document:firstdoc writer user:emilia
 	commands.RegisterWatchRelationshipCmd(relCmd)
 
 	schemaCmd := commands.RegisterSchemaCmd(rootCmd)
-	registerAdditionalSchemaCmds(schemaCmd)
+	schemaCompileCmd := registerAdditionalSchemaCmds(schemaCmd)
+	registerPreviewCmd(rootCmd, schemaCompileCmd)
 
 	return rootCmd
 }

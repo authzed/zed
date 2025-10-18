@@ -28,8 +28,15 @@ var (
 )
 
 func RegisterWatchCmd(rootCmd *cobra.Command) *cobra.Command {
-	rootCmd.AddCommand(watchCmd)
+	watchCmd := &cobra.Command{
+		Use:        "watch [object_types, ...] [start_cursor]",
+		Short:      "Watches the stream of relationship updates and schema updates from the server",
+		Args:       ValidationWrapper(cobra.RangeArgs(0, 2)),
+		RunE:       watchCmdFunc,
+		Deprecated: "please use `zed relationships watch` instead",
+	}
 
+	rootCmd.AddCommand(watchCmd)
 	watchCmd.Flags().StringSliceVar(&watchObjectTypes, "object_types", nil, "optional object types to watch updates for")
 	watchCmd.Flags().StringVar(&watchRevision, "revision", "", "optional revision at which to start watching")
 	watchCmd.Flags().BoolVar(&watchTimestamps, "timestamp", false, "shows timestamp of incoming update events")
@@ -37,27 +44,19 @@ func RegisterWatchCmd(rootCmd *cobra.Command) *cobra.Command {
 }
 
 func RegisterWatchRelationshipCmd(parentCmd *cobra.Command) *cobra.Command {
+	watchRelationshipsCmd := &cobra.Command{
+		Use:   "watch [object_types, ...] [start_cursor]",
+		Short: "Watches the stream of relationship updates and schema updates from the server",
+		Args:  ValidationWrapper(cobra.RangeArgs(0, 2)),
+		RunE:  watchCmdFunc,
+	}
+
 	parentCmd.AddCommand(watchRelationshipsCmd)
 	watchRelationshipsCmd.Flags().StringSliceVar(&watchObjectTypes, "object_types", nil, "optional object types to watch updates for")
 	watchRelationshipsCmd.Flags().StringVar(&watchRevision, "revision", "", "optional revision at which to start watching")
 	watchRelationshipsCmd.Flags().BoolVar(&watchTimestamps, "timestamp", false, "shows timestamp of incoming update events")
 	watchRelationshipsCmd.Flags().StringSliceVar(&watchRelationshipFilters, "filter", nil, "optional filter(s) for the watch stream. Example: `optional_resource_type:optional_resource_id_or_prefix#optional_relation@optional_subject_filter`")
 	return watchRelationshipsCmd
-}
-
-var watchCmd = &cobra.Command{
-	Use:        "watch [object_types, ...] [start_cursor]",
-	Short:      "Watches the stream of relationship updates and schema updates from the server",
-	Args:       ValidationWrapper(cobra.RangeArgs(0, 2)),
-	RunE:       watchCmdFunc,
-	Deprecated: "please use `zed relationships watch` instead",
-}
-
-var watchRelationshipsCmd = &cobra.Command{
-	Use:   "watch [object_types, ...] [start_cursor]",
-	Short: "Watches the stream of relationship updates and schema updates from the server",
-	Args:  ValidationWrapper(cobra.RangeArgs(0, 2)),
-	RunE:  watchCmdFunc,
 }
 
 func watchCmdFunc(cmd *cobra.Command, _ []string) error {

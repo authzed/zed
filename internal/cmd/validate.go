@@ -48,16 +48,10 @@ var (
 )
 
 func registerValidateCmd(cmd *cobra.Command) {
-	validateCmd.Flags().Bool("force-color", false, "force color code output even in non-tty environments")
-	validateCmd.Flags().Bool("fail-on-warn", false, "treat warnings as errors during validation")
-	validateCmd.Flags().String("schema-type", "", "force validation according to specific schema syntax (\"\", \"composable\", \"standard\")")
-	cmd.AddCommand(validateCmd)
-}
-
-var validateCmd = &cobra.Command{
-	Use:   "validate <validation_file_or_schema_file>",
-	Short: "Validates the given validation file (.yaml, .zaml) or schema file (.zed)",
-	Example: `
+	validateCmd := &cobra.Command{
+		Use:   "validate <validation_file_or_schema_file>",
+		Short: "Validates the given validation file (.yaml, .zaml) or schema file (.zed)",
+		Example: `
 	From a local file (with prefix):
 		zed validate file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
 
@@ -75,25 +69,31 @@ var validateCmd = &cobra.Command{
 
 	From a devtools instance:
 		zed validate https://localhost:8443/download`,
-	Args:              commands.ValidationWrapper(cobra.MinimumNArgs(1)),
-	ValidArgsFunction: commands.FileExtensionCompletions("zed", "yaml", "zaml"),
-	PreRunE:           validatePreRunE,
-	RunE: func(cmd *cobra.Command, filenames []string) error {
-		result, shouldExit, err := validateCmdFunc(cmd, filenames)
-		if err != nil {
-			return err
-		}
-		console.Print(result)
-		if shouldExit {
-			os.Exit(1)
-		}
-		return nil
-	},
+		Args:              commands.ValidationWrapper(cobra.MinimumNArgs(1)),
+		ValidArgsFunction: commands.FileExtensionCompletions("zed", "yaml", "zaml"),
+		PreRunE:           validatePreRunE,
+		RunE: func(cmd *cobra.Command, filenames []string) error {
+			result, shouldExit, err := validateCmdFunc(cmd, filenames)
+			if err != nil {
+				return err
+			}
+			console.Print(result)
+			if shouldExit {
+				os.Exit(1)
+			}
+			return nil
+		},
 
-	// A schema that causes the parser/compiler to error will halt execution
-	// of this command with an error. In that case, we want to just display the error,
-	// rather than showing usage for this command.
-	SilenceUsage: true,
+		// A schema that causes the parser/compiler to error will halt execution
+		// of this command with an error. In that case, we want to just display the error,
+		// rather than showing usage for this command.
+		SilenceUsage: true,
+	}
+
+	validateCmd.Flags().Bool("force-color", false, "force color code output even in non-tty environments")
+	validateCmd.Flags().Bool("fail-on-warn", false, "treat warnings as errors during validation")
+	validateCmd.Flags().String("schema-type", "", "force validation according to specific schema syntax (\"\", \"composable\", \"standard\")")
+	cmd.AddCommand(validateCmd)
 }
 
 var validSchemaTypes = []string{"", "standard", "composable"}

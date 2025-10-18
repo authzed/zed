@@ -22,18 +22,10 @@ import (
 )
 
 func registerImportCmd(rootCmd *cobra.Command) {
-	rootCmd.AddCommand(importCmd)
-	importCmd.Flags().Int("batch-size", 1000, "import batch size")
-	importCmd.Flags().Int("workers", 1, "number of concurrent batching workers")
-	importCmd.Flags().Bool("schema", true, "import schema")
-	importCmd.Flags().Bool("relationships", true, "import relationships")
-	importCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before importing")
-}
-
-var importCmd = &cobra.Command{
-	Use:   "import <url>",
-	Short: "Imports schema and relationships from a file or url",
-	Example: `
+	importCmd := &cobra.Command{
+		Use:   "import <url>",
+		Short: "Imports schema and relationships from a file or url",
+		Example: `
 	From a gist:
 		zed import https://gist.github.com/ecordell/8e3b613a677e3c844742cf24421c08b6
 
@@ -61,8 +53,16 @@ var importCmd = &cobra.Command{
 	With schema definition prefix:
 		zed import --schema-definition-prefix=mypermsystem file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
 `,
-	Args: commands.ValidationWrapper(cobra.ExactArgs(1)),
-	RunE: importCmdFunc,
+		Args: commands.ValidationWrapper(cobra.ExactArgs(1)),
+		RunE: importCmdFunc,
+	}
+
+	rootCmd.AddCommand(importCmd)
+	importCmd.Flags().Int("batch-size", 1000, "import batch size")
+	importCmd.Flags().Int("workers", 1, "number of concurrent batching workers")
+	importCmd.Flags().Bool("schema", true, "import schema")
+	importCmd.Flags().Bool("relationships", true, "import relationships")
+	importCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before importing")
 }
 
 func importCmdFunc(cmd *cobra.Command, args []string) error {

@@ -58,11 +58,11 @@ func TestCommandOutput(t *testing.T) {
 		},
 	}
 
-	zl := cobrazerolog.New(cobrazerolog.WithPreRunLevel(zerolog.DebugLevel))
-
-	rootCmd := InitialiseRootCmd(zl)
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
+			zl := cobrazerolog.New(cobrazerolog.WithPreRunLevel(zerolog.DebugLevel))
+			rootCmd := InitialiseRootCmd(zl)
+
 			var flagErrorCalled bool
 			testFlagError := func(cmd *cobra.Command, err error) error {
 				require.ErrorContains(t, err, tt.flagErrorContains)
@@ -83,6 +83,26 @@ func TestCommandOutput(t *testing.T) {
 			}
 			require.Equal(t, tt.expectFlagErrorCalled, flagErrorCalled)
 		})
+	}
+}
+
+// TestMultipleInitialiseRootCmd is a regression test to ensure that calling
+// InitialiseRootCmd multiple times doesn't panic due to flag redefinition.
+// This fixes issue #556.
+func TestMultipleInitialiseRootCmd(t *testing.T) {
+	zl := cobrazerolog.New(cobrazerolog.WithPreRunLevel(zerolog.DebugLevel))
+
+	// Call InitialiseRootCmd multiple times to simulate what happens
+	// when tests run with -count=10
+	for i := 0; i < 10; i++ {
+		rootCmd := InitialiseRootCmd(zl)
+		require.NotNil(t, rootCmd)
+
+		// Execute the command with invalid args to trigger the command tree
+		// This ensures all commands and flags are properly initialized
+		os.Args = []string{"zed", "version", "--invalid-flag"}
+		err := rootCmd.ExecuteContext(t.Context())
+		require.Error(t, err) // We expect an error due to the invalid flag
 	}
 }
 
