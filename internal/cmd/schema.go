@@ -40,7 +40,58 @@ func (rtc *realTermChecker) IsTerminal(fd int) bool {
 	return term.IsTerminal(fd)
 }
 
-func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
+func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) *cobra.Command {
+	schemaWriteCmd := &cobra.Command{
+		Use:               "write <file?>",
+		Args:              commands.ValidationWrapper(cobra.MaximumNArgs(1)),
+		Short:             "Write a schema file (.zed or stdin) to the current permissions system",
+		ValidArgsFunction: commands.FileExtensionCompletions("zed"),
+		Example: `
+	Write from a file:
+		zed schema write schema.zed
+	Write from stdin:
+		cat schema.zed | zed schema write
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := client.NewClient(cmd)
+			if err != nil {
+				return err
+			}
+			return schemaWriteCmdImpl(cmd, args, client, &realTermChecker{})
+		},
+	}
+
+	schemaCopyCmd := &cobra.Command{
+		Use:               "copy <src context> <dest context>",
+		Short:             "Copy a schema from one context into another",
+		Args:              commands.ValidationWrapper(cobra.ExactArgs(2)),
+		ValidArgsFunction: ContextGet,
+		RunE:              schemaCopyCmdFunc,
+	}
+
+	schemaDiffCmd := &cobra.Command{
+		Use:   "diff <before file> <after file>",
+		Short: "Diff two schema files",
+		Args:  commands.ValidationWrapper(cobra.ExactArgs(2)),
+		RunE:  schemaDiffCmdFunc,
+	}
+
+	schemaCompileCmd := &cobra.Command{
+		Use:   "compile <file>",
+		Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
+		Short: "Compile a schema that uses extended syntax into one that can be written to SpiceDB",
+		Example: `
+	Write to stdout:
+		zed preview schema compile root.zed
+	Write to an output file:
+		zed preview schema compile root.zed --out compiled.zed
+	`,
+		ValidArgsFunction: commands.FileExtensionCompletions("zed"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return schemaCompileCmdFunc(cmd, args, &realTermChecker{})
+		},
+	}
+
 	schemaCmd.AddCommand(schemaCopyCmd)
 	schemaCopyCmd.Flags().Bool("json", false, "output as JSON")
 	schemaCopyCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before writing")
@@ -53,57 +104,8 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 
 	schemaCmd.AddCommand(schemaCompileCmd)
 	schemaCompileCmd.Flags().String("out", "", "output filepath; omitting writes to stdout")
-}
 
-var schemaWriteCmd = &cobra.Command{
-	Use:               "write <file?>",
-	Args:              commands.ValidationWrapper(cobra.MaximumNArgs(1)),
-	Short:             "Write a schema file (.zed or stdin) to the current permissions system",
-	ValidArgsFunction: commands.FileExtensionCompletions("zed"),
-	Example: `
-	Write from a file:
-		zed schema write schema.zed
-	Write from stdin:
-		cat schema.zed | zed schema write
-`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		client, err := client.NewClient(cmd)
-		if err != nil {
-			return err
-		}
-		return schemaWriteCmdImpl(cmd, args, client, &realTermChecker{})
-	},
-}
-
-var schemaCopyCmd = &cobra.Command{
-	Use:               "copy <src context> <dest context>",
-	Short:             "Copy a schema from one context into another",
-	Args:              commands.ValidationWrapper(cobra.ExactArgs(2)),
-	ValidArgsFunction: ContextGet,
-	RunE:              schemaCopyCmdFunc,
-}
-
-var schemaDiffCmd = &cobra.Command{
-	Use:   "diff <before file> <after file>",
-	Short: "Diff two schema files",
-	Args:  commands.ValidationWrapper(cobra.ExactArgs(2)),
-	RunE:  schemaDiffCmdFunc,
-}
-
-var schemaCompileCmd = &cobra.Command{
-	Use:   "compile <file>",
-	Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
-	Short: "Compile a schema that uses extended syntax into one that can be written to SpiceDB",
-	Example: `
-	Write to stdout:
-		zed preview schema compile root.zed
-	Write to an output file:
-		zed preview schema compile root.zed --out compiled.zed
-	`,
-	ValidArgsFunction: commands.FileExtensionCompletions("zed"),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return schemaCompileCmdFunc(cmd, args, &realTermChecker{})
-	},
+	return schemaCompileCmd
 }
 
 func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {

@@ -26,7 +26,60 @@ import (
 	"github.com/authzed/zed/internal/console"
 )
 
+const readCmdHelpLong = `Enumerates relationships matching the provided pattern.
+
+To filter returned relationships using a resource ID prefix, append a '%' to the resource ID:
+
+zed relationship read some-type:some-prefix-%
+`
+
 func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
+	relationshipCmd := &cobra.Command{
+		Use:   "relationship <subcommand>",
+		Short: "Query and mutate the relationships in a permissions system",
+	}
+
+	createCmd := &cobra.Command{
+		Use:               "create <resource:id> <relation> <subject:id#optional_subject_relation>",
+		Short:             "Create a relationship for a subject",
+		Args:              ValidationWrapper(StdinOrExactArgs(3)),
+		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
+		RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE, os.Stdin),
+	}
+
+	touchCmd := &cobra.Command{
+		Use:               "touch <resource:id> <relation> <subject:id#optional_subject_relation>",
+		Short:             "Idempotently updates a relationship for a subject",
+		Args:              ValidationWrapper(StdinOrExactArgs(3)),
+		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
+		RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, os.Stdin),
+	}
+
+	deleteCmd := &cobra.Command{
+		Use:               "delete <resource:id> <relation> <subject:id#optional_subject_relation>",
+		Short:             "Deletes a relationship",
+		Args:              ValidationWrapper(StdinOrExactArgs(3)),
+		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
+		RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE, os.Stdin),
+	}
+
+	readCmd := &cobra.Command{
+		Use:               "read <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
+		Short:             "Enumerates relationships matching the provided pattern",
+		Long:              readCmdHelpLong,
+		Args:              ValidationWrapper(cobra.RangeArgs(1, 3)),
+		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
+		RunE:              readRelationships,
+	}
+
+	bulkDeleteCmd := &cobra.Command{
+		Use:               "bulk-delete <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
+		Short:             "Deletes relationships matching the provided pattern en masse",
+		Args:              ValidationWrapper(cobra.RangeArgs(1, 3)),
+		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
+		RunE:              bulkDeleteRelationships,
+	}
+
 	rootCmd.AddCommand(relationshipCmd)
 
 	relationshipCmd.AddCommand(createCmd)
@@ -60,59 +113,6 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	bulkDeleteCmd.Flags().Bool("estimate-count", true, "estimate the count of relationships to be deleted")
 	_ = bulkDeleteCmd.Flags().MarkDeprecated("estimate-count", "no longer used, make use of --optional-limit instead")
 	return relationshipCmd
-}
-
-var relationshipCmd = &cobra.Command{
-	Use:   "relationship <subcommand>",
-	Short: "Query and mutate the relationships in a permissions system",
-}
-
-var createCmd = &cobra.Command{
-	Use:               "create <resource:id> <relation> <subject:id#optional_subject_relation>",
-	Short:             "Create a relationship for a subject",
-	Args:              ValidationWrapper(StdinOrExactArgs(3)),
-	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
-	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE, os.Stdin),
-}
-
-var touchCmd = &cobra.Command{
-	Use:               "touch <resource:id> <relation> <subject:id#optional_subject_relation>",
-	Short:             "Idempotently updates a relationship for a subject",
-	Args:              ValidationWrapper(StdinOrExactArgs(3)),
-	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
-	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, os.Stdin),
-}
-
-var deleteCmd = &cobra.Command{
-	Use:               "delete <resource:id> <relation> <subject:id#optional_subject_relation>",
-	Short:             "Deletes a relationship",
-	Args:              ValidationWrapper(StdinOrExactArgs(3)),
-	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
-	RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_DELETE, os.Stdin),
-}
-
-const readCmdHelpLong = `Enumerates relationships matching the provided pattern.
-
-To filter returned relationships using a resource ID prefix, append a '%' to the resource ID:
-
-zed relationship read some-type:some-prefix-%
-`
-
-var readCmd = &cobra.Command{
-	Use:               "read <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
-	Short:             "Enumerates relationships matching the provided pattern",
-	Long:              readCmdHelpLong,
-	Args:              ValidationWrapper(cobra.RangeArgs(1, 3)),
-	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
-	RunE:              readRelationships,
-}
-
-var bulkDeleteCmd = &cobra.Command{
-	Use:               "bulk-delete <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
-	Short:             "Deletes relationships matching the provided pattern en masse",
-	Args:              ValidationWrapper(cobra.RangeArgs(1, 3)),
-	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
-	RunE:              bulkDeleteRelationships,
 }
 
 func StdinOrExactArgs(n int) cobra.PositionalArgs {

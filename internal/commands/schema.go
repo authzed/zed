@@ -17,28 +17,25 @@ import (
 )
 
 func RegisterSchemaCmd(rootCmd *cobra.Command) *cobra.Command {
-	rootCmd.AddCommand(schemaCmd)
-
-	schemaCmd.AddCommand(schemaReadCmd)
-	schemaReadCmd.Flags().Bool("json", false, "output as JSON")
-
-	return schemaCmd
-}
-
-var (
-	schemaCmd = &cobra.Command{
+	schemaCmd := &cobra.Command{
 		Use:   "schema <subcommand>",
 		Short: "Manage schema for a permissions system",
 	}
 
-	schemaReadCmd = &cobra.Command{
+	schemaReadCmd := &cobra.Command{
 		Use:               "read",
 		Short:             "Read the schema of a permissions system",
 		Args:              ValidationWrapper(cobra.ExactArgs(0)),
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE:              schemaReadCmdFunc,
 	}
-)
+
+	rootCmd.AddCommand(schemaCmd)
+	schemaCmd.AddCommand(schemaReadCmd)
+	schemaReadCmd.Flags().Bool("json", false, "output as JSON")
+
+	return schemaCmd
+}
 
 func schemaReadCmdFunc(cmd *cobra.Command, _ []string) error {
 	client, err := client.NewClient(cmd)
