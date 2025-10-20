@@ -49,8 +49,8 @@ func withErrorHandling(f cobraRunEFunc) cobraRunEFunc {
 	}
 }
 
-var (
-	backupCmd = &cobra.Command{
+func registerBackupCmd(rootCmd *cobra.Command) {
+	backupCmd := &cobra.Command{
 		Use:   "backup <filename>",
 		Short: "Create, restore, and inspect permissions system backups",
 		Args:  commands.ValidationWrapper(cobra.MaximumNArgs(1)),
@@ -58,21 +58,21 @@ var (
 		RunE: withErrorHandling(backupCreateCmdFunc),
 	}
 
-	backupCreateCmd = &cobra.Command{
+	backupCreateCmd := &cobra.Command{
 		Use:   "create <filename>",
 		Short: "Backup a permission system to a file",
 		Args:  commands.ValidationWrapper(cobra.MaximumNArgs(1)),
 		RunE:  withErrorHandling(backupCreateCmdFunc),
 	}
 
-	backupRestoreCmd = &cobra.Command{
+	backupRestoreCmd := &cobra.Command{
 		Use:   "restore <filename>",
 		Short: "Restore a permission system from a file",
 		Args:  commands.ValidationWrapper(commands.StdinOrExactArgs(1)),
 		RunE:  backupRestoreCmdFunc,
 	}
 
-	backupParseSchemaCmd = &cobra.Command{
+	backupParseSchemaCmd := &cobra.Command{
 		Use:   "parse-schema <filename>",
 		Short: "Extract the schema from a backup file",
 		Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
@@ -81,7 +81,7 @@ var (
 		},
 	}
 
-	backupParseRevisionCmd = &cobra.Command{
+	backupParseRevisionCmd := &cobra.Command{
 		Use:   "parse-revision <filename>",
 		Short: "Extract the revision from a backup file",
 		Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
@@ -90,7 +90,7 @@ var (
 		},
 	}
 
-	backupParseRelsCmd = &cobra.Command{
+	backupParseRelsCmd := &cobra.Command{
 		Use:   "parse-relationships <filename>",
 		Short: "Extract the relationships from a backup file",
 		Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
@@ -99,7 +99,7 @@ var (
 		},
 	}
 
-	backupRedactCmd = &cobra.Command{
+	backupRedactCmd := &cobra.Command{
 		Use:   "redact <filename>",
 		Short: "Redact a backup file to remove sensitive information",
 		Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
@@ -107,9 +107,7 @@ var (
 			return backupRedactCmdFunc(cmd, args)
 		},
 	}
-)
 
-func registerBackupCmd(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(backupCmd)
 	registerBackupCreateFlags(backupCmd)
 

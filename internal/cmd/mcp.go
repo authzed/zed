@@ -8,28 +8,27 @@ import (
 )
 
 func registerMCPCmd(rootCmd *cobra.Command) {
-	rootCmd.AddCommand(mcpCmd)
-	mcpCmd.AddCommand(mcpRunCmd)
+	mcpCmd := &cobra.Command{
+		Use:   "mcp <subcommand>",
+		Short: "MCP (Model Context Protocol) server commands",
+		Long: `MCP (Model Context Protocol) server commands.
 
-	mcpRunCmd.Flags().IntP("port", "p", 9999, "port for the HTTP streaming server")
-}
-
-var mcpCmd = &cobra.Command{
-	Use:   "mcp <subcommand>",
-	Short: "MCP (Model Context Protocol) server commands",
-	Long: `MCP (Model Context Protocol) server commands.
-	
 The MCP server provides tooling and resources for developing and debugging SpiceDB schema and relationships. The server runs an in-memory development instance of SpiceDB and does not connect to a running instance of SpiceDB.
 
 To use with Claude Code, run ` + "`zed mcp experimental-run`" + ` to start the SpiceDB Dev MCP server and then run ` + "`claude mcp add --transport http spicedb \"http://localhost:9999/mcp\"`" + ` to add the server to your Claude Code integrations.`,
-}
+	}
 
-var mcpRunCmd = &cobra.Command{
-	Use:               "experimental-run",
-	Short:             "Run the Experimental MCP server",
-	Args:              commands.ValidationWrapper(cobra.ExactArgs(0)),
-	ValidArgsFunction: cobra.NoFileCompletions,
-	RunE:              mcpRunCmdFunc,
+	mcpRunCmd := &cobra.Command{
+		Use:               "experimental-run",
+		Short:             "Run the Experimental MCP server",
+		Args:              commands.ValidationWrapper(cobra.ExactArgs(0)),
+		ValidArgsFunction: cobra.NoFileCompletions,
+		RunE:              mcpRunCmdFunc,
+	}
+
+	rootCmd.AddCommand(mcpCmd)
+	mcpCmd.AddCommand(mcpRunCmd)
+	mcpRunCmd.Flags().IntP("port", "p", 9999, "port for the HTTP streaming server")
 }
 
 func mcpRunCmdFunc(cmd *cobra.Command, _ []string) error {

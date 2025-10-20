@@ -69,6 +69,61 @@ func consistencyFromCmd(cmd *cobra.Command) (c *v1.Consistency, err error) {
 }
 
 func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
+	permissionCmd := &cobra.Command{
+		Use:     "permission <subcommand>",
+		Short:   "Query the permissions in a permissions system",
+		Aliases: []string{"perm"},
+	}
+
+	checkBulkCmd := &cobra.Command{
+		Use:   "bulk <resource:id#permission@subject:id> <resource:id#permission@subject:id> ...",
+		Short: "Check permissions in bulk exist for resource-subject pairs",
+		Args:  ValidationWrapper(cobra.MinimumNArgs(1)),
+		RunE:  checkBulkCmdFunc,
+	}
+
+	checkCmd := &cobra.Command{
+		Use:               "check <resource:id> <permission> <subject:id>",
+		Short:             "Check that a permission exists for a subject",
+		Args:              ValidationWrapper(cobra.ExactArgs(3)),
+		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectID),
+		RunE:              checkCmdFunc,
+	}
+
+	expandCmd := &cobra.Command{
+		Use:               "expand <permission> <resource:id>",
+		Short:             "Expand the structure of a permission",
+		Args:              ValidationWrapper(cobra.ExactArgs(2)),
+		ValidArgsFunction: cobra.NoFileCompletions,
+		RunE:              expandCmdFunc,
+	}
+
+	lookupResourcesCmd := &cobra.Command{
+		Use:               "lookup-resources <type> <permission> <subject:id>",
+		Short:             "Enumerates the resources of a given type for which the subject has permission",
+		Args:              ValidationWrapper(cobra.ExactArgs(3)),
+		ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
+		RunE:              lookupResourcesCmdFunc,
+	}
+
+	lookupCmd := &cobra.Command{
+		Use:               "lookup <type> <permission> <subject:id>",
+		Short:             "Enumerates the resources of a given type for which the subject has permission",
+		Args:              ValidationWrapper(cobra.ExactArgs(3)),
+		ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
+		RunE:              lookupResourcesCmdFunc,
+		Deprecated:        "prefer lookup-resources",
+		Hidden:            true,
+	}
+
+	lookupSubjectsCmd := &cobra.Command{
+		Use:               "lookup-subjects <resource:id> <permission> <subject_type#optional_subject_relation>",
+		Short:             "Enumerates the subjects of a given type for which the subject has permission on the resource",
+		Args:              ValidationWrapper(cobra.ExactArgs(3)),
+		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
+		RunE:              lookupSubjectsCmdFunc,
+	}
+
 	rootCmd.AddCommand(permissionCmd)
 
 	permissionCmd.AddCommand(checkCmd)
@@ -118,61 +173,6 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	registerConsistencyFlags(lookupSubjectsCmd.Flags())
 
 	return permissionCmd
-}
-
-var permissionCmd = &cobra.Command{
-	Use:     "permission <subcommand>",
-	Short:   "Query the permissions in a permissions system",
-	Aliases: []string{"perm"},
-}
-
-var checkBulkCmd = &cobra.Command{
-	Use:   "bulk <resource:id#permission@subject:id> <resource:id#permission@subject:id> ...",
-	Short: "Check permissions in bulk exist for resource-subject pairs",
-	Args:  ValidationWrapper(cobra.MinimumNArgs(1)),
-	RunE:  checkBulkCmdFunc,
-}
-
-var checkCmd = &cobra.Command{
-	Use:               "check <resource:id> <permission> <subject:id>",
-	Short:             "Check that a permission exists for a subject",
-	Args:              ValidationWrapper(cobra.ExactArgs(3)),
-	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectID),
-	RunE:              checkCmdFunc,
-}
-
-var expandCmd = &cobra.Command{
-	Use:               "expand <permission> <resource:id>",
-	Short:             "Expand the structure of a permission",
-	Args:              ValidationWrapper(cobra.ExactArgs(2)),
-	ValidArgsFunction: cobra.NoFileCompletions,
-	RunE:              expandCmdFunc,
-}
-
-var lookupResourcesCmd = &cobra.Command{
-	Use:               "lookup-resources <type> <permission> <subject:id>",
-	Short:             "Enumerates the resources of a given type for which the subject has permission",
-	Args:              ValidationWrapper(cobra.ExactArgs(3)),
-	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
-	RunE:              lookupResourcesCmdFunc,
-}
-
-var lookupCmd = &cobra.Command{
-	Use:               "lookup <type> <permission> <subject:id>",
-	Short:             "Enumerates the resources of a given type for which the subject has permission",
-	Args:              ValidationWrapper(cobra.ExactArgs(3)),
-	ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
-	RunE:              lookupResourcesCmdFunc,
-	Deprecated:        "prefer lookup-resources",
-	Hidden:            true,
-}
-
-var lookupSubjectsCmd = &cobra.Command{
-	Use:               "lookup-subjects <resource:id> <permission> <subject_type#optional_subject_relation>",
-	Short:             "Enumerates the subjects of a given type for which the subject has permission on the resource",
-	Args:              ValidationWrapper(cobra.ExactArgs(3)),
-	ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
-	RunE:              lookupSubjectsCmdFunc,
 }
 
 func checkCmdFunc(cmd *cobra.Command, args []string) error {
