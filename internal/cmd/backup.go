@@ -928,5 +928,5 @@ func addPermissionDeniedErrInfo(err error) error {
 	if code != codes.PermissionDenied {
 		return err
 	}
-	return fmt.Errorf("%w: ensure that the token used for this call has all requisite permissions", err)
+	return fmt.Errorf("%w: ensure that the token used for this call has all required permissions", err)
 }
