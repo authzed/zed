@@ -282,7 +282,9 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
-		require.NoError(t, srv.Run(ctx))
+		// NOTE: we don't assert anything about the error
+		// here because there isn't a good time or place to do so.
+		_ = srv.Run(ctx)
 	}()
 	conn, err := srv.GRPCDialContext(ctx)
 	require.NoError(t, err)
@@ -519,7 +521,9 @@ func TestBackupRestoreCmdFunc(t *testing.T) {
 	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
-		require.NoError(t, srv.Run(ctx))
+		// NOTE: we don't assert anything about the error
+		// here because there isn't a good time or place to do so.
+		_ = srv.Run(ctx)
 	}()
 	conn, err := srv.GRPCDialContext(ctx)
 	require.NoError(t, err)
