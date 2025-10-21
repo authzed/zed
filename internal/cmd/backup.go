@@ -42,10 +42,20 @@ const (
 // cobraRunEFunc is the signature of a cobra.Command.RunE function.
 type cobraRunEFunc = func(cmd *cobra.Command, args []string) (err error)
 
+// TODO: apply these to other cmds as well
+var errorHandlers = []func(error) error{
+	addPermissionDeniedErrInfo,
+	addSizeErrInfo,
+}
+
 // withErrorHandling is a wrapper that centralizes error handling, instead of having to scatter it around the command logic.
 func withErrorHandling(f cobraRunEFunc) cobraRunEFunc {
 	return func(cmd *cobra.Command, args []string) (err error) {
-		return addSizeErrInfo(f(cmd, args))
+		cmdErr := f(cmd, args)
+		for _, handler := range errorHandlers {
+			cmdErr = handler(cmdErr)
+		}
+		return cmdErr
 	}
 }
 
@@ -398,9 +408,15 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	backupCompleted = true
-	return nil
+	// NOTE: we return err here because there's cleanup being done
+	// in the `defer` blocks that will modify the `err` if cleanup
+	// fails
+	return err
 }
 
 func takeBackup(ctx context.Context, spiceClient client.Client, req *v1.ExportBulkRelationshipsRequest, processResponse func(*v1.ExportBulkRelationshipsResponse) error) error {
@@ -901,4 +917,16 @@ func addSizeErrInfo(err error) error {
 	}
 
 	return fmt.Errorf("%w: set flag --max-message-size=%d to increase the maximum allowable size", err, 2*necessaryByteCount)
+}
+
+func addPermissionDeniedErrInfo(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	code := status.Code(err)
+	if code != codes.PermissionDenied {
+		return err
+	}
+	return fmt.Errorf("%w: ensure that the token used for this call has all requisite permissions", err)
 }

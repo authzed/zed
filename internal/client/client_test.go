@@ -239,6 +239,7 @@ func TestDoesNotRetry(t *testing.T) {
 		ibc, err := c.ImportBulkRelationships(ctx)
 		require.NoError(t, err)
 		err = ibc.SendMsg(&v1.ImportBulkRelationshipsRequest{})
+		// TODO: this occasionally flakes with an unexpected EOF
 		require.NoError(t, err)
 		_, err = ibc.CloseAndRecv()
 		grpcutil.RequireStatus(t, codes.Aborted, err)
