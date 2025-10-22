@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpiceDB Permission Trace Examples</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: #2d2d30;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 4px solid #007acc;
+        }
+        
+        h1 {
+            font-size: 32px;
+            color: #4ec9b0;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #858585;
+            font-size: 16px;
+        }
+        
+        .examples {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .example-card {
+            background: #252526;
+            padding: 20px;
+            border-radius: 8px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 2px solid transparent;
+        }
+        
+        .example-card:hover {
+            transform: translateY(-2px);
+            border-color: #007acc;
+            box-shadow: 0 4px 12px rgba(0, 122, 204, 0.3);
+        }
+        
+        .example-card h2 {
+            font-size: 18px;
+            color: #4ec9b0;
+            margin-bottom: 10px;
+        }
+        
+        .example-card .icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+        
+        .example-card .description {
+            color: #858585;
+            font-size: 13px;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+        
+        .example-card .features {
+            list-style: none;
+            margin-bottom: 15px;
+        }
+        
+        .example-card .features li {
+            color: #9cdcfe;
+            font-size: 12px;
+            margin-bottom: 5px;
+            padding-left: 15px;
+            position: relative;
+        }
+        
+        .example-card .features li:before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: #007acc;
+        }
+        
+        .example-card a {
+            display: inline-block;
+            background: #007acc;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        
+        .example-card a:hover {
+            background: #005a9e;
+        }
+        
+        .legend {
+            background: #2d2d30;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 40px;
+        }
+        
+        .legend h3 {
+            color: #4ec9b0;
+            margin-bottom: 15px;
+        }
+        
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .legend-icon {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .has-permission { color: #4ec9b0; }
+        .no-permission { color: #f48771; }
+        .conditional { color: #c586c0; }
+        .cycle { color: #ce9178; }
+        
+        @media (prefers-color-scheme: light) {
+            body {
+                background: #ffffff;
+                color: #333333;
+            }
+            
+            header, .example-card, .legend {
+                background: #f3f3f3;
+            }
+            
+            h1, .example-card h2, .legend h3 {
+                color: #0078d4;
+            }
+            
+            .subtitle, .description {
+                color: #666666;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎨 SpiceDB Permission Trace Examples</h1>
+            <p class="subtitle">Interactive HTML visualizations of permission checks</p>
+        </header>
+        
+        <div class="examples">
+            <div class="example-card">
+                <div class="icon has-permission">✓</div>
+                <h2>Example 1: Simple Has Permission</h2>
+                <p class="description">
+                    Basic permission check that succeeds. Shows clean permission grant with metadata.
+                </p>
+                <ul class="features">
+                    <li>Has permission (green)</li>
+                    <li>Subject display</li>
+                    <li>Duration tracking</li>
+                </ul>
+                <a href="example1_simple_has_permission.html">View Example →</a>
+            </div>
+            
+            <div class="example-card">
+                <div class="icon no-permission">⨉</div>
+                <h2>Example 2: No Permission</h2>
+                <p class="description">
+                    Permission denied scenario with faint styling to de-emphasize failed checks.
+                </p>
+                <ul class="features">
+                    <li>No permission (red)</li>
+                    <li>Faint text styling</li>
+                    <li>Clear denial indicator</li>
+                </ul>
+                <a href="example2_no_permission.html">View Example →</a>
+            </div>
+            
+            <div class="example-card">
+                <div class="icon has-permission">✓ 🏎️</div>
+                <h2>Example 3: Nested with Cache</h2>
+                <p class="description">
+                    Hierarchical permission resolution showing nested traces with cache badges.
+                </p>
+                <ul class="features">
+                    <li>Expandable tree structure</li>
+                    <li>Cache badges (SpiceDB)</li>
+                    <li>Relation color coding</li>
+                </ul>
+                <a href="example3_nested_with_cache.html">View Example →</a>
+            </div>
+            
+            <div class="example-card">
+                <div class="icon has-permission">✓</div>
+                <h2>Example 4: Conditional with Caveat</h2>
+                <p class="description">
+                    Permission granted after caveat evaluation with context display.
+                </p>
+                <ul class="features">
+                    <li>Caveat evaluation (TRUE)</li>
+                    <li>Expression display</li>
+                    <li>JSON context rendering</li>
+                </ul>
+                <a href="example4_conditional_with_caveat.html">View Example →</a>
+            </div>
+            
+            <div class="example-card">
+                <div class="icon conditional">?</div>
+                <h2>Example 5: Missing Context</h2>
+                <p class="description">
+                    Permission check requires additional context that wasn't provided.
+                </p>
+                <ul class="features">
+                    <li>Missing context indicator</li>
+                    <li>Required fields list</li>
+                    <li>Conditional styling</li>
+                </ul>
+                <a href="example5_missing_context.html">View Example →</a>
+            </div>
+            
+            <div class="example-card">
+                <div class="icon has-permission">✓</div>
+                <h2>Example 6: Complex Hierarchy</h2>
+                <p class="description">
+                    Deep nested permission resolution across multiple resource types.
+                </p>
+                <ul class="features">
+                    <li>3-level nesting</li>
+                    <li>Mixed permission types</li>
+                    <li>Hierarchical visualization</li>
+                </ul>
+                <a href="example6_complex_hierarchy.html">View Example →</a>
+            </div>
+            
+            <div class="example-card">
+                <div class="icon">✓⨉?</div>
+                <h2>Example 7: Bulk Mixed Results</h2>
+                <p class="description">
+                    Multiple permission checks with different outcomes in one report.
+                </p>
+                <ul class="features">
+                    <li>3 checks (has/no/conditional)</li>
+                    <li>Visual separators</li>
+                    <li>Shared metadata</li>
+                </ul>
+                <a href="example7_bulk_mixed_results.html">View Example →</a>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <h3>🎯 Icon Legend</h3>
+            <div class="legend-grid">
+                <div class="legend-item">
+                    <span class="legend-icon has-permission">✓</span>
+                    <span>Has Permission</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-icon no-permission">⨉</span>
+                    <span>No Permission</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-icon conditional">?</span>
+                    <span>Conditional/Missing Context</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-icon cycle">!</span>
+                    <span>Cycle Detected</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
