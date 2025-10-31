@@ -166,7 +166,7 @@ func fileExists(path string) (bool, error) {
 }
 
 func promptPassword(prompt string) (string, error) {
-	console.Printf(prompt)
+	console.Printf("%s", prompt)
 	b, err := term.ReadPassword(os.Stdin.Fd())
 	if err != nil {
 		return "", err

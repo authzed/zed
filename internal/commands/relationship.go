@@ -26,13 +26,6 @@ import (
 	"github.com/authzed/zed/internal/console"
 )
 
-const readCmdHelpLong = `Enumerates relationships matching the provided pattern.
-
-To filter returned relationships using a resource ID prefix, append a '%' to the resource ID:
-
-zed relationship read some-type:some-prefix-%
-`
-
 func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	relationshipCmd := &cobra.Command{
 		Use:   "relationship <subcommand>",
@@ -45,6 +38,10 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 		Args:              ValidationWrapper(StdinOrExactArgs(3)),
 		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
 		RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_CREATE, os.Stdin),
+		Example: `
+  zed relationship create document:budget view user:anne --expiration-time "2025-12-31T23:59:59Z"
+  zed relationship create document:budget view user:anne --caveat ip_address:'{"ip": "192.168.0.1"}
+`,
 	}
 
 	touchCmd := &cobra.Command{
@@ -53,6 +50,10 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 		Args:              ValidationWrapper(StdinOrExactArgs(3)),
 		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
 		RunE:              writeRelationshipCmdFunc(v1.RelationshipUpdate_OPERATION_TOUCH, os.Stdin),
+		Example: `
+  zed relationship touch document:budget view user:anne --expiration-time "2025-12-31T23:59:59Z"
+  zed relationship touch document:budget view user:anne --caveat ip_address:'{"ip": "192.168.0.1"}
+`,
 	}
 
 	deleteCmd := &cobra.Command{
@@ -66,10 +67,13 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	readCmd := &cobra.Command{
 		Use:               "read <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation>",
 		Short:             "Enumerates relationships matching the provided pattern",
-		Long:              readCmdHelpLong,
 		Args:              ValidationWrapper(cobra.RangeArgs(1, 3)),
 		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectTypeWithOptionalRelation),
 		RunE:              readRelationships,
+		Example: `
+  # To filter returned relationships using a resource ID prefix, append a '%' to the resource ID.
+  zed relationship read document:finance-%
+`,
 	}
 
 	bulkDeleteCmd := &cobra.Command{

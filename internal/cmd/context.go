@@ -40,8 +40,8 @@ func registerContextCmd(rootCmd *cobra.Command) {
 	}
 
 	contextRemoveCmd := &cobra.Command{
-		Use:               "remove <system>",
-		Short:             "Removes a context",
+		Use:               "remove <name>",
+		Short:             "Removes a context by name",
 		Aliases:           []string{"rm"},
 		Args:              commands.ValidationWrapper(cobra.ExactArgs(1)),
 		ValidArgsFunction: ContextGet,
@@ -49,7 +49,7 @@ func registerContextCmd(rootCmd *cobra.Command) {
 	}
 
 	contextUseCmd := &cobra.Command{
-		Use:               "use <system>",
+		Use:               "use <name>",
 		Short:             "Sets a context as the current context",
 		Args:              commands.ValidationWrapper(cobra.MaximumNArgs(1)),
 		ValidArgsFunction: ContextGet,
