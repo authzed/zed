@@ -626,7 +626,7 @@ Query the permissions in a permissions system
 ### Children commands
 
 - [zed permission bulk](#reference-zed-permission-bulk)	 - Check permissions in bulk exist for resource-permission-subject triplets
-- [zed permission check](#reference-zed-permission-check)	 - Check if a subject has permission to a resource
+- [zed permission check](#reference-zed-permission-check)	 - Check if a subject has permission on a resource
 - [zed permission expand](#reference-zed-permission-expand)	 - Expand the structure of a permission
 - [zed permission lookup-resources](#reference-zed-permission-lookup-resources)	 - Enumerates the resources of a given type for which a subject has permission
 - [zed permission lookup-subjects](#reference-zed-permission-lookup-subjects)	 - Enumerates the subjects of a given type for which the subject has permission on the resource
@@ -676,7 +676,7 @@ zed permission bulk <resource:id#permission@subject:id> <resource:id#permission@
 
 ## Reference: `zed permission check`
 
-Check if a subject has permission to a resource
+Check if a subject has permission on a resource
 
 ```
 zed permission check <resource:id> <permission> <subject:id> [flags]

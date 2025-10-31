@@ -84,7 +84,7 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 
 	checkCmd := &cobra.Command{
 		Use:               "check <resource:id> <permission> <subject:id>",
-		Short:             "Check if a subject has permission to a resource",
+		Short:             "Check if a subject has permission on a resource",
 		Args:              ValidationWrapper(cobra.ExactArgs(3)),
 		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectID),
 		RunE:              checkCmdFunc,
