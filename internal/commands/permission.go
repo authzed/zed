@@ -77,14 +77,14 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 
 	checkBulkCmd := &cobra.Command{
 		Use:   "bulk <resource:id#permission@subject:id> <resource:id#permission@subject:id> ...",
-		Short: "Check permissions in bulk exist for resource-subject pairs",
+		Short: "Check permissions in bulk exist for resource-permission-subject triplets",
 		Args:  ValidationWrapper(cobra.MinimumNArgs(1)),
 		RunE:  checkBulkCmdFunc,
 	}
 
 	checkCmd := &cobra.Command{
 		Use:               "check <resource:id> <permission> <subject:id>",
-		Short:             "Check that a permission exists for a subject",
+		Short:             "Check if a subject has permission on a resource",
 		Args:              ValidationWrapper(cobra.ExactArgs(3)),
 		ValidArgsFunction: GetArgs(ResourceID, Permission, SubjectID),
 		RunE:              checkCmdFunc,
@@ -100,7 +100,7 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 
 	lookupResourcesCmd := &cobra.Command{
 		Use:               "lookup-resources <type> <permission> <subject:id>",
-		Short:             "Enumerates the resources of a given type for which the subject has permission",
+		Short:             "Enumerates the resources of a given type for which a subject has permission",
 		Args:              ValidationWrapper(cobra.ExactArgs(3)),
 		ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
 		RunE:              lookupResourcesCmdFunc,
@@ -108,7 +108,7 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 
 	lookupCmd := &cobra.Command{
 		Use:               "lookup <type> <permission> <subject:id>",
-		Short:             "Enumerates the resources of a given type for which the subject has permission",
+		Short:             "Enumerates the resources of a given type for which a subject has permission",
 		Args:              ValidationWrapper(cobra.ExactArgs(3)),
 		ValidArgsFunction: GetArgs(ResourceType, Permission, SubjectID),
 		RunE:              lookupResourcesCmdFunc,

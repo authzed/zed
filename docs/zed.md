@@ -334,7 +334,7 @@ Manage configurations for connecting to SpiceDB deployments
 ### Children commands
 
 - [zed context list](#reference-zed-context-list)	 - Lists all available contexts
-- [zed context remove](#reference-zed-context-remove)	 - Removes a context
+- [zed context remove](#reference-zed-context-remove)	 - Removes a context by name
 - [zed context set](#reference-zed-context-set)	 - Creates or overwrite a context
 - [zed context use](#reference-zed-context-use)	 - Sets a context as the current context
 
@@ -376,10 +376,10 @@ zed context list [flags]
 
 ## Reference: `zed context remove`
 
-Removes a context
+Removes a context by name
 
 ```
-zed context remove <system>
+zed context remove <name>
 ```
 
 ### Options Inherited From Parent Flags
@@ -437,7 +437,7 @@ zed context set <name> <endpoint> <api-token>
 Sets a context as the current context
 
 ```
-zed context use <system>
+zed context use <name>
 ```
 
 ### Options Inherited From Parent Flags
@@ -536,7 +536,7 @@ zed import <url> [flags]
 ## Reference: `zed mcp`
 
 MCP (Model Context Protocol) server commands.
-	
+
 The MCP server provides tooling and resources for developing and debugging SpiceDB schema and relationships. The server runs an in-memory development instance of SpiceDB and does not connect to a running instance of SpiceDB.
 
 To use with Claude Code, run `zed mcp experimental-run` to start the SpiceDB Dev MCP server and then run `claude mcp add --transport http spicedb "http://localhost:9999/mcp"` to add the server to your Claude Code integrations.
@@ -625,16 +625,16 @@ Query the permissions in a permissions system
 
 ### Children commands
 
-- [zed permission bulk](#reference-zed-permission-bulk)	 - Check a permissions in bulk exists for a resource-subject pairs
-- [zed permission check](#reference-zed-permission-check)	 - Check that a permission exists for a subject
+- [zed permission bulk](#reference-zed-permission-bulk)	 - Check permissions in bulk exist for resource-permission-subject triplets
+- [zed permission check](#reference-zed-permission-check)	 - Check if a subject has permission on a resource
 - [zed permission expand](#reference-zed-permission-expand)	 - Expand the structure of a permission
-- [zed permission lookup-resources](#reference-zed-permission-lookup-resources)	 - Enumerates resources of a given type for which the subject has permission
+- [zed permission lookup-resources](#reference-zed-permission-lookup-resources)	 - Enumerates the resources of a given type for which a subject has permission
 - [zed permission lookup-subjects](#reference-zed-permission-lookup-subjects)	 - Enumerates the subjects of a given type for which the subject has permission on the resource
 
 
 ## Reference: `zed permission bulk`
 
-Check a permissions in bulk exists for a resource-subject pairs
+Check permissions in bulk exist for resource-permission-subject triplets
 
 ```
 zed permission bulk <resource:id#permission@subject:id> <resource:id#permission@subject:id> ... [flags]
@@ -676,7 +676,7 @@ zed permission bulk <resource:id#permission@subject:id> <resource:id#permission@
 
 ## Reference: `zed permission check`
 
-Check that a permission exists for a subject
+Check if a subject has permission on a resource
 
 ```
 zed permission check <resource:id> <permission> <subject:id> [flags]
@@ -759,7 +759,7 @@ zed permission expand <permission> <resource:id> [flags]
 
 ## Reference: `zed permission lookup-resources`
 
-Enumerates resources of a given type for which the subject has permission
+Enumerates the resources of a given type for which a subject has permission
 
 ```
 zed permission lookup-resources <type> <permission> <subject:id> [flags]
@@ -819,6 +819,52 @@ zed permission lookup-subjects <resource:id> <permission> <subject_type#optional
       --consistency-min-latency         evaluate at the zedtoken preferred by the database
       --json                            output as JSON
       --revision string                 optional revision at which to check
+```
+
+### Options Inherited From Parent Flags
+
+```
+      --certificate-path string     path to certificate authority used to verify secure connections
+      --endpoint string             spicedb gRPC API endpoint
+      --hostname-override string    override the hostname used in the connection to the endpoint
+      --insecure                    connect over a plaintext connection
+      --log-format string           format of logs ("auto", "console", "json") (default "auto")
+      --log-level string            verbosity of logging ("trace", "debug", "info", "warn", "error") (default "info")
+      --max-message-size int        maximum size *in bytes* (defaults to 4_194_304 bytes ~= 4MB) of a gRPC message that can be sent or received by zed
+      --max-retries uint            maximum number of sequential retries to attempt when a request fails (default 10)
+      --no-verify-ca                do not attempt to verify the server's certificate chain and host name
+      --permissions-system string   permissions system to query
+      --proxy string                specify a SOCKS5 proxy address
+      --request-id string           optional id to send along with SpiceDB requests for tracing
+      --skip-version-check          if true, no version check is performed against the server
+      --token string                token used to authenticate to SpiceDB
+```
+
+
+
+## Reference: `zed preview schema compile`
+
+Compile a schema that uses extended syntax into one that can be written to SpiceDB
+
+```
+zed preview schema compile <file> [flags]
+```
+
+### Examples
+
+```
+
+	Write to stdout:
+		zed preview schema compile root.zed
+	Write to an output file:
+		zed preview schema compile root.zed --out compiled.zed
+	
+```
+
+### Options
+
+```
+      --out string   output filepath; omitting writes to stdout
 ```
 
 ### Options Inherited From Parent Flags
@@ -920,6 +966,15 @@ Create a relationship for a subject
 zed relationship create <resource:id> <relation> <subject:id#optional_subject_relation> [flags]
 ```
 
+### Examples
+
+```
+
+  zed relationship create document:budget view user:anne --expiration-time "2025-12-31T23:59:59Z"
+  zed relationship create document:budget view user:anne --caveat ip_address:'{"ip": "192.168.0.1"}
+
+```
+
 ### Options
 
 ```
@@ -988,15 +1043,19 @@ zed relationship delete <resource:id> <relation> <subject:id#optional_subject_re
 
 ## Reference: `zed relationship read`
 
-Enumerates relationships matching the provided pattern.
-
-To filter returned relationships using a resource ID prefix, append a '%' to the resource ID:
-
-zed relationship read some-type:some-prefix-%
-
+Enumerates relationships matching the provided pattern
 
 ```
 zed relationship read <resource_type:optional_resource_id> <optional_relation> <optional_subject_type:optional_subject_id#optional_subject_relation> [flags]
+```
+
+### Examples
+
+```
+
+  # To filter returned relationships using a resource ID prefix, append a '%' to the resource ID.
+  zed relationship read document:finance-%
+
 ```
 
 ### Options
@@ -1040,6 +1099,15 @@ Idempotently updates a relationship for a subject
 zed relationship touch <resource:id> <relation> <subject:id#optional_subject_relation> [flags]
 ```
 
+### Examples
+
+```
+
+  zed relationship touch document:budget view user:anne --expiration-time "2025-12-31T23:59:59Z"
+  zed relationship touch document:budget view user:anne --caveat ip_address:'{"ip": "192.168.0.1"}
+
+```
+
 ### Options
 
 ```
@@ -1075,16 +1143,26 @@ zed relationship touch <resource:id> <relation> <subject:id#optional_subject_rel
 Watches the stream of relationship updates and schema updates from the server
 
 ```
-zed relationship watch [object_types, ...] [start_cursor] [flags]
+zed relationship watch [object_types, ...] [revision] [flags]
+```
+
+### Examples
+
+```
+
+zed relationship watch --filter document:finance
+zed relationship watch --filter document:finance#view
+zed relationship watch --filter document:finance#view@user:anne
+
 ```
 
 ### Options
 
 ```
-      --filter optional_resource_type:optional_resource_id_or_prefix#optional_relation@optional_subject_filter   optional filter(s) for the watch stream. Example: optional_resource_type:optional_resource_id_or_prefix#optional_relation@optional_subject_filter
-      --object_types strings                                                                                     optional object types to watch updates for
-      --revision string                                                                                          optional revision at which to start watching
-      --timestamp                                                                                                shows timestamp of incoming update events
+      --filter strings         optional filter(s) for the watch stream
+      --object_types strings   optional object types to watch updates for
+      --revision string        optional revision at which to start watching
+      --timestamp              shows timestamp of incoming update events
 ```
 
 ### Options Inherited From Parent Flags
@@ -1138,52 +1216,6 @@ Manage schema for a permissions system
 - [zed schema diff](#reference-zed-schema-diff)	 - Diff two schema files
 - [zed schema read](#reference-zed-schema-read)	 - Read the schema of a permissions system
 - [zed schema write](#reference-zed-schema-write)	 - Write a schema file (.zed or stdin) to the current permissions system
-
-
-## Reference: `zed schema compile`
-
-Compile a schema that uses extended syntax into one that can be written to SpiceDB
-
-```
-zed schema compile <file> [flags]
-```
-
-### Examples
-
-```
-
-	Write to stdout:
-		zed preview schema compile root.zed
-	Write to an output file:
-		zed preview schema compile root.zed --out compiled.zed
-	
-```
-
-### Options
-
-```
-      --out string   output filepath; omitting writes to stdout
-```
-
-### Options Inherited From Parent Flags
-
-```
-      --certificate-path string     path to certificate authority used to verify secure connections
-      --endpoint string             spicedb gRPC API endpoint
-      --hostname-override string    override the hostname used in the connection to the endpoint
-      --insecure                    connect over a plaintext connection
-      --log-format string           format of logs ("auto", "console", "json") (default "auto")
-      --log-level string            verbosity of logging ("trace", "debug", "info", "warn", "error") (default "info")
-      --max-message-size int        maximum size *in bytes* (defaults to 4_194_304 bytes ~= 4MB) of a gRPC message that can be sent or received by zed
-      --max-retries uint            maximum number of sequential retries to attempt when a request fails (default 10)
-      --no-verify-ca                do not attempt to verify the server's certificate chain and host name
-      --permissions-system string   permissions system to query
-      --proxy string                specify a SOCKS5 proxy address
-      --request-id string           optional id to send along with SpiceDB requests for tracing
-      --skip-version-check          if true, no version check is performed against the server
-      --token string                token used to authenticate to SpiceDB
-```
-
 
 
 ## Reference: `zed schema copy`

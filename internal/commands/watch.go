@@ -29,7 +29,7 @@ var (
 
 func RegisterWatchCmd(rootCmd *cobra.Command) *cobra.Command {
 	watchCmd := &cobra.Command{
-		Use:        "watch [object_types, ...] [start_cursor]",
+		Use:        "watch [object_types, ...] [revision]",
 		Short:      "Watches the stream of relationship updates and schema updates from the server",
 		Args:       ValidationWrapper(cobra.RangeArgs(0, 2)),
 		RunE:       watchCmdFunc,
@@ -45,17 +45,22 @@ func RegisterWatchCmd(rootCmd *cobra.Command) *cobra.Command {
 
 func RegisterWatchRelationshipCmd(parentCmd *cobra.Command) *cobra.Command {
 	watchRelationshipsCmd := &cobra.Command{
-		Use:   "watch [object_types, ...] [start_cursor]",
+		Use:   "watch [object_types, ...] [revision]",
 		Short: "Watches the stream of relationship updates and schema updates from the server",
 		Args:  ValidationWrapper(cobra.RangeArgs(0, 2)),
 		RunE:  watchCmdFunc,
+		Example: `
+zed relationship watch --filter document:finance
+zed relationship watch --filter document:finance#view
+zed relationship watch --filter document:finance#view@user:anne
+`,
 	}
 
 	parentCmd.AddCommand(watchRelationshipsCmd)
 	watchRelationshipsCmd.Flags().StringSliceVar(&watchObjectTypes, "object_types", nil, "optional object types to watch updates for")
 	watchRelationshipsCmd.Flags().StringVar(&watchRevision, "revision", "", "optional revision at which to start watching")
 	watchRelationshipsCmd.Flags().BoolVar(&watchTimestamps, "timestamp", false, "shows timestamp of incoming update events")
-	watchRelationshipsCmd.Flags().StringSliceVar(&watchRelationshipFilters, "filter", nil, "optional filter(s) for the watch stream. Example: `optional_resource_type:optional_resource_id_or_prefix#optional_relation@optional_subject_filter`")
+	watchRelationshipsCmd.Flags().StringSliceVar(&watchRelationshipFilters, "filter", nil, "optional filter(s) for the watch stream")
 	return watchRelationshipsCmd
 }
 
