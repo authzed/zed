@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ccoveille/go-safecast"
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
@@ -279,7 +279,7 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Permiss
 
 	// it was a successful transaction commit without duplicates
 	if resp != nil {
-		numLoaded, err := safecast.ToUint(resp.NumLoaded)
+		numLoaded, err := safecast.Convert[uint](resp.NumLoaded)
 		if err != nil {
 			return spiceerrors.MustBugf("could not cast numLoaded to uint")
 		}
@@ -289,7 +289,7 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Permiss
 		}
 	}
 
-	writtenAndSkipped, err := safecast.ToInt64(r.writtenRels + r.skippedRels)
+	writtenAndSkipped, err := safecast.Convert[int64](r.writtenRels + r.skippedRels)
 	if err != nil {
 		return fmt.Errorf("too many written and skipped rels for an int64")
 	}

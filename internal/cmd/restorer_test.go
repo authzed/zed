@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ccoveille/go-safecast"
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -220,7 +220,11 @@ func (m *mockClientForRestore) Send(req *v1.ImportBulkRelationshipsRequest) erro
 
 	for i, rel := range req.Relationships {
 		// This is a gosec115 false positive which should be fixed in a future version.
-		uinti, _ := safecast.ToUint(i)
+		uinti, err := safecast.Convert[uint](i)
+		if err != nil {
+			// just in case to avoid accessing out of bounds in the []string
+			uinti = 0
+		}
 		require.True(m.t, proto.Equal(rel, tuple.MustParseV1Rel(m.expectedRels[((m.receivedBatches-1)*m.requestedBatchSize)+uinti])))
 	}
 

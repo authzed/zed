@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ccoveille/go-safecast"
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/muesli/termenv"
@@ -283,9 +283,16 @@ func outputErrorWithSource(sb *strings.Builder, validateContents []byte, errWith
 
 func outputForLine(sb *strings.Builder, validateContents []byte, oneIndexedLineNumber uint64, sourceCodeString string, oneIndexedColumnPosition uint64) {
 	lines := strings.Split(string(validateContents), "\n")
-	// These should be fine to be zero if the cast fails.
-	intLineNumber, _ := safecast.ToInt(oneIndexedLineNumber)
-	intColumnPosition, _ := safecast.ToInt(oneIndexedColumnPosition)
+	intLineNumber, err := safecast.Convert[int](oneIndexedLineNumber)
+	if err != nil {
+		// It's fine to be zero if the cast fails.
+		intLineNumber = 0
+	}
+	intColumnPosition, err := safecast.Convert[int](oneIndexedColumnPosition)
+	if err != nil {
+		// It's fine to be zero if the cast fails.
+		intColumnPosition = 0
+	}
 	errorLineNumber := intLineNumber - 1
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {

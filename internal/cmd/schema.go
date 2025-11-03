@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ccoveille/go-safecast"
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
@@ -223,7 +223,7 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func schemaWriteCmdImpl(cmd *cobra.Command, args []string, client v1.SchemaServiceClient, terminalChecker termChecker) error {
-	stdInFd, err := safecast.ToInt(uint(os.Stdin.Fd()))
+	stdInFd, err := safecast.Convert[int](os.Stdin.Fd())
 	if err != nil {
 		return err
 	}
@@ -363,7 +363,7 @@ func determinePrefixForSchema(ctx context.Context, specifiedPrefix string, clien
 // Compiles an input schema written in the new composable schema syntax
 // and produces it as a fully-realized schema
 func schemaCompileCmdFunc(cmd *cobra.Command, args []string, termChecker termChecker) error {
-	stdOutFd, err := safecast.ToInt(uint(os.Stdout.Fd()))
+	stdOutFd, err := safecast.Convert[int](os.Stdout.Fd())
 	if err != nil {
 		return err
 	}
