@@ -45,9 +45,7 @@ jobs:
 
   development:
     name: "WASM Tests"
-    # TODO: figure out workaround for apparmor issue
-    # see #449
-    runs-on: "ubuntu-22.04"
+    runs-on: "depot-ubuntu-24.04-4"
     steps:
       - uses: "actions/checkout@v5"
       - uses: "authzed/actions/setup-go@main"
@@ -56,8 +54,33 @@ jobs:
           # go env gopath won't point at the right install location for the
           # wasm tool.
           go-version: "1.23.2"
-          cache: "false"  # do not cache to prevent cache poisoning
+      - name: "Disable AppArmor"
+        if:
+          "runner.os == 'Linux'"
+          # Disable AppArmor for Ubuntu 23.10+.
+          # https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md
+        run: "echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns"
       - name: "Install wasmbrowsertest"
         run: "go install github.com/agnivade/wasmbrowsertest@latest"
+      # cleanenv is a util provided by the wasmbrowsertest package that removes
+      # environment variables from the environment handed to wasmbrowsertest.
+      # this works around https://github.com/agnivade/wasmbrowsertest/issues/40,
+      # which we were experiencing on depot.
+      - name: "Install cleanenv"
+        run: "go install github.com/agnivade/wasmbrowsertest/cmd/cleanenv@latest"
       - name: "Run WASM Tests"
-        run: "GOOS=js GOARCH=wasm go test ./pkg/wasm/... -exec $(go env GOPATH)/bin/wasmbrowsertest"
+        # There's a whole bunch of vars in the environment that aren't needed for running this test, so we clear them out.
+        # NOTE: if you need to do this in the future, I recommend bashing into the container and running `env | sort | less`
+        run: |-
+          GOOS=js \
+          GOARCH=wasm \
+          cleanenv \
+          -remove-prefix GITHUB_ \
+          -remove-prefix ANDROID_ \
+          -remove-prefix JAVA_ \
+          -remove-prefix DOTNET_ \
+          -remove-prefix RUNNER_ \
+          -remove-prefix HOMEBREW_ \
+          -remove-prefix runner_ \
+          -- \
+          go test ./pkg/wasm/... -exec $(go env GOPATH)/bin/wasmbrowsertest
