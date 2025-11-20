@@ -40,7 +40,7 @@ func (rtc *realTermChecker) IsTerminal(fd int) bool {
 	return term.IsTerminal(fd)
 }
 
-func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) *cobra.Command {
+func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 	schemaWriteCmd := &cobra.Command{
 		Use:               "write <file?>",
 		Args:              commands.ValidationWrapper(cobra.MaximumNArgs(1)),
@@ -82,9 +82,9 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) *cobra.Command {
 		Short: "Compile a schema that uses extended syntax into one that can be written to SpiceDB",
 		Example: `
 	Write to stdout:
-		zed preview schema compile root.zed
+		zed schema compile root.zed
 	Write to an output file:
-		zed preview schema compile root.zed --out compiled.zed
+		zed schema compile root.zed --out compiled.zed
 	`,
 		ValidArgsFunction: commands.FileExtensionCompletions("zed"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -104,8 +104,6 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) *cobra.Command {
 
 	schemaCmd.AddCommand(schemaCompileCmd)
 	schemaCompileCmd.Flags().String("out", "", "output filepath; omitting writes to stdout")
-
-	return schemaCompileCmd
 }
 
 func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {
