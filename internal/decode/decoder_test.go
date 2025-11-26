@@ -161,6 +161,120 @@ schema:
 			outSchema:    "",
 			wantErr:      true,
 		},
+		{
+			name: "schema with relation named schema",
+			in: []byte(`definition parent {
+	relation owner: user
+
+	permission manage = owner
+}
+
+definition child {
+	relation schema: parent
+
+	permission access = schema->manage
+}
+
+definition user {}`),
+			isOnlySchema: true,
+			outSchema: `definition parent {
+	relation owner: user
+
+	permission manage = owner
+}
+
+definition child {
+	relation schema: parent
+
+	permission access = schema->manage
+}
+
+definition user {}`,
+			wantErr: false,
+		},
+		{
+			name: "schema with relation named something_schema",
+			in: []byte(`definition parent {
+	relation owner: user
+	permission manage = owner
+}
+
+definition child {
+	relation something_schema: parent
+	permission access = something_schema->manage
+}
+
+definition user {}`),
+			isOnlySchema: true,
+			outSchema: `definition parent {
+	relation owner: user
+	permission manage = owner
+}
+
+definition child {
+	relation something_schema: parent
+	permission access = something_schema->manage
+}
+
+definition user {}`,
+			wantErr: false,
+		},
+		{
+			name: "schema with relation named relationships",
+			in: []byte(`definition parent {
+	relation owner: user
+	permission manage = owner
+}
+
+definition child {
+	relation relationships: parent
+	permission access = relationships->manage
+}
+
+definition user {}`),
+			isOnlySchema: true,
+			outSchema: `definition parent {
+	relation owner: user
+	permission manage = owner
+}
+
+definition child {
+	relation relationships: parent
+	permission access = relationships->manage
+}
+
+definition user {}`,
+			wantErr: false,
+		},
+		{
+			name: "valid yaml with relation named schema inside",
+			in: []byte(`schema: |-
+  definition parent {
+    relation owner: user
+    permission manage = owner
+  }
+
+  definition child {
+    relation schema: parent
+    permission access = schema->manage
+  }
+
+  definition user {}
+`),
+			isOnlySchema: false,
+			outSchema: `definition parent {
+  relation owner: user
+  permission manage = owner
+}
+
+definition child {
+  relation schema: parent
+  permission access = schema->manage
+}
+
+definition user {}`,
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -171,6 +285,129 @@ schema:
 			if !tt.wantErr {
 				require.Equal(t, tt.outSchema, block.Schema.Schema)
 			}
+		})
+	}
+}
+
+func TestHasYAMLSchemaKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "yaml schema key at start of line",
+			input:    "schema:\n  definition user {}",
+			expected: true,
+		},
+		{
+			name:     "yaml schema key with space before colon",
+			input:    "schema :\n  definition user {}",
+			expected: true,
+		},
+		{
+			name:     "relation named schema in definition",
+			input:    "definition child {\n\trelation schema: parent\n}",
+			expected: false,
+		},
+		{
+			name:     "relation named something_schema in definition",
+			input:    "definition child {\n\trelation something_schema: parent\n}",
+			expected: false,
+		},
+		{
+			name:     "schema arrow expression",
+			input:    "definition child {\n\tpermission access = schema->manage\n}",
+			expected: false,
+		},
+		{
+			name:     "no schema at all",
+			input:    "definition user {}",
+			expected: false,
+		},
+		{
+			name:     "schema in single line comment should not trigger",
+			input:    "// schema: this is a comment\ndefinition user {}",
+			expected: false,
+		},
+		{
+			name:     "schema in block comment should not trigger",
+			input:    "/* schema: block comment */\ndefinition user {}",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := hasYAMLSchemaKey(tt.input)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestHasYAMLRelationshipsKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "yaml relationships key at start of line",
+			input:    "schema:\n  definition user {}\nrelationships:\n  user:1#member@user:2",
+			expected: true,
+		},
+		{
+			name:     "no relationships key",
+			input:    "schema:\n  definition user {}",
+			expected: false,
+		},
+		{
+			name:     "relationships in middle of line",
+			input:    "  relationships: user:1#member@user:2",
+			expected: false,
+		},
+		{
+			name:     "relation named relationships in definition",
+			input:    "definition child {\n\trelation relationships: parent\n}",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := hasYAMLRelationshipsKey(tt.input)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestHasYAMLSchemaFileKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "yaml schemaFile key at start of line",
+			input:    "schemaFile: ./schema.zed\nrelationships:\n  user:1#member@user:2",
+			expected: true,
+		},
+		{
+			name:     "no schemaFile key",
+			input:    "schema:\n  definition user {}",
+			expected: false,
+		},
+		{
+			name:     "relation named schemaFile in definition",
+			input:    "definition child {\n\trelation schemaFile: parent\n}",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := hasYAMLSchemaFileKey(tt.input)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }
