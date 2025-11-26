@@ -26,6 +26,16 @@ import (
 
 var playgroundPattern = regexp.MustCompile("^.*/s/.*/schema|relationships|assertions|expected.*$")
 
+// yamlKeyPatterns match YAML top-level keys that indicate a validation file format.
+// These patterns look for the key at the start of a line (column 0), followed by a colon.
+// This avoids false positives like "relation schema: parent" in a schema file being
+// mistaken for the "schema:" YAML key.
+var (
+	yamlSchemaKeyPattern        = regexp.MustCompile(`(?m)^schema\s*:`)
+	yamlSchemaFileKeyPattern    = regexp.MustCompile(`(?m)^schemaFile\s*:`)
+	yamlRelationshipsKeyPattern = regexp.MustCompile(`(?m)^relationships\s*:`)
+)
+
 // SchemaRelationships holds the schema (as a string) and a list of
 // relationships (as a string) in the format from the devtools download API.
 type SchemaRelationships struct {
@@ -110,7 +120,8 @@ func directHTTPDecoder(u *url.URL) Func {
 
 // Uses the files passed in the args and looks for the specified schemaFile to parse the YAML.
 func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, filename string) (bool, error) {
-	if strings.Contains(string(data), "schemaFile:") && !strings.Contains(string(data), "schema:") {
+	inputString := string(data)
+	if hasYAMLSchemaFileKey(inputString) && !hasYAMLSchemaKey(inputString) {
 		if err := yaml.Unmarshal(data, out); err != nil {
 			return false, err
 		}
@@ -147,15 +158,17 @@ func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, filename stri
 func unmarshalAsYAMLOrSchema(filename string, data []byte, out interface{}) (bool, error) {
 	inputString := string(data)
 
-	// Check for indications of a schema-only file.
-	if !strings.Contains(inputString, "schema:") && !strings.Contains(inputString, "relationships:") {
+	// Check for indications of a schema-only file by looking for YAML top-level keys.
+	// We use regex patterns to match keys at the start of a line to avoid false positives
+	// like "relation schema: parent" in a schema file being mistaken for the "schema:" YAML key.
+	if !hasYAMLSchemaKey(inputString) && !hasYAMLRelationshipsKey(inputString) {
 		if err := compileSchemaFromData(filename, inputString, out); err != nil {
 			return false, err
 		}
 		return true, nil
 	}
 
-	if !strings.Contains(inputString, "schema:") && !strings.Contains(inputString, "schemaFile:") {
+	if !hasYAMLSchemaKey(inputString) && !hasYAMLSchemaFileKey(inputString) {
 		// If there is no schema and no schemaFile and it doesn't compile then it must be yaml with missing fields
 		if err := compileSchemaFromData(filename, inputString, out); err != nil {
 			return false, errors.New("either schema or schemaFile must be present")
@@ -168,6 +181,21 @@ func unmarshalAsYAMLOrSchema(filename string, data []byte, out interface{}) (boo
 	}
 
 	return false, nil
+}
+
+// hasYAMLSchemaKey returns true if the input contains a "schema:" YAML key at the start of a line.
+func hasYAMLSchemaKey(input string) bool {
+	return yamlSchemaKeyPattern.MatchString(input)
+}
+
+// hasYAMLSchemaFileKey returns true if the input contains a "schemaFile:" YAML key at the start of a line.
+func hasYAMLSchemaFileKey(input string) bool {
+	return yamlSchemaFileKeyPattern.MatchString(input)
+}
+
+// hasYAMLRelationshipsKey returns true if the input contains a "relationships:" YAML key at the start of a line.
+func hasYAMLRelationshipsKey(input string) bool {
+	return yamlRelationshipsKeyPattern.MatchString(input)
 }
 
 // compileSchemaFromData attempts to compile using the old DSL and the new composable DSL,

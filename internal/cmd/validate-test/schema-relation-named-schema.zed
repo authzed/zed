@@ -1,0 +1,13 @@
+definition parent {
+	relation owner: user
+
+	permission manage = owner
+}
+
+definition child {
+	relation schema: parent
+
+	permission access = schema->manage
+}
+
+definition user {}
