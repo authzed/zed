@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
@@ -214,6 +215,43 @@ func isNoneOf(routes ...string) func(_ context.Context, c interceptors.CallMeta)
 	}
 }
 
+func extraHeadersUnaryInterceptor(headers map[string]string) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		if len(headers) > 0 {
+			md := metadata.New(headers)
+			ctx = metadata.NewOutgoingContext(ctx, md)
+		}
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+}
+
+func extraHeadersStreamInterceptor(headers map[string]string) grpc.StreamClientInterceptor {
+	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		if len(headers) > 0 {
+			md := metadata.New(headers)
+			ctx = metadata.NewOutgoingContext(ctx, md)
+		}
+		return streamer(ctx, desc, cc, method, opts...)
+	}
+}
+
+func parseExtraHeaders(headerStrings []string) (map[string]string, error) {
+	headers := make(map[string]string)
+	for _, headerStr := range headerStrings {
+		parts := strings.SplitN(headerStr, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid header format '%s': expected 'key=value'", headerStr)
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		if key == "" {
+			return nil, fmt.Errorf("invalid header format '%s': key cannot be empty", headerStr)
+		}
+		headers[key] = value
+	}
+	return headers, nil
+}
+
 // DialOptsFromFlags returns the dial options from the CLI-specified flags.
 func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOption, error) {
 	maxRetries := cobrautil.MustGetUint(cmd, "max-retries")
@@ -237,6 +275,17 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 		// retrying bulk export is also handled manually, because the default behavior is
 		// to start at the beginning of the stream, which produces duplicate values.
 		selector.StreamClientInterceptor(retry.StreamClientInterceptor(retryOpts...), selector.MatchFunc(isNoneOf(importBulkRoute, exportBulkRoute, watchRoute))),
+	}
+
+	// Parse and add extra headers if provided
+	extraHeaderStrings := cobrautil.MustGetStringSlice(cmd, "extra-header")
+	if len(extraHeaderStrings) > 0 {
+		headers, err := parseExtraHeaders(extraHeaderStrings)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse extra headers: %w", err)
+		}
+		unaryInterceptors = append(unaryInterceptors, extraHeadersUnaryInterceptor(headers))
+		streamInterceptors = append(streamInterceptors, extraHeadersStreamInterceptor(headers))
 	}
 
 	if !cobrautil.MustGetBool(cmd, "skip-version-check") {

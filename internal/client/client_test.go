@@ -180,6 +180,7 @@ func TestRetries(t *testing.T) {
 		zedtesting.StringFlag{FlagName: "proxy", FlagValue: "", Changed: true},
 		zedtesting.StringFlag{FlagName: "hostname-override", FlagValue: "", Changed: true},
 		zedtesting.IntFlag{FlagName: "max-message-size", FlagValue: 1000, Changed: true},
+		zedtesting.StringSliceFlag{FlagName: "extra-header", FlagValue: []string{}, Changed: false},
 	)
 	dialOpts, err := client.DialOptsFromFlags(cmd, storage.Token{Insecure: &secure})
 	require.NoError(t, err)
@@ -224,6 +225,7 @@ func TestDoesNotRetry(t *testing.T) {
 		zedtesting.StringFlag{FlagName: "proxy", FlagValue: "", Changed: true},
 		zedtesting.StringFlag{FlagName: "hostname-override", FlagValue: "", Changed: true},
 		zedtesting.IntFlag{FlagName: "max-message-size", FlagValue: 1000, Changed: true},
+		zedtesting.StringSliceFlag{FlagName: "extra-header", FlagValue: []string{}, Changed: false},
 	)
 	dialOpts, err := client.DialOptsFromFlags(cmd, storage.Token{Insecure: &secure})
 	require.NoError(t, err)

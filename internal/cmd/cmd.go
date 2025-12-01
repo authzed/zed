@@ -91,6 +91,7 @@ zed permission check --explain document:firstdoc writer user:emilia
 	rootCmd.PersistentFlags().Int("max-message-size", 0, "maximum size *in bytes* (defaults to 4_194_304 bytes ~= 4MB) of a gRPC message that can be sent or received by zed")
 	rootCmd.PersistentFlags().String("proxy", "", "specify a SOCKS5 proxy address")
 	rootCmd.PersistentFlags().Uint("max-retries", 10, "maximum number of sequential retries to attempt when a request fails")
+	rootCmd.PersistentFlags().StringSlice("extra-header", []string{}, "extra header(s) to add to gRPC requests in the format 'key=value' (can be specified multiple times)")
 	_ = rootCmd.PersistentFlags().MarkHidden("debug") // This cannot return its error.
 
 	versionCmd := &cobra.Command{
