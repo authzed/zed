@@ -42,7 +42,7 @@ func (m *mockCheckClient) CheckPermission(_ context.Context, _ *v1.CheckPermissi
 		protoText = "invalid"
 	}
 
-	err := spiceerrors.WithCodeAndDetailsAsError(fmt.Errorf("test"), codes.ResourceExhausted, &errdetails.ErrorInfo{
+	err := spiceerrors.WithCodeAndDetailsAsError(fmt.Errorf("test"), codes.FailedPrecondition, &errdetails.ErrorInfo{
 		Reason: v1.ErrorReason_name[int32(v1.ErrorReason_ERROR_REASON_MAXIMUM_DEPTH_EXCEEDED)],
 		Domain: "test",
 		Metadata: map[string]string{
