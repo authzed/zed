@@ -96,3 +96,11 @@ jobs:
           echo "IMAGE_VERSION=$IMAGE_VERSION" >> $GITHUB_ENV
       - name: "run trivy on release image"
         run: "docker run -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --format table --exit-code 1 --ignore-unfixed --vuln-type os,library --no-progress --severity CRITICAL,HIGH,MEDIUM authzed/zed:v${{ env.IMAGE_VERSION }}-amd64 --db-repository public.ecr.aws/aquasecurity/trivy-db --java-db-repository public.ecr.aws/aquasecurity/trivy-java-db"
+
+  conventional-commits:
+    name: "Lint Commit Messages"
+    runs-on: "depot-ubuntu-24.04-small"
+    if: "github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened' || github.event.action == 'edited')"
+    steps:
+      - uses: "actions/checkout@v5"
+      - uses: "webiny/action-conventional-commits@v1.3.0"
