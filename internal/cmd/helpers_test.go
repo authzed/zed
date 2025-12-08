@@ -61,7 +61,7 @@ func createTestBackup(t *testing.T, schema string, relationships []string) strin
 
 	for _, rel := range relationships {
 		r := tuple.MustParseV1Rel(rel)
-		require.NoError(t, avroWriter.Append(r))
+		require.NoError(t, avroWriter.Append(r, ""))
 	}
 
 	return f.Name()

@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/jzelinskie/cobrautil/v2"
-	"github.com/mattn/go-isatty"
 	"github.com/rodaine/table"
 	"github.com/rs/zerolog/log"
+	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/constraints"
 	"golang.org/x/exp/maps"
@@ -23,6 +23,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	corev1 "github.com/authzed/spicedb/pkg/proto/core/v1"
 	schemapkg "github.com/authzed/spicedb/pkg/schema"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
@@ -269,7 +270,30 @@ func hasRelPrefix(rel *v1.Relationship, prefix string) bool {
 		strings.HasPrefix(rel.Subject.Object.ObjectType, prefix)
 }
 
+// revisionForServerless determines the latest revision to use for the backup
+// because Serverless doesn't return a revision in the ReadSchema response.
+func revisionForServerless(ctx context.Context, spiceClient client.Client, schema *compiler.CompiledSchema) (*v1.ZedToken, error) {
+	stream, err := spiceClient.ReadRelationships(ctx, &v1.ReadRelationshipsRequest{
+		RelationshipFilter: &v1.RelationshipFilter{ResourceType: schema.ObjectDefinitions[0].Name},
+		OptionalLimit:      1,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for msg, err := stream.Recv(); !errors.Is(err, io.EOF); msg, err = stream.Recv() {
+		if err != nil {
+			return nil, err
+		}
+		log.Trace().Str("revision", msg.ReadAt.Token).Msg("determined serverless revision")
+		return msg.ReadAt, nil
+	}
+
+	panic("unreachable")
+}
+
 func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
+	ctx := cmd.Context()
 	prefixFilter := cobrautil.MustGetString(cmd, "prefix-filter")
 	pageLimit := cobrautil.MustGetUint32(cmd, "page-limit")
 
@@ -278,210 +302,81 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	backupFile, backupExists, err := createBackupFile(backupFileName, returnIfExists)
-	if err != nil {
-		return err
-	}
-
-	defer func(e *error) {
-		*e = errors.Join(*e, backupFile.Sync())
-		*e = errors.Join(*e, backupFile.Close())
-	}(&err)
-
-	// the goal of this file is to keep the bulk export cursor in case the process is terminated
-	// and we need to resume from where we left off. OCF does not support in-place record updates.
-	progressFile, cursor, err := openProgressFile(backupFileName, backupExists)
-	if err != nil {
-		return err
-	}
-
-	var backupCompleted bool
-	defer func(e *error) {
-		*e = errors.Join(*e, progressFile.Sync())
-		*e = errors.Join(*e, progressFile.Close())
-
-		if backupCompleted {
-			if err := os.Remove(progressFile.Name()); err != nil {
-				log.Warn().
-					Str("progress-file", progressFile.Name()).
-					Msg("failed to remove progress file, consider removing it manually")
-			}
-		}
-	}(&err)
-
 	spiceClient, err := client.NewClient(cmd)
 	if err != nil {
 		return fmt.Errorf("unable to initialize client: %w", err)
 	}
 
-	var zedToken *v1.ZedToken
-	var encoder *backupformat.Encoder
-	if backupExists {
-		encoder, err = backupformat.NewEncoderForExisting(backupFile)
-		if err != nil {
-			return fmt.Errorf("error creating backup file encoder: %w", err)
+					cursor = msg.AfterResultCursor.Token
+					cursorObj = def.Name
+					log.Trace().Str("cursor", cursor).Stringer("relationship", msg.Relationship).Msg("appending relationship")
+					if err := encoder.Append(msg.Relationship, cursor); err != nil {
+						return err
+					}
+				}
+			}
 		}
+		encoder.MarkComplete()
 	} else {
-		encoder, zedToken, err = encoderForNewBackup(cmd, spiceClient, backupFile)
+		fencoder, cursor, err := backupformat.NewOrExistingFileEncoder(backupFileName, schemaResp.SchemaText, schemaResp.ReadAt)
 		if err != nil {
 			return err
 		}
-	}
+		encoder := backupformat.WithProgress(prefixFilter, fencoder)
+		defer func(e *error) { *e = errors.Join(*e, encoder.Close()) }(&err)
 
-	defer func(e *error) { *e = errors.Join(*e, encoder.Close()) }(&err)
-
-	if zedToken == nil && cursor == nil {
-		return errors.New("malformed existing backup, consider recreating it")
-	}
-
-	req := &v1.ExportBulkRelationshipsRequest{
-		OptionalLimit:  pageLimit,
-		OptionalCursor: cursor,
-	}
-
-	// if a cursor is present, zedtoken is not needed (it is already in the cursor)
-	if zedToken != nil {
-		req.Consistency = &v1.Consistency{
-			Requirement: &v1.Consistency_AtExactSnapshot{
-				AtExactSnapshot: zedToken,
-			},
-		}
-	}
-
-	ctx := cmd.Context()
-
-	relationshipReadStart := time.Now()
-	tick := time.Tick(5 * time.Second)
-	progressBar := console.CreateProgressBar("processing backup")
-	var relsFilteredOut, relsProcessed uint64
-	defer func() {
-		_ = progressBar.Finish()
-
-		evt := log.Info().
-			Uint64("filtered", relsFilteredOut).
-			Uint64("processed", relsProcessed).
-			Uint64("throughput", perSec(relsProcessed, time.Since(relationshipReadStart))).
-			Stringer("elapsed", time.Since(relationshipReadStart).Round(time.Second))
-		switch {
-		case isCanceled(err):
-			evt.Msg("backup canceled - resume by restarting the backup command")
-		case err != nil:
-			evt.Msg("backup failed")
-		default:
-			evt.Msg("finished backup")
-		}
-	}()
-
-	err = takeBackup(ctx, spiceClient, req, func(response *v1.ExportBulkRelationshipsResponse) error {
-		for _, rel := range response.Relationships {
-			if hasRelPrefix(rel, prefixFilter) {
-				if err := encoder.Append(rel); err != nil {
-					return fmt.Errorf("error storing relationship: %w", err)
-				}
-			} else {
-				relsFilteredOut++
-			}
-
-			relsProcessed++
-			if err := progressBar.Add(1); err != nil {
-				return fmt.Errorf("error incrementing progress bar: %w", err)
-			}
-
-			// progress fallback in case there is no TTY
-			if !isatty.IsTerminal(os.Stderr.Fd()) {
-				select {
-				case <-tick:
-					log.Info().
-						Uint64("filtered", relsFilteredOut).
-						Uint64("processed", relsProcessed).
-						Uint64("throughput", perSec(relsProcessed, time.Since(relationshipReadStart))).
-						Stringer("elapsed", time.Since(relationshipReadStart).Round(time.Second)).
-						Msg("backup progress")
-				default:
-				}
+		req := &v1.ExportBulkRelationshipsRequest{OptionalLimit: pageLimit}
+		if cursor != "" {
+			req.OptionalCursor = &v1.Cursor{Token: cursor}
+		} else {
+			req.Consistency = &v1.Consistency{
+				Requirement: &v1.Consistency_AtExactSnapshot{
+					AtExactSnapshot: schemaResp.ReadAt,
+				},
 			}
 		}
 
-		if err := writeProgress(progressFile, response); err != nil {
+		stream, err := spiceClient.ExportBulkRelationships(ctx, req)
+		if err != nil {
 			return err
 		}
-		return nil
-	})
-	if err != nil {
-		return err
+
+		for msg, err := stream.Recv(); !errors.Is(err, io.EOF); msg, err = stream.Recv() {
+			switch {
+			case isCanceled(err) || isCanceled(ctx.Err()):
+				return context.Canceled
+			case isRetryableError(err):
+				newReq := req.CloneVT()
+				newReq.OptionalCursor = &v1.Cursor{Token: cursor}
+				stream, err = spiceClient.ExportBulkRelationships(ctx, newReq)
+				if err != nil {
+					return fmt.Errorf("failed to retry request")
+				}
+			case err != nil:
+				return err
+			case ctx.Err() != nil:
+				return fmt.Errorf("aborted backup: %w", err)
+			default:
+				cursor = msg.AfterResultCursor.Token
+				for _, r := range msg.Relationships {
+					if err := encoder.Append(r, cursor); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		encoder.MarkComplete()
 	}
 
-	backupCompleted = true
-	// NOTE: we return err here because there's cleanup being done
-	// in the `defer` blocks that will modify the `err` if cleanup
+	// NOTE: err is returned here because there's cleanup being done
+	// in the `defer` blocks that will modify the `err` if the cleanup
 	// fails
 	return err
 }
 
-func takeBackup(ctx context.Context, spiceClient client.Client, req *v1.ExportBulkRelationshipsRequest, processResponse func(*v1.ExportBulkRelationshipsResponse) error) error {
-	relationshipStream, err := spiceClient.ExportBulkRelationships(ctx, req)
-	if err != nil {
-		return fmt.Errorf("error exporting relationships: %w", err)
-	}
-	var lastResponse *v1.ExportBulkRelationshipsResponse
-	for {
-		if err := ctx.Err(); err != nil {
-			if isCanceled(err) {
-				return context.Canceled
-			}
-
-			return fmt.Errorf("aborted backup: %w", err)
-		}
-
-		relsResp, err := relationshipStream.Recv()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-
-			if isCanceled(err) {
-				return context.Canceled
-			}
-
-			if isRetryableError(err) {
-				// If the error is retryable, we overwrite the existing stream with a new
-				// stream based on a new request that starts at the cursor location of the
-				// last received response.
-
-				// Clone the request to ensure that we are keeping all other fields the same
-				newReq := req.CloneVT()
-				cursorToken := "undefined"
-				if lastResponse != nil && lastResponse.AfterResultCursor != nil {
-					newReq.OptionalCursor = lastResponse.AfterResultCursor
-					cursorToken = lastResponse.AfterResultCursor.Token
-				}
-
-				relationshipStream, err = spiceClient.ExportBulkRelationships(ctx, newReq)
-				log.Info().Err(err).Str("cursor-token", cursorToken).Msg("encountered retryable error, resuming after last known cursor")
-				// Bounce to the top of the loop
-				continue
-			}
-
-			return fmt.Errorf("error receiving relationships: %w", err)
-		}
-
-		// Get a reference to the last response in case we need to retry
-		// starting at its cursor
-		lastResponse = relsResp
-
-		// Process the response using the provided function
-		err = processResponse(relsResp)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // encoderForNewBackup creates a new encoder for a new zed backup file. It returns the ZedToken at which the backup
 // must be taken.
-func encoderForNewBackup(cmd *cobra.Command, c client.Client, backupFile *os.File) (*backupformat.Encoder, *v1.ZedToken, error) {
+func encoderForNewBackup(cmd *cobra.Command, c client.Client, backupFile *os.File) (*backupformat.OcfEncoder, *v1.ZedToken, error) {
 	prefixFilter := cobrautil.MustGetString(cmd, "prefix-filter")
 
 	schemaResp, err := c.ReadSchema(cmd.Context(), &v1.ReadSchemaRequest{})
@@ -516,68 +411,6 @@ func encoderForNewBackup(cmd *cobra.Command, c client.Client, backupFile *os.Fil
 	}
 
 	return encoder, zedToken, nil
-}
-
-func writeProgress(progressFile *os.File, relsResp *v1.ExportBulkRelationshipsResponse) error {
-	err := progressFile.Truncate(0)
-	if err != nil {
-		return fmt.Errorf("unable to truncate backup progress file: %w", err)
-	}
-
-	_, err = progressFile.Seek(0, 0)
-	if err != nil {
-		return fmt.Errorf("unable to seek backup progress file: %w", err)
-	}
-
-	_, err = progressFile.WriteString(relsResp.AfterResultCursor.Token)
-	if err != nil {
-		return fmt.Errorf("unable to write result cursor to backup progress file: %w", err)
-	}
-
-	return nil
-}
-
-// openProgressFile returns the progress marker file and the stored progress cursor if it exists, or creates
-// a new one if it does not exist. If the backup file exists, but the progress marker does not, it will return an error.
-//
-// The progress marker file keeps track of the last successful cursor received from the server, and is used to resume
-// backups in case of failure.
-func openProgressFile(backupFileName string, backupAlreadyExisted bool) (*os.File, *v1.Cursor, error) {
-	var cursor *v1.Cursor
-	progressFileName := toLockFileName(backupFileName)
-	var progressFile *os.File
-	// if a backup existed
-	var fileMode int
-	readCursor, err := os.ReadFile(progressFileName)
-	if backupAlreadyExisted {
-		if os.IsNotExist(err) || len(readCursor) == 0 {
-			return nil, nil, fmt.Errorf("backup file %s already exists", backupFileName)
-		}
-		if err == nil {
-			cursor = &v1.Cursor{
-				Token: string(readCursor),
-			}
-
-			// if backup existed and there is a progress marker, the latter should not be truncated to make sure the
-			// cursor stays around in case of a failure before we even start ingesting from bulk export
-			fileMode = os.O_WRONLY | os.O_CREATE
-			log.Info().Str("filename", backupFileName).Msg("backup file already exists, will resume")
-		}
-	} else {
-		// if a backup did not exist, make sure to truncate the progress file
-		fileMode = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	}
-
-	progressFile, err = os.OpenFile(progressFileName, fileMode, 0o644)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return progressFile, cursor, nil
-}
-
-func toLockFileName(backupFileName string) string {
-	return backupFileName + ".lock"
 }
 
 // computeBackupFileName computes the backup file name based.
