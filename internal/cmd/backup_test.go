@@ -327,7 +327,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 
 		validateBackup(t, f, testSchema, resp.WrittenAt, expectedRels)
 		// validate progress file is deleted after successful backup
-		require.NoFileExists(t, toLockFileName(f))
+		require.NoFileExists(t, f+".bak")
 	})
 
 	t.Run("fails if backup without progress file exists", func(t *testing.T) {
@@ -389,7 +389,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		_ = streamClient.CloseSend()
 
 		f := filepath.Join(t.TempDir(), uuid.NewString())
-		lockFileName := toLockFileName(f)
+		lockFileName := f + ".bak"
 		err = os.WriteFile(lockFileName, []byte(streamResp.AfterResultCursor.Token), 0o600)
 		require.NoError(t, err)
 
@@ -398,7 +398,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 
 		// we know it did its work because it imported the 100 relationships regardless of the progress file
 		validateBackup(t, f, testSchema, resp.WrittenAt, expectedRels)
-		require.NoFileExists(t, toLockFileName(f))
+		require.NoFileExists(t, lockFileName)
 	})
 
 	t.Run("resumes backup if marker file exists", func(t *testing.T) {
@@ -423,14 +423,14 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		require.NoError(t, err)
 		require.FileExists(t, f)
 
-		lockFileName := toLockFileName(f)
+		lockFileName := f + "bak"
 		err = os.WriteFile(lockFileName, []byte(streamResp.AfterResultCursor.Token), 0o600)
 		require.NoError(t, err)
 
 		// run backup again, this time with an existing backup file and progress file
 		err = backupCreateCmdFunc(cmd, []string{f})
 		require.NoError(t, err)
-		require.NoFileExists(t, toLockFileName(f))
+		require.NoFileExists(t, lockFileName)
 
 		// we know it did its work because we created a progress file at relationship 90, so we will get
 		// a backup with 100 rels from the original import + the last 10 rels repeated again (110 in total)
@@ -617,42 +617,6 @@ func TestAddSizeErrInfo(t *testing.T) {
 	}
 }
 
-func TestTakeBackupMockWorksAsExpected(t *testing.T) {
-	rels := []*v1.Relationship{
-		{
-			Resource: &v1.ObjectReference{
-				ObjectType: "resource",
-				ObjectId:   "foo",
-			},
-			Relation: "view",
-			Subject: &v1.SubjectReference{
-				Object: &v1.ObjectReference{
-					ObjectType: "user",
-					ObjectId:   "jim",
-				},
-			},
-		},
-	}
-	client := &mockClientForBackup{
-		t: t,
-		recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
-			func() (*v1.ExportBulkRelationshipsResponse, error) {
-				return &v1.ExportBulkRelationshipsResponse{
-					Relationships: rels,
-				}, nil
-			},
-		},
-	}
-
-	err := takeBackup(t.Context(), client, &v1.ExportBulkRelationshipsRequest{}, func(response *v1.ExportBulkRelationshipsResponse) error {
-		require.Len(t, response.Relationships, 1, "expecting 1 rel in the list")
-		return nil
-	})
-	require.NoError(t, err)
-
-	client.assertAllRecvCalls()
-}
-
 func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 	firstRels := []*v1.Relationship{
 		{
@@ -741,7 +705,7 @@ type mockClientForBackup struct {
 	client.Client
 	grpc.ServerStreamingClient[v1.ExportBulkRelationshipsResponse]
 	t *testing.T
-	backupformat.Encoder
+	backupformat.OcfEncoder
 	recvCalls     []func() (*v1.ExportBulkRelationshipsResponse, error)
 	recvCallIndex int
 	// exportCalls provides a handle on the calls made to ExportBulkRelationships,

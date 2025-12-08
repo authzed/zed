@@ -91,7 +91,7 @@ func NewRedactor(dec *Decoder, w io.Writer, opts RedactionOptions) (*Redactor, e
 type Redactor struct {
 	dec          *Decoder
 	opts         RedactionOptions
-	enc          *Encoder
+	enc          Encoder
 	redactionMap RedactionMap
 }
 
@@ -114,7 +114,7 @@ func (r *Redactor) Next() error {
 	}
 
 	// Write the redacted record.
-	return r.enc.Append(redactedRel)
+	return r.enc.Append(redactedRel, "")
 }
 
 // RedactionMap returns the redaction map containing the original names and their redacted names.
@@ -123,8 +123,10 @@ func (r *Redactor) RedactionMap() RedactionMap {
 }
 
 func (r *Redactor) Close() error {
-	if err := r.enc.Close(); err != nil {
-		return err
+	if closer, ok := r.enc.(io.Closer); ok {
+		if err := closer.Close(); err != nil {
+			return err
+		}
 	}
 
 	return r.dec.Close()
