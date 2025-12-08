@@ -112,7 +112,7 @@ func TestWriteAndRead(t *testing.T) {
 			require.NoError(err)
 
 			for _, rel := range expectedRels {
-				require.NoError(enc.Append(rel))
+				require.NoError(enc.Append(rel, ""))
 			}
 			require.NoError(enc.Close())
 			require.NotEmpty(buf.Bytes())

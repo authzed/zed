@@ -348,7 +348,7 @@ func TestRedactBackup(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, rel := range exampleRelationships {
-		require.NoError(t, enc.Append(rel))
+		require.NoError(t, enc.Append(rel, ""))
 	}
 	require.NoError(t, enc.Close())
 	require.NotEmpty(t, buf.Bytes())
