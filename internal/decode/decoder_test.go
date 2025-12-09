@@ -193,6 +193,37 @@ definition user {}`,
 			wantErr: false,
 		},
 		{
+			name: "schema with permission named schema",
+			in: []byte(`definition parent {
+	relation owner: user
+
+	permission manage = owner
+}
+
+definition child {
+	relation parent: parent
+
+	permission schema = parent->manage
+}
+
+definition user {}`),
+			isOnlySchema: true,
+			outSchema: `definition parent {
+	relation owner: user
+
+	permission manage = owner
+}
+
+definition child {
+	relation parent: parent
+
+	permission schema = parent->manage
+}
+
+definition user {}`,
+			wantErr: false,
+		},
+		{
 			name: "schema with relation named something_schema",
 			in: []byte(`definition parent {
 	relation owner: user
