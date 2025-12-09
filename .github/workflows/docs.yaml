@@ -7,7 +7,7 @@ on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
 env:
   DOCS_REPO: "authzed/docs"
-  TARGET_DOCS_FILE: "pages/spicedb/getting-started/installing-zed.mdx"
+  TARGET_DOCS_FILE: "app/spicedb/getting-started/installing-zed/page.mdx"
   CHANGES_DETECTED: false
 
 permissions:
