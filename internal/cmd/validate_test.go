@@ -132,6 +132,12 @@ total files: 2, successfully validated files: 2
 			},
 			expectStr: "Success! - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
 		},
+		`schema_with_relation_named_schema_passes`: {
+			files: []string{
+				filepath.Join("validate-test", "schema-relation-named-schema.zed"),
+			},
+			expectStr: "Success! - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
+		},
 		`invalid_schema_fails`: {
 			files: []string{
 				filepath.Join("validate-test", "invalid-schema.zed"),
