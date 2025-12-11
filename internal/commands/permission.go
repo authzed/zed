@@ -504,6 +504,9 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 			default:
 				count++
 				totalCount++
+				if pageLimit > 0 && totalCount > uint(pageLimit) {
+					break stream
+				}
 				if cobrautil.MustGetBool(cmd, "json") {
 					prettyProto, err := PrettyProto(resp)
 					if err != nil {
