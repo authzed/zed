@@ -314,7 +314,10 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("error reading schema: %w", err)
 	}
 
-	if serverless := schemaResp.ReadAt == nil; serverless {
+	// Determine if the server supports modern APIs for backups and if not,
+	// fallback to using ReadSchema and ReadRelationships.
+	// This codepath can be removed when AuthZed Serverless is fully sunset.
+	if bulkOpsUnsupported := schemaResp.ReadAt == nil; bulkOpsUnsupported {
 		compiledSchema, err := compiler.Compile(
 			compiler.InputSchema{Source: "schema", SchemaString: schemaResp.SchemaText},
 			compiler.AllowUnprefixedObjectType(),

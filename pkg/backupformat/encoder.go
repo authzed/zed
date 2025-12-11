@@ -61,8 +61,15 @@ func NewEncoder(w io.Writer, schema string, token *v1.ZedToken) (*OcfEncoder, er
 	return &OcfEncoder{enc}, nil
 }
 
+// Encoder represents the operations required to iteratively encode a backup
+// of SpiceDB relationship data.
 type Encoder interface {
+	// Append encodes an additional Relationship using the provided cursor to
+	// keep track of progress.
 	Append(r *v1.Relationship, cursor string) error
+
+	// MarkComplete signals that the final relationship has been written and
+	// that the process is complete.
 	MarkComplete()
 }
 
@@ -72,6 +79,7 @@ var (
 	_ Encoder = (*ProgressRenderingEncoder)(nil)
 )
 
+// OcfEncoder implements `Encoder` by formatting data in the AVRO OCF format.
 type OcfEncoder struct {
 	enc *ocf.Encoder
 }
@@ -114,6 +122,9 @@ func (e *OcfEncoder) Close() error {
 	return nil
 }
 
+// OcfFileEncoder implements `Encoder` by formatting data in the AVRO OCF
+// format, while also persisting it to a file and maintaining a lockfile that
+// tracks the progress so that it can be resumed if stopped.
 type OcfFileEncoder struct {
 	file      *os.File
 	lockFile  *os.File
@@ -253,6 +264,8 @@ func (fe *OcfFileEncoder) MarshalZerologObject(e *zerolog.Event) {
 		Str("lockFile", fe.lockFile.Name())
 }
 
+// ProgressRenderingEncoder implements `Encoder` by wrapping an existing Encoder
+// and displaying its progress to the current tty.
 type ProgressRenderingEncoder struct {
 	prefix          string
 	relsProcessed   uint64
