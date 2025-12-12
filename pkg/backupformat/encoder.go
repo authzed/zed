@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+
 	"github.com/authzed/zed/internal/console"
 )
 
