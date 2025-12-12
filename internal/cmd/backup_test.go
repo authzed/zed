@@ -389,7 +389,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		_ = streamClient.CloseSend()
 
 		f := filepath.Join(t.TempDir(), uuid.NewString())
-		lockFileName := f + ".bak"
+		lockFileName := f + ".lock"
 		err = os.WriteFile(lockFileName, []byte(streamResp.AfterResultCursor.Token), 0o600)
 		require.NoError(t, err)
 
@@ -423,7 +423,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		require.NoError(t, err)
 		require.FileExists(t, f)
 
-		lockFileName := f + "bak"
+		lockFileName := f + ".lock"
 		err = os.WriteFile(lockFileName, []byte(streamResp.AfterResultCursor.Token), 0o600)
 		require.NoError(t, err)
 
@@ -434,7 +434,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 
 		// we know it did its work because we created a progress file at relationship 90, so we will get
 		// a backup with 100 rels from the original import + the last 10 rels repeated again (110 in total)
-		validationFunc := func(t *testing.T, expected, received []string) {
+		validateBackupWithFunc(t, f, testSchema, resp.WrittenAt, expectedRels, func(t testing.TB, expected, received []string) {
 			require.Len(t, received, 110)
 			receivedSet := mapz.NewSet(received...)
 			expectedSet := mapz.NewSet(expected...)
@@ -445,8 +445,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 			for i, s := range received[100:] {
 				require.Equal(t, fmt.Sprintf(testRel, i+90), s)
 			}
-		}
-		validateBackupWithFunc(t, f, testSchema, resp.WrittenAt, expectedRels, validationFunc)
+		})
 	})
 }
 
@@ -472,18 +471,16 @@ func (tss testSecretStore) Get() (storage.Secrets, error) {
 	return storage.Secrets{Tokens: []storage.Token{tss.token}}, nil
 }
 
-func validateBackup(t *testing.T, backupFileName string, schema string, token *v1.ZedToken, expected []string) {
+func validateBackup(t testing.TB, backupFileName string, schema string, token *v1.ZedToken, expected []string) {
 	t.Helper()
 
-	f := func(t *testing.T, expected, received []string) {
+	validateBackupWithFunc(t, backupFileName, schema, token, expected, func(t testing.TB, expected, received []string) {
 		require.ElementsMatch(t, expected, received)
-	}
-
-	validateBackupWithFunc(t, backupFileName, schema, token, expected, f)
+	})
 }
 
-func validateBackupWithFunc(t *testing.T, backupFileName string, schema string, token *v1.ZedToken, expected []string,
-	validateRels func(t *testing.T, expected, received []string),
+func validateBackupWithFunc(t testing.TB, backupFileName, schema string, token *v1.ZedToken, expected []string,
+	validateRels func(t testing.TB, expected, received []string),
 ) {
 	t.Helper()
 
@@ -618,41 +615,30 @@ func TestAddSizeErrInfo(t *testing.T) {
 }
 
 func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
-	firstRels := []*v1.Relationship{
-		{
-			Resource: &v1.ObjectReference{
-				ObjectType: "resource",
-				ObjectId:   "foo",
-			},
-			Relation: "view",
-			Subject: &v1.SubjectReference{
-				Object: &v1.ObjectReference{
-					ObjectType: "user",
-					ObjectId:   "jim",
-				},
-			},
+	firstRels := []*v1.Relationship{{
+		Resource: &v1.ObjectReference{ObjectType: "resource", ObjectId: "foo"},
+		Relation: "view",
+		Subject: &v1.SubjectReference{
+			Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "jim"},
 		},
-	}
-	cursor := &v1.Cursor{
-		Token: "a token",
-	}
-	secondRels := []*v1.Relationship{
-		{
-			Resource: &v1.ObjectReference{
-				ObjectType: "resource",
-				ObjectId:   "bar",
-			},
-			Relation: "view",
-			Subject: &v1.SubjectReference{
-				Object: &v1.ObjectReference{
-					ObjectType: "user",
-					ObjectId:   "jim",
-				},
-			},
+	}}
+	cursor := &v1.Cursor{Token: "a token"}
+	secondRels := []*v1.Relationship{{
+		Resource: &v1.ObjectReference{ObjectType: "resource", ObjectId: "bar"},
+		Relation: "view",
+		Subject: &v1.SubjectReference{
+			Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "jim"},
 		},
-	}
+	}}
 	client := &mockClientForBackup{
 		t: t,
+		schemaCalls: []func() (*v1.ReadSchemaResponse, error){
+			func() (*v1.ReadSchemaResponse, error) {
+				return &v1.ReadSchemaResponse{
+					ReadAt: &v1.ZedToken{Token: "init"},
+				}, nil
+			},
+		},
 		recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
 			func() (*v1.ExportBulkRelationshipsResponse, error) {
 				return &v1.ExportBulkRelationshipsResponse{
@@ -686,17 +672,15 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 		},
 	}
 
-	actualRels := make([]*v1.Relationship, 0)
+	encoder := &backupformat.MockEncoder{}
 
-	err := takeBackup(t.Context(), client, &v1.ExportBulkRelationshipsRequest{}, func(response *v1.ExportBulkRelationshipsResponse) error {
-		actualRels = append(actualRels, response.Relationships...)
-		return nil
-	})
+	err := takeBackup(t.Context(), client, encoder, "ignored", "", 0)
 	require.NoError(t, err)
 
-	require.Len(t, actualRels, 2, "expecting two rels in the realized list")
-	require.Equal(t, "foo", actualRels[0].Resource.ObjectId)
-	require.Equal(t, "bar", actualRels[1].Resource.ObjectId)
+	require.True(t, encoder.Complete, "expecting encoder to be marked complete")
+	require.Len(t, encoder.Relationships, 2, "expecting two rels in the realized list")
+	require.Equal(t, encoder.Relationships[0].Resource.ObjectId, "foo")
+	require.Equal(t, encoder.Relationships[1].Resource.ObjectId, "bar")
 
 	client.assertAllRecvCalls()
 }
@@ -706,8 +690,10 @@ type mockClientForBackup struct {
 	grpc.ServerStreamingClient[v1.ExportBulkRelationshipsResponse]
 	t *testing.T
 	backupformat.OcfEncoder
-	recvCalls     []func() (*v1.ExportBulkRelationshipsResponse, error)
-	recvCallIndex int
+	schemaCalls      []func() (*v1.ReadSchemaResponse, error)
+	schemaCallsIndex int
+	recvCalls        []func() (*v1.ExportBulkRelationshipsResponse, error)
+	recvCallIndex    int
 	// exportCalls provides a handle on the calls made to ExportBulkRelationships,
 	// allowing for assertions to be made against those calls.
 	exportCalls      []func(t *testing.T, req *v1.ExportBulkRelationshipsRequest)
@@ -724,12 +710,26 @@ func (m *mockClientForBackup) Recv() (*v1.ExportBulkRelationshipsResponse, error
 	return recvCall()
 }
 
+func (m *mockClientForBackup) ReadSchema(ctx context.Context, req *v1.ReadSchemaRequest, opts ...grpc.CallOption) (*v1.ReadSchemaResponse, error) {
+	if m.schemaCalls == nil {
+		// If the caller doesn't supply any calls, pass through
+		return m.ReadSchema(ctx, req, opts...)
+	} else if m.schemaCallsIndex == len(m.schemaCalls) {
+		// If invoked too many times, fail the test
+		m.t.FailNow()
+		return nil, nil
+	}
+
+	schemaCall := m.schemaCalls[m.schemaCallsIndex]
+	m.schemaCallsIndex++
+	return schemaCall()
+}
+
 func (m *mockClientForBackup) ExportBulkRelationships(_ context.Context, req *v1.ExportBulkRelationshipsRequest, _ ...grpc.CallOption) (grpc.ServerStreamingClient[v1.ExportBulkRelationshipsResponse], error) {
 	if m.exportCalls == nil {
 		// If the caller doesn't supply exportCalls, pass through
 		return m, nil
-	}
-	if m.exportCallsIndex == len(m.exportCalls) {
+	} else if m.exportCallsIndex == len(m.exportCalls) {
 		// If invoked too many times, fail the test
 		m.t.FailNow()
 		return m, nil

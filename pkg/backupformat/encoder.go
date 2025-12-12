@@ -1,6 +1,7 @@
 package backupformat
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/hamba/avro/v2/ocf"
 	"github.com/mattn/go-isatty"
+	"github.com/natefinch/atomic"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/schollz/progressbar/v3"
@@ -74,10 +76,25 @@ type Encoder interface {
 }
 
 var (
+	_ Encoder = (*MockEncoder)(nil)
 	_ Encoder = (*OcfEncoder)(nil)
 	_ Encoder = (*OcfFileEncoder)(nil)
 	_ Encoder = (*ProgressRenderingEncoder)(nil)
 )
+
+type MockEncoder struct {
+	Relationships []*v1.Relationship
+	Cursors       []string
+	Complete      bool
+}
+
+func (m *MockEncoder) Append(r *v1.Relationship, cursor string) error {
+	m.Relationships = append(m.Relationships, r)
+	m.Cursors = append(m.Cursors, cursor)
+	return nil
+}
+
+func (m *MockEncoder) MarkComplete() { m.Complete = true }
 
 // OcfEncoder implements `Encoder` by formatting data in the AVRO OCF format.
 type OcfEncoder struct {
@@ -126,10 +143,14 @@ func (e *OcfEncoder) Close() error {
 // format, while also persisting it to a file and maintaining a lockfile that
 // tracks the progress so that it can be resumed if stopped.
 type OcfFileEncoder struct {
-	file      *os.File
-	lockFile  *os.File
-	completed bool
+	file             *os.File
+	lastSyncedCursor string
+	completed        bool
 	*OcfEncoder
+}
+
+func (fe *OcfFileEncoder) lockFileName() string {
+	return fe.file.Name() + ".lock"
 }
 
 func NewOrExistingFileEncoder(filename, schema string, revision *v1.ZedToken) (e *OcfFileEncoder, cursor string, err error) {
@@ -141,13 +162,18 @@ func NewOrExistingFileEncoder(filename, schema string, revision *v1.ZedToken) (e
 }
 
 func NewExistingFileEncoder(filename string) (e *OcfFileEncoder, cursor string, err error) {
-	if _, err := os.Stat(filename); filename == "-" && err != nil {
-		return nil, "", fmt.Errorf("unable to open existing backup file: %w", err)
-	}
+	var f *os.File
+	if filename == "" {
+		f = os.Stdout
+	} else {
+		if _, err := os.Stat(filename); err != nil {
+			return nil, "", fmt.Errorf("unable to open existing backup file: %w", err)
+		}
 
-	f, err := os.OpenFile(filename, os.O_RDWR|os.O_APPEND, 0o644)
-	if err != nil {
-		return nil, "", fmt.Errorf("unable to open existing backup file: %w", err)
+		f, err = os.OpenFile(filename, os.O_RDWR|os.O_APPEND, 0o644)
+		if err != nil {
+			return nil, "", fmt.Errorf("unable to open existing backup file: %w", err)
+		}
 	}
 
 	encoder, err := NewEncoderForExisting(f)
@@ -155,32 +181,20 @@ func NewExistingFileEncoder(filename string) (e *OcfFileEncoder, cursor string, 
 		return nil, "", err
 	}
 
-	lockFileName := filename + ".lock"
-	cursorBytes, err := os.ReadFile(lockFileName)
+	fileEncoder := &OcfFileEncoder{file: f, OcfEncoder: encoder}
+	cursorBytes, err := os.ReadFile(fileEncoder.lockFileName())
 	if os.IsNotExist(err) {
 		return nil, "", fmt.Errorf("completed backup file %s already exists", filename)
 	} else if err != nil {
 		return nil, "", err
 	}
 
-	// If backup existed and there is a progress marker, the latter should not
-	// be truncated to make sure the cursor stays around in case of a failure
-	// before we even start ingesting from bulk export.
-	lf, err := os.OpenFile(lockFileName, os.O_WRONLY|os.O_CREATE, 0o644)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to open lockfile: %w", err)
-	}
-
-	return &OcfFileEncoder{
-		file:       f,
-		lockFile:   lf,
-		OcfEncoder: encoder,
-	}, string(cursorBytes), nil
+	return fileEncoder, string(cursorBytes), nil
 }
 
 func NewFileEncoder(filename, schema string, revision *v1.ZedToken) (*OcfFileEncoder, error) {
 	if filename == "-" {
-		return encoderForFile(os.Stdout, nil, schema, revision)
+		return encoderForFile(os.Stdout, schema, revision)
 	}
 
 	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o644)
@@ -188,15 +202,10 @@ func NewFileEncoder(filename, schema string, revision *v1.ZedToken) (*OcfFileEnc
 		return nil, fmt.Errorf("unable to create backup file: %w", err)
 	}
 
-	lf, err := os.OpenFile(filename+".lock", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create lock file: %w", err)
-	}
-
-	return encoderForFile(f, lf, schema, revision)
+	return encoderForFile(f, schema, revision)
 }
 
-func encoderForFile(file, lockFile *os.File, schema string, revision *v1.ZedToken) (*OcfFileEncoder, error) {
+func encoderForFile(file *os.File, schema string, revision *v1.ZedToken) (*OcfFileEncoder, error) {
 	encoder, err := NewEncoder(file, schema, revision)
 	if err != nil {
 		return nil, err
@@ -204,7 +213,6 @@ func encoderForFile(file, lockFile *os.File, schema string, revision *v1.ZedToke
 
 	return &OcfFileEncoder{
 		file:       file,
-		lockFile:   lockFile,
 		OcfEncoder: encoder,
 	}, nil
 }
@@ -214,19 +222,11 @@ func (fe *OcfFileEncoder) Append(r *v1.Relationship, cursor string) error {
 		return fmt.Errorf("error storing relationship: %w", err)
 	}
 
-	// TODO(jzelinskie): Replace this with a new file+rename to make it atomic
-	// similar to tailscale.com/atomicfile.
-
-	if err := fe.lockFile.Truncate(0); err != nil {
-		return fmt.Errorf("unable to truncate backup progress file: %w", err)
-	}
-
-	if _, err := fe.lockFile.Seek(0, 0); err != nil {
-		return fmt.Errorf("unable to seek backup progress file: %w", err)
-	}
-
-	if _, err := fe.lockFile.WriteString(cursor); err != nil {
-		return fmt.Errorf("unable to write result cursor to backup progress file: %w", err)
+	if cursor != fe.lastSyncedCursor { // Only write to disk when necessary
+		if err := atomic.WriteFile(fe.lockFileName(), bytes.NewBufferString(cursor)); err != nil {
+			return fmt.Errorf("failed to store cursor in lockfile: %w", err)
+		}
+		fe.lastSyncedCursor = cursor
 	}
 
 	return nil
@@ -253,15 +253,14 @@ func (fe *OcfFileEncoder) Close() error {
 	return errors.Join(
 		fe.OcfEncoder.Close(),
 		closeFile(fe.file),
-		closeFile(fe.lockFile),
-		removeCompleted(fe.lockFile.Name()),
+		removeCompleted(fe.lockFileName()),
 	)
 }
 
 func (fe *OcfFileEncoder) MarshalZerologObject(e *zerolog.Event) {
 	e.EmbedObject(fe.OcfEncoder).
 		Str("file", fe.file.Name()).
-		Str("lockFile", fe.lockFile.Name())
+		Str("lockFile", fe.lockFileName())
 }
 
 // ProgressRenderingEncoder implements `Encoder` by wrapping an existing Encoder

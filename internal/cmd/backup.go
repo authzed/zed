@@ -35,10 +35,7 @@ import (
 	"github.com/authzed/zed/pkg/backupformat"
 )
 
-const (
-	returnIfExists      = true
-	doNotReturnIfExists = false
-)
+const doNotReturnIfExists = false
 
 // cobraRunEFunc is the signature of a cobra.Command.RunE function.
 type cobraRunEFunc = func(cmd *cobra.Command, args []string) (err error)
@@ -264,8 +261,9 @@ func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) 
 	return filteredSchema, nil
 }
 
+// hasRelPrefix returns false if any resources within the relationship do not
+// contain the prefix.
 func hasRelPrefix(rel *v1.Relationship, prefix string) bool {
-	// Skip any relationships without the prefix on both sides.
 	return strings.HasPrefix(rel.Resource.ObjectType, prefix) &&
 		strings.HasPrefix(rel.Subject.Object.ObjectType, prefix)
 }
@@ -281,19 +279,26 @@ func revisionForServerless(ctx context.Context, spiceClient client.Client, schem
 		return nil, err
 	}
 
-	for msg, err := stream.Recv(); !errors.Is(err, io.EOF); msg, err = stream.Recv() {
-		if err != nil {
-			return nil, err
-		}
-		log.Trace().Str("revision", msg.ReadAt.Token).Msg("determined serverless revision")
-		return msg.ReadAt, nil
+	msg, err := stream.Recv()
+	if err != nil {
+		return nil, err
 	}
+	log.Trace().Str("revision", msg.ReadAt.Token).Msg("determined serverless revision")
+	return msg.ReadAt, nil
+}
 
-	panic("unreachable")
+// CloseAndJoin attempts to close the provided arguement and joins the error
+// with any existing errors that may have occurred.
+//
+// This function is intended to be used with `defer` like this:
+// `defer CloseAndJoin(&err, f)`
+func CloseAndJoin(e *error, maybeCloser any) {
+	if closer, ok := maybeCloser.(io.Closer); ok {
+		*e = errors.Join(*e, closer.Close())
+	}
 }
 
 func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
-	ctx := cmd.Context()
 	prefixFilter := cobrautil.MustGetString(cmd, "prefix-filter")
 	pageLimit := cobrautil.MustGetUint32(cmd, "page-limit")
 
@@ -307,6 +312,10 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("unable to initialize client: %w", err)
 	}
 
+	return takeBackup(cmd.Context(), spiceClient, nil, backupFileName, prefixFilter, pageLimit)
+}
+
+func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupformat.Encoder, backupFileName, prefixFilter string, pageLimit uint32) error {
  	schemaResp, err := spiceClient.ReadSchema(ctx, &v1.ReadSchemaRequest{})
  	if err != nil {
  		return fmt.Errorf("error reading schema: %w", err)
@@ -330,12 +339,16 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
  			return err
  		}
  
- 		fencoder, cursor, err := backupformat.NewOrExistingFileEncoder(backupFileName, schemaResp.SchemaText, revision)
- 		if err != nil {
- 			return err
+		var cursor string
+		if encoder == nil {
+			var fencoder *backupformat.OcfFileEncoder
+			fencoder, cursor, err = backupformat.NewOrExistingFileEncoder(backupFileName, schemaResp.SchemaText, revision)
+			if err != nil {
+				return err
+			}
+			encoder = backupformat.WithProgress(prefixFilter, fencoder)
  		}
- 		encoder := backupformat.WithProgress(prefixFilter, fencoder)
- 		defer func(e *error) { *e = errors.Join(*e, encoder.Close()) }(&err)
+		defer CloseAndJoin(&err, encoder)
  
  		log.Trace().Strs("definitions", lo.Map(compiledSchema.ObjectDefinitions, func(def *corev1.NamespaceDefinition, _ int) string {
  			return def.Name
@@ -390,12 +403,15 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		}
 		encoder.MarkComplete()
 	} else {
-		fencoder, cursor, err := backupformat.NewOrExistingFileEncoder(backupFileName, schemaResp.SchemaText, schemaResp.ReadAt)
-		if err != nil {
-			return err
+		var cursor string
+		if encoder == nil {
+			encoder, cursor, err = backupformat.NewOrExistingFileEncoder(backupFileName, schemaResp.SchemaText, schemaResp.ReadAt)
+			if err != nil {
+				return err
+			}
 		}
-		encoder := backupformat.WithProgress(prefixFilter, fencoder)
-		defer func(e *error) { *e = errors.Join(*e, encoder.Close()) }(&err)
+		encoder = backupformat.WithProgress(prefixFilter, encoder)
+		defer CloseAndJoin(&err, encoder)
 
 		req := &v1.ExportBulkRelationshipsRequest{OptionalLimit: pageLimit}
 		if cursor != "" {
@@ -444,45 +460,6 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	// in the `defer` blocks that will modify the `err` if the cleanup
 	// fails
 	return err
-}
-
-// encoderForNewBackup creates a new encoder for a new zed backup file. It returns the ZedToken at which the backup
-// must be taken.
-func encoderForNewBackup(cmd *cobra.Command, c client.Client, backupFile *os.File) (*backupformat.OcfEncoder, *v1.ZedToken, error) {
-	prefixFilter := cobrautil.MustGetString(cmd, "prefix-filter")
-
-	schemaResp, err := c.ReadSchema(cmd.Context(), &v1.ReadSchemaRequest{})
-	if err != nil {
-		return nil, nil, fmt.Errorf("error reading schema: %w", err)
-	}
-	if schemaResp.ReadAt == nil {
-		return nil, nil, errors.New("`backup` is not supported on this version of SpiceDB")
-	}
-	schema := schemaResp.SchemaText
-
-	// Remove any invalid relations generated from old, backwards-incompat
-	// Serverless permission systems.
-	if cobrautil.MustGetBool(cmd, "rewrite-legacy") {
-		schema = rewriteLegacy(schema)
-	}
-
-	// Skip any definitions without the provided prefix
-
-	if prefixFilter != "" {
-		schema, err = filterSchemaDefs(schema, prefixFilter)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	zedToken := schemaResp.ReadAt
-
-	encoder, err := backupformat.NewEncoder(backupFile, schema, zedToken)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error creating backup file encoder: %w", err)
-	}
-
-	return encoder, zedToken, nil
 }
 
 // computeBackupFileName computes the backup file name based.
@@ -577,7 +554,7 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 	batchSize := cobrautil.MustGetUint(cmd, "batch-size")
 	batchesPerTransaction := cobrautil.MustGetUint(cmd, "batches-per-transaction")
 
-	strategy, err := GetEnum[ConflictStrategy](cmd, "conflict-strategy", conflictStrategyMapping)
+	strategy, err := GetEnum(cmd, "conflict-strategy", conflictStrategyMapping)
 	if err != nil {
 		return err
 	}
