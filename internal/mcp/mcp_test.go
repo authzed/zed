@@ -311,7 +311,7 @@ definition user {}`
 		// Create mock request
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
-				Arguments: map[string]interface{}{
+				Arguments: map[string]any{
 					"schema": schemaText,
 				},
 			},
@@ -377,7 +377,7 @@ func TestBuildRelationship(t *testing.T) {
 			SubjectType:   "user",
 			SubjectID:     "alice",
 			CaveatName:    "ip_range",
-			CaveatContext: map[string]interface{}{"max_attempts": 3, "enabled": true},
+			CaveatContext: map[string]any{"max_attempts": 3, "enabled": true},
 		}
 
 		relationship, err := server.buildRelationship(rel)
