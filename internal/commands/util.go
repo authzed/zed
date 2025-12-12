@@ -70,7 +70,7 @@ func PrettyProto(m proto.Message) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	var obj interface{}
+	var obj any
 	err = json.Unmarshal(encoded, &obj)
 	if err != nil {
 		panic("protojson decode failed: " + err.Error())

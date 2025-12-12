@@ -31,7 +31,7 @@ var once sync.Once
 func CheckServerVersion(
 	ctx context.Context,
 	method string,
-	req, reply interface{},
+	req, reply any,
 	cc *grpc.ClientConn,
 	invoker grpc.UnaryInvoker,
 	callOpts ...grpc.CallOption,
@@ -101,7 +101,7 @@ func CheckServerVersion(
 func LogDispatchTrailers(
 	ctx context.Context,
 	method string,
-	req, reply interface{},
+	req, reply any,
 	cc *grpc.ClientConn,
 	invoker grpc.UnaryInvoker,
 	callOpts ...grpc.CallOption,
@@ -159,7 +159,7 @@ type wrappedStream struct {
 	grpc.ClientStream
 }
 
-func (w *wrappedStream) RecvMsg(m interface{}) error {
+func (w *wrappedStream) RecvMsg(m any) error {
 	err := w.ClientStream.RecvMsg(m)
 	if err != nil && errors.Is(err, io.EOF) {
 		outputDispatchTrailers(w.Trailer())
