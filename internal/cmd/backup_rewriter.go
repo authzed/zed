@@ -45,7 +45,7 @@ func rewriterFromFlags(cmd *cobra.Command) Rewriter {
 }
 
 type Rewriter interface {
-	// RewriteRelationship transforms a schema.
+	// RewriteSchema transforms a schema.
 	RewriteSchema(schema string) (string, error)
 
 	// RewriteRelationship transforms a relationship or returns nil to signal
@@ -61,6 +61,7 @@ var (
 	_ Rewriter = (*PrefixReplacer)(nil)
 )
 
+// NoopRewriter is a rewriter that returns the schema and relationships unchanged.
 type NoopRewriter struct{}
 
 func (n *NoopRewriter) RewriteSchema(schema string) (string, error) { return schema, nil }
@@ -68,6 +69,8 @@ func (n *NoopRewriter) RewriteRelationship(r *v1.Relationship) (*v1.Relationship
 	return r.CloneVT(), nil
 }
 
+// ChainRewriter is a rewriter that composes other rewriters and
+// runs them in the order they were declared.
 type ChainRewriter struct {
 	rewriters []Rewriter
 }
@@ -107,12 +110,15 @@ var (
 	shortRelations      = regexp.MustCompile(`(\s*)relation [a-z][a-z0-9_]:(.+)`)
 )
 
+// TODO: what are these changes and why are they necessary?
 func (lr *LegacyRewriter) RewriteSchema(schema string) (string, error) {
 	schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
 	schema = string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
 	return schema, nil
 }
 
+// PrefixFilterer selects a subset of relationships and schema definitions
+// that match the provided prefix.
 type PrefixFilterer struct {
 	prefix string
 }
@@ -151,6 +157,8 @@ func (sf *PrefixFilterer) RewriteRelationship(r *v1.Relationship) (*v1.Relations
 	return nil, nil
 }
 
+// PrefixReplacer takes a given map of (oldPrefix, newPrefix)
+// pairs and replaces those prefixes in definitions and relationships.
 type PrefixReplacer struct {
 	replacements map[string]string
 }

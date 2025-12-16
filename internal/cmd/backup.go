@@ -238,29 +238,29 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 }
 
 func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupformat.Encoder, backupFileName, prefixFilter string, pageLimit uint32) error {
- 	schemaResp, err := spiceClient.ReadSchema(ctx, &v1.ReadSchemaRequest{})
- 	if err != nil {
- 		return fmt.Errorf("error reading schema: %w", err)
- 	}
- 
+	schemaResp, err := spiceClient.ReadSchema(ctx, &v1.ReadSchemaRequest{})
+	if err != nil {
+		return fmt.Errorf("error reading schema: %w", err)
+	}
+
 	// Determine if the server supports modern APIs for backups and if not,
 	// fallback to using ReadSchema and ReadRelationships.
 	// This codepath can be removed when AuthZed Serverless is fully sunset.
 	if bulkOpsUnsupported := schemaResp.ReadAt == nil; bulkOpsUnsupported {
- 		compiledSchema, err := compiler.Compile(
- 			compiler.InputSchema{Source: "schema", SchemaString: schemaResp.SchemaText},
- 			compiler.AllowUnprefixedObjectType(),
- 			compiler.SkipValidation(),
- 		)
- 		if err != nil {
- 			return err
- 		}
- 
- 		revision, err := revisionForServerless(ctx, spiceClient, compiledSchema)
- 		if err != nil {
- 			return err
- 		}
- 
+		compiledSchema, err := compiler.Compile(
+			compiler.InputSchema{Source: "schema", SchemaString: schemaResp.SchemaText},
+			compiler.AllowUnprefixedObjectType(),
+			compiler.SkipValidation(),
+		)
+		if err != nil {
+			return err
+		}
+
+		revision, err := revisionForServerless(ctx, spiceClient, compiledSchema)
+		if err != nil {
+			return err
+		}
+
 		var cursor string
 		if encoder == nil {
 			var fencoder *backupformat.OcfFileEncoder
@@ -269,51 +269,51 @@ func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupfo
 				return err
 			}
 			encoder = backupformat.WithProgress(prefixFilter, fencoder)
- 		}
+		}
 		defer CloseAndJoin(&err, encoder)
- 
- 		log.Trace().Strs("definitions", lo.Map(compiledSchema.ObjectDefinitions, func(def *corev1.NamespaceDefinition, _ int) string {
- 			return def.Name
- 		})).Msg("parsed object definitions")
- 
- 		var cursorObj string
- 		for _, def := range compiledSchema.ObjectDefinitions {
- 			req := &v1.ReadRelationshipsRequest{
- 				RelationshipFilter: &v1.RelationshipFilter{ResourceType: def.Name},
- 				OptionalLimit:      pageLimit,
- 			}
- 			if cursor != "" && cursorObj == def.Name {
- 				req.OptionalCursor = &v1.Cursor{Token: cursor}
- 			} else {
- 				req.Consistency = &v1.Consistency{
- 					Requirement: &v1.Consistency_AtExactSnapshot{
- 						AtExactSnapshot: revision,
- 					},
- 				}
- 			}
- 			log.Trace().Str("resource", def.Name).Str("cursor", cursor).Str("revision", revision.Token).Msg("iterated over definition")
- 
- 			stream, err := spiceClient.ReadRelationships(ctx, req)
- 			if err != nil {
- 				return err
- 			}
- 
- 			for msg, err := stream.Recv(); !errors.Is(err, io.EOF); msg, err = stream.Recv() {
- 				switch {
- 				case isCanceled(err) || isCanceled(ctx.Err()):
- 					return context.Canceled
- 				case isRetryableError(err):
- 					newReq := req.CloneVT()
- 					newReq.OptionalCursor = &v1.Cursor{Token: cursor}
- 					stream, err = spiceClient.ReadRelationships(ctx, newReq)
- 					if err != nil {
- 						return fmt.Errorf("failed to retry request")
- 					}
- 				case err != nil:
- 					return err
- 				case ctx.Err() != nil:
- 					return fmt.Errorf("aborted backup: %w", err)
- 				default:
+
+		log.Trace().Strs("definitions", lo.Map(compiledSchema.ObjectDefinitions, func(def *corev1.NamespaceDefinition, _ int) string {
+			return def.Name
+		})).Msg("parsed object definitions")
+
+		var cursorObj string
+		for _, def := range compiledSchema.ObjectDefinitions {
+			req := &v1.ReadRelationshipsRequest{
+				RelationshipFilter: &v1.RelationshipFilter{ResourceType: def.Name},
+				OptionalLimit:      pageLimit,
+			}
+			if cursor != "" && cursorObj == def.Name {
+				req.OptionalCursor = &v1.Cursor{Token: cursor}
+			} else {
+				req.Consistency = &v1.Consistency{
+					Requirement: &v1.Consistency_AtExactSnapshot{
+						AtExactSnapshot: revision,
+					},
+				}
+			}
+			log.Trace().Str("resource", def.Name).Str("cursor", cursor).Str("revision", revision.Token).Msg("iterated over definition")
+
+			stream, err := spiceClient.ReadRelationships(ctx, req)
+			if err != nil {
+				return err
+			}
+
+			for msg, err := stream.Recv(); !errors.Is(err, io.EOF); msg, err = stream.Recv() {
+				switch {
+				case isCanceled(err) || isCanceled(ctx.Err()):
+					return context.Canceled
+				case isRetryableError(err):
+					newReq := req.CloneVT()
+					newReq.OptionalCursor = &v1.Cursor{Token: cursor}
+					stream, err = spiceClient.ReadRelationships(ctx, newReq)
+					if err != nil {
+						return errors.New("failed to retry request")
+					}
+				case err != nil:
+					return err
+				case ctx.Err() != nil:
+					return fmt.Errorf("aborted backup: %w", err)
+				default:
 					cursor = msg.AfterResultCursor.Token
 					cursorObj = def.Name
 					log.Trace().Str("cursor", cursor).Stringer("relationship", msg.Relationship).Msg("appending relationship")
@@ -360,7 +360,7 @@ func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupfo
 				newReq.OptionalCursor = &v1.Cursor{Token: cursor}
 				stream, err = spiceClient.ExportBulkRelationships(ctx, newReq)
 				if err != nil {
-					return fmt.Errorf("failed to retry request")
+					return errors.New("failed to retry request")
 				}
 			case err != nil:
 				return err
