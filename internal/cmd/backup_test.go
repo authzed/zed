@@ -686,8 +686,8 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 
 	require.True(t, encoder.Complete, "expecting encoder to be marked complete")
 	require.Len(t, encoder.Relationships, 2, "expecting two rels in the realized list")
-	require.Equal(t, encoder.Relationships[0].Resource.ObjectId, "foo")
-	require.Equal(t, encoder.Relationships[1].Resource.ObjectId, "bar")
+	require.Equal(t, "foo", encoder.Relationships[0].Resource.ObjectId)
+	require.Equal(t, "bar", encoder.Relationships[1].Resource.ObjectId)
 
 	client.assertAllRecvCalls()
 }
