@@ -44,7 +44,7 @@ type SchemaRelationships struct {
 }
 
 // Func will decode into the supplied object.
-type Func func(out interface{}) ([]byte, bool, error)
+type Func func(out any) ([]byte, bool, error)
 
 // DecoderForURL returns the appropriate decoder for a given URL.
 // Some URLs have special handling to dereference to the actual file.
@@ -61,7 +61,7 @@ func DecoderForURL(u *url.URL) (d Func, err error) {
 }
 
 func fileDecoder(u *url.URL) Func {
-	return func(out interface{}) ([]byte, bool, error) {
+	return func(out any) ([]byte, bool, error) {
 		file, err := os.Open(u.Path)
 		if err != nil {
 			return nil, false, err
@@ -101,7 +101,7 @@ func rewriteURL(u *url.URL) {
 }
 
 func directHTTPDecoder(u *url.URL) Func {
-	return func(out interface{}) ([]byte, bool, error) {
+	return func(out any) ([]byte, bool, error) {
 		log.Debug().Stringer("url", u).Send()
 		r, err := http.Get(u.String())
 		if err != nil {
@@ -119,7 +119,7 @@ func directHTTPDecoder(u *url.URL) Func {
 }
 
 // Uses the files passed in the args and looks for the specified schemaFile to parse the YAML.
-func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, filename string) (bool, error) {
+func unmarshalAsYAMLOrSchemaWithFile(data []byte, out any, filename string) (bool, error) {
 	inputString := string(data)
 	if hasYAMLSchemaFileKey(inputString) && !hasYAMLSchemaKey(inputString) {
 		if err := yaml.Unmarshal(data, out); err != nil {
@@ -127,7 +127,7 @@ func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, filename stri
 		}
 		validationFile, ok := out.(*validationfile.ValidationFile)
 		if !ok {
-			return false, fmt.Errorf("could not cast unmarshalled file to validationfile")
+			return false, errors.New("could not cast unmarshalled file to validationfile")
 		}
 
 		// Need to join the original filepath with the requested filepath
@@ -155,7 +155,7 @@ func unmarshalAsYAMLOrSchemaWithFile(data []byte, out interface{}, filename stri
 	return unmarshalAsYAMLOrSchema(filename, data, out)
 }
 
-func unmarshalAsYAMLOrSchema(filename string, data []byte, out interface{}) (bool, error) {
+func unmarshalAsYAMLOrSchema(filename string, data []byte, out any) (bool, error) {
 	inputString := string(data)
 
 	// Check for indications of a schema-only file by looking for YAML top-level keys.
@@ -201,7 +201,7 @@ func hasYAMLRelationshipsKey(input string) bool {
 // compileSchemaFromData attempts to compile using the old DSL and the new composable DSL,
 // but prefers the new DSL.
 // It returns the errors returned by both compilations.
-func compileSchemaFromData(filename, schemaString string, out interface{}) error {
+func compileSchemaFromData(filename, schemaString string, out any) error {
 	var (
 		standardCompileErr   error
 		composableCompiled   *composable.CompiledSchema

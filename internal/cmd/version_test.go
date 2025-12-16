@@ -36,6 +36,7 @@ func TestGetClientVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
 				zedtesting.BoolFlag{FlagName: "include-deps", FlagValue: tt.includeDeps})
 
@@ -47,6 +48,7 @@ func TestGetClientVersion(t *testing.T) {
 }
 
 func TestGetServerVersion(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name                   string
 		serverVersionInHeader  string
@@ -81,6 +83,7 @@ func TestGetServerVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t)
 
 			mockClient := &mockSchemaServiceClient{

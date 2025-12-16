@@ -79,7 +79,7 @@ func TestCommandOutput(t *testing.T) {
 			if tt.expectStdErrorMsg != "" {
 				require.Contains(t, string(stdErrBytes), tt.expectStdErrorMsg)
 			} else {
-				require.Len(t, stdErrBytes, 0)
+				require.Empty(t, stdErrBytes)
 			}
 			require.Equal(t, tt.expectFlagErrorCalled, flagErrorCalled)
 		})

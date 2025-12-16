@@ -124,7 +124,7 @@ func TestRewriteURL(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			rewriteURL(&tt.in)
-			require.EqualValues(t, tt.out, tt.in)
+			require.Equal(t, tt.out, tt.in)
 		})
 	}
 }

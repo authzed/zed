@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/ccoveille/go-safecast/v2"
@@ -342,7 +343,7 @@ func renderLine(sb *strings.Builder, lines []string, index int, highlight string
 		return
 	}
 
-	lineNumberLength := len(fmt.Sprintf("%d", len(lines)))
+	lineNumberLength := len(strconv.Itoa(len(lines)))
 	lineContents := strings.ReplaceAll(lines[index], "\t", " ")
 	lineDelimiter := "|"
 
@@ -371,7 +372,7 @@ func renderLine(sb *strings.Builder, lines []string, index int, highlight string
 		highlightColumnIndex = highlightStartingColumnIndex
 	}
 
-	lineNumberStr := fmt.Sprintf("%d", index+1)
+	lineNumberStr := strconv.Itoa(index + 1)
 	noNumberSpaces := strings.Repeat(" ", lineNumberLength)
 
 	lineNumberStyle := linePrefixStyle

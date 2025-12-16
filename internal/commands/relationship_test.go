@@ -11,6 +11,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -229,7 +230,7 @@ func TestWriteRelationshipsArgs(t *testing.T) {
 	}()
 
 	// returns accepts anything if input file is not a terminal
-	require.Nil(t, StdinOrExactArgs(3)(&cobra.Command{}, nil))
+	require.NoError(t, StdinOrExactArgs(3)(&cobra.Command{}, nil))
 
 	// if both STDIN and CLI args are provided, CLI args take precedence
 	require.ErrorContains(t, StdinOrExactArgs(3)(&cobra.Command{}, []string{"a", "b"}), "accepts 3 arg(s), received 2")
@@ -237,7 +238,7 @@ func TestWriteRelationshipsArgs(t *testing.T) {
 	isTerm = true
 	// checks there is 3 input arguments in case of tty
 	require.ErrorContains(t, StdinOrExactArgs(3)(&cobra.Command{}, nil), "accepts 3 arg(s), received 0")
-	require.Nil(t, StdinOrExactArgs(3)(&cobra.Command{}, []string{"a", "b", "c"}))
+	require.NoError(t, StdinOrExactArgs(3)(&cobra.Command{}, []string{"a", "b", "c"}))
 }
 
 func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
@@ -564,6 +565,7 @@ func fileFromStrings(t *testing.T, strings []string) *os.File {
 }
 
 func TestBuildRelationshipsFilter(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		args     []string
@@ -652,7 +654,7 @@ func TestBulkDeleteForcing(t *testing.T) {
 	defer cancel()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
-		require.NoError(t, srv.Run(ctx))
+		assert.NoError(t, srv.Run(ctx))
 	}()
 	conn, err := srv.GRPCDialContext(ctx)
 	require.NoError(t, err)
@@ -702,7 +704,7 @@ func TestBulkDeleteManyForcing(t *testing.T) {
 	defer cancel()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
-		require.NoError(t, srv.Run(ctx))
+		assert.NoError(t, srv.Run(ctx))
 	}()
 	conn, err := srv.GRPCDialContext(ctx)
 	require.NoError(t, err)
@@ -744,7 +746,7 @@ func TestBulkDeleteNotForcing(t *testing.T) {
 	defer cancel()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
-		require.NoError(t, srv.Run(ctx))
+		assert.NoError(t, srv.Run(ctx))
 	}()
 	conn, err := srv.GRPCDialContext(ctx)
 	require.NoError(t, err)

@@ -45,6 +45,7 @@ var testRelationships = []string{
 }
 
 func TestFilterSchemaDefs(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name         string
 		inputSchema  string
@@ -139,6 +140,7 @@ func TestFilterSchemaDefs(t *testing.T) {
 }
 
 func TestBackupParseRelsCmdFunc(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name          string
 		filter        string
@@ -192,6 +194,7 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 }
 
 func TestBackupParseRevisionCmdFunc(t *testing.T) {
+	t.Parallel()
 	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t, zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: "test"})
 	backupName := createTestBackup(t, testSchema, testRelationships)
 	f, err := os.CreateTemp(t.TempDir(), "parse-output")
@@ -209,6 +212,7 @@ func TestBackupParseRevisionCmdFunc(t *testing.T) {
 }
 
 func TestBackupParseSchemaCmdFunc(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name          string
 		filter        string
@@ -727,8 +731,8 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, actualRels, 2, "expecting two rels in the realized list")
-	require.Equal(t, actualRels[0].Resource.ObjectId, "foo")
-	require.Equal(t, actualRels[1].Resource.ObjectId, "bar")
+	require.Equal(t, "foo", actualRels[0].Resource.ObjectId)
+	require.Equal(t, "bar", actualRels[1].Resource.ObjectId)
 
 	client.assertAllRecvCalls()
 }

@@ -34,7 +34,7 @@ func TestValidationWrapper(t *testing.T) {
 			if tt.wantErr {
 				var validationError ValidationError
 				require.ErrorAs(t, err, &validationError)
-				require.NotNil(t, validationError.error)
+				require.Error(t, validationError.error)
 				require.ErrorContains(t, validationError.error, "accepts at most")
 			} else {
 				require.NoError(t, err)

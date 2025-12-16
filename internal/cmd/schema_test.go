@@ -128,65 +128,69 @@ caveat test/some_caveat(someCondition int) {
 
 func TestSchemaCompile(t *testing.T) {
 	t.Parallel()
+	require := require.New(t)
 
-	testCases := map[string]struct {
-		files     []string
-		out       string
-		expectErr error
-		expectStr string
-	}{
-		`file_not_found`: {
-			files: []string{
-				filepath.Join("preview-test", "nonexistent.zed"),
-			},
-			expectErr: fs.ErrNotExist,
-		},
-		`happy_path`: {
-			files: []string{
-				filepath.Join("preview-test", "composable-schema-root.zed"),
-			},
-			expectStr: `definition user {}
+	files := []string{filepath.Join("preview-test", "composable-schema-root.zed")}
+	expected := `definition user {}
 
 definition resource {
 	relation user: user
 	permission view = user
 }
-`,
-		},
-		`cannot_be_compiled_because_using_reserved_keyword`: {
-			files: []string{
-				filepath.Join("preview-test", "composable-schema-invalid-root.zed"),
-			},
-			expectErr: compiler.BaseCompilerError{},
-		},
-	}
+`
 
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			require := require.New(t)
+	tempOutFile := filepath.Join(t.TempDir(), "out.zed")
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "out", FlagValue: tempOutFile})
 
-			tempOutFile := filepath.Join(t.TempDir(), "out.zed")
-			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
-				zedtesting.StringFlag{FlagName: "out", FlagValue: tempOutFile})
+	mockTermCheckerr := &mockTermChecker{returnVal: false}
+	err := schemaCompileCmdFunc(cmd, files, mockTermCheckerr)
 
-			mockTermCheckerr := &mockTermChecker{returnVal: false}
-			err := schemaCompileCmdFunc(cmd, tc.files, mockTermCheckerr)
-			if tc.expectErr == nil {
-				require.NoError(err)
-				tempOutString, err := os.ReadFile(tempOutFile)
-				require.NoError(err)
-				require.Equal(tc.expectStr, string(tempOutString))
-				// TODO re-enable after adding a test that uses stdout
-				// require.Equal(int(os.Stdout.Fd()), mockTermCheckerr.capturedFd, "expected stdout to be checked for terminal")
-			} else {
-				require.Error(err)
-				require.ErrorAs(err, &tc.expectErr)
-			}
-		})
-	}
+	require.NoError(err)
+	tempOutString, err := os.ReadFile(tempOutFile)
+	require.NoError(err)
+	require.Equal(expected, string(tempOutString))
+	// TODO re-enable after adding a test that uses stdout
+	// require.Equal(int(os.Stdout.Fd()), mockTermCheckerr.capturedFd, "expected stdout to be checked for terminal")
 }
 
+func TestSchemaCompileFileNotFound(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	files := []string{filepath.Join("preview-test", "nonexistent.zed")}
+
+	tempOutFile := filepath.Join(t.TempDir(), "out.zed")
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "out", FlagValue: tempOutFile})
+
+	mockTermCheckerr := &mockTermChecker{returnVal: false}
+	err := schemaCompileCmdFunc(cmd, files, mockTermCheckerr)
+	require.Error(err)
+	require.ErrorIs(err, fs.ErrNotExist)
+}
+
+func TestSchemaCompileFailureFromReservedKeyword(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	files := []string{filepath.Join("preview-test", "composable-schema-invalid-root.zed")}
+	var expectedErr compiler.BaseCompilerError
+
+	tempOutFile := filepath.Join(t.TempDir(), "out.zed")
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "out", FlagValue: tempOutFile})
+
+	mockTermCheckerr := &mockTermChecker{returnVal: false}
+	err := schemaCompileCmdFunc(cmd, files, mockTermCheckerr)
+	require.Error(err)
+	require.ErrorAs(err, &expectedErr)
+}
+
+// TODO: refactor the impl function to provide a pipe or buffer directly and delegate the input selection to
+// another function
+//
+//nolint:tparallel // these tests can't be parallel because they muck around with the definition of os.Stdin.
 func TestSchemaWrite(t *testing.T) {
 	t.Parallel()
 

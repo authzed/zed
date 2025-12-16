@@ -243,11 +243,11 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				" 11 | \n\n\n",
 		},
 		// TODO: https://github.com/authzed/zed/issues/487
-		//`url_passes`: {
+		// `url_passes`: {
 		//	files: []string{
 		//		"https://play.authzed.com/s/iksdFvCtvnkR/schema",
 		//	},
-		//},
+		// },
 		`composable_schema_passes`: {
 			files: []string{
 				filepath.Join("validate-test", "composable-schema-root.zed"),

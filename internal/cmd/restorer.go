@@ -260,7 +260,7 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Permiss
 		r.writtenRels += numLoaded
 	case conflict && r.conflictStrategy == Fail:
 		r.bar.Describe("conflict detected, aborting restore")
-		return fmt.Errorf("duplicate relationships found")
+		return errors.New("duplicate relationships found")
 	case retryable:
 		r.bar.Describe("retrying after error")
 		r.totalRetries++
@@ -291,7 +291,7 @@ func (r *restorer) commitStream(ctx context.Context, bulkImportClient v1.Permiss
 
 	writtenAndSkipped, err := safecast.Convert[int64](r.writtenRels + r.skippedRels)
 	if err != nil {
-		return fmt.Errorf("too many written and skipped rels for an int64")
+		return errors.New("too many written and skipped rels for an int64")
 	}
 
 	if err := r.bar.Set64(writtenAndSkipped); err != nil {

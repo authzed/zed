@@ -183,11 +183,12 @@ func handleError(command *cobra.Command, err error) error {
 		cmdToExecute = command
 	}
 
-	if errors.Is(err, commands.ValidationError{}) {
+	switch {
+	case errors.Is(err, commands.ValidationError{}):
 		_ = flagError(cmdToExecute, err)
-	} else if err != nil && strings.Contains(err.Error(), "unknown command") {
+	case err != nil && strings.Contains(err.Error(), "unknown command"):
 		_ = flagError(cmdToExecute, err)
-	} else if !errors.Is(err, errParsing) {
+	case !errors.Is(err, errParsing):
 		log.Err(err).Msg("terminated with errors")
 	}
 

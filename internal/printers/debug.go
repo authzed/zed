@@ -146,14 +146,12 @@ func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp *TreePrinter, hasError
 		if len(contextMap) > 0 {
 			contextJSON, _ := json.MarshalIndent(contextMap, "", "  ")
 			c.Child(string(contextJSON))
-		} else {
-			if checkTrace.CaveatEvaluationInfo.Result != v1.CaveatEvalInfo_RESULT_MISSING_SOME_CONTEXT {
-				c.Child(faint("(no matching context found)"))
-			}
+		} else if checkTrace.CaveatEvaluationInfo.Result != v1.CaveatEvalInfo_RESULT_MISSING_SOME_CONTEXT {
+			c.Child(faint("(no matching context found)"))
 		}
 
 		if checkTrace.CaveatEvaluationInfo.Result == v1.CaveatEvalInfo_RESULT_MISSING_SOME_CONTEXT {
-			c.Child(fmt.Sprintf("missing context: %s", strings.Join(checkTrace.CaveatEvaluationInfo.PartialCaveatInfo.MissingRequiredContext, ", ")))
+			c.Child("missing context: " + strings.Join(checkTrace.CaveatEvaluationInfo.PartialCaveatInfo.MissingRequiredContext, ", "))
 		}
 	}
 

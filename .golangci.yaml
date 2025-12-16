@@ -4,26 +4,33 @@ linters:
   enable:
     - "bidichk"
     - "bodyclose"
+    - "depguard"
     - "errcheck"
     - "errname"
     - "errorlint"
+    - "gocritic"
     - "goprintffuncname"
     - "gosec"
     - "govet"
     - "importas"
     - "ineffassign"
     - "makezero"
+    - "perfsprint"
     - "prealloc"
     - "predeclared"
     - "promlinter"
     - "revive"
     - "rowserrcheck"
+    - "spancheck"
     - "staticcheck"
+    - "tagalign"
+    - "testifylint"
+    - "tparallel"
     - "unconvert"
-    - "unused"
     - "usetesting"
     - "wastedassign"
     - "whitespace"
+    - "unused"
   exclusions:
     generated: "lax"
     presets:
@@ -35,12 +42,29 @@ linters:
       - "third_party$"
       - "builtin$"
       - "examples$"
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: "k8s.io/utils/strings/slices$"
+              desc: "use github.com/samber/lo"
+    staticcheck:
+      checks:
+        - "all"
 formatters:
   enable:
     - "gci"
+    - "gofmt"
     - "gofumpt"
     - "goimports"
   settings:
+    gofmt:
+      rewrite-rules:
+        - pattern: "interface{}"
+          replacement: "any"
+        - pattern: "a[b:len(a)]"
+          replacement: "a[b:]"
     gci:
       sections:
         - "standard"
