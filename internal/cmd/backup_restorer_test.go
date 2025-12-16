@@ -138,17 +138,14 @@ func TestRestorer(t *testing.T) {
 			expectedRetries := uint(0)
 			var expectsError error
 			for _, err := range tt.commitErrors {
-				switch {
-				case isRetryableError(err):
-					{
-						expectedRetries++
-						if tt.disableRetryErrors {
-							expectsError = err
-						}
+				if isRetryableError(err) {
+					expectedRetries++
+					if tt.disableRetryErrors {
+						expectsError = err
 					}
-				case isAlreadyExistsError(err):
+				} else if isAlreadyExistsError(err) {
 					expectedConflicts++
-				default:
+				} else {
 					expectsError = err
 				}
 			}
