@@ -128,7 +128,7 @@ func TestFilterSchemaDefs(t *testing.T) {
 			tt := tt
 			t.Parallel()
 
-			outputSchema, err := filterSchemaDefs(tt.inputSchema, tt.inputPrefix)
+			outputSchema, err := (&PrefixFilterer{prefix: tt.inputPrefix}).RewriteSchema(tt.inputSchema)
 			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
 			} else {
@@ -175,7 +175,11 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 			tt := tt
 			t.Parallel()
 
-			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t, zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: tt.filter})
+			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+				zedtesting.StringToStringFlag{FlagName: "prefix-replacements"},
+				zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: tt.filter},
+				zedtesting.BoolFlag{FlagName: "rewrite-legacy"},
+			)
 			backupName := createTestBackup(t, tt.schema, tt.relationships)
 			f, err := os.CreateTemp(t.TempDir(), "parse-output")
 			require.NoError(t, err)
@@ -195,7 +199,7 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 
 func TestBackupParseRevisionCmdFunc(t *testing.T) {
 	t.Parallel()
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t, zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: "test"})
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t)
 	backupName := createTestBackup(t, testSchema, testRelationships)
 	f, err := os.CreateTemp(t.TempDir(), "parse-output")
 	require.NoError(t, err)
@@ -253,6 +257,7 @@ func TestBackupParseSchemaCmdFunc(t *testing.T) {
 			t.Parallel()
 
 			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+				zedtesting.StringToStringFlag{FlagName: "prefix-replacements"},
 				zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: tt.filter},
 				zedtesting.BoolFlag{FlagName: "rewrite-legacy", FlagValue: tt.rewriteLegacy})
 			backupName := createTestBackup(t, tt.schema, nil)
@@ -274,6 +279,7 @@ func TestBackupParseSchemaCmdFunc(t *testing.T) {
 
 func TestBackupCreateCmdFunc(t *testing.T) {
 	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringToStringFlag{FlagName: "prefix-replacements"},
 		zedtesting.StringFlag{FlagName: "prefix-filter"},
 		zedtesting.BoolFlag{FlagName: "rewrite-legacy"},
 		zedtesting.UintFlag32{FlagName: "page-limit"},
@@ -509,6 +515,7 @@ func validateBackupWithFunc(t testing.TB, backupFileName, schema string, token *
 
 func TestBackupRestoreCmdFunc(t *testing.T) {
 	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringToStringFlag{FlagName: "prefix-replacements"},
 		zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: "test"},
 		zedtesting.BoolFlag{FlagName: "rewrite-legacy"},
 		zedtesting.StringFlag{FlagName: "conflict-strategy", FlagValue: "fail"},
