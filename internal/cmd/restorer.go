@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -56,10 +57,9 @@ var (
 )
 
 type restorer struct {
-	schema                string
+	rewriter              Rewriter
 	decoder               *backupformat.Decoder
 	client                client.Client
-	prefixFilter          string
 	batchSize             uint
 	batchesPerTransaction uint
 	conflictStrategy      ConflictStrategy
@@ -78,15 +78,14 @@ type restorer struct {
 	requestTimeout   time.Duration
 }
 
-func newRestorer(schema string, decoder *backupformat.Decoder, client client.Client, prefixFilter string, batchSize uint,
+func newRestorer(rw Rewriter, decoder *backupformat.Decoder, client client.Client, batchSize uint,
 	batchesPerTransaction uint, conflictStrategy ConflictStrategy, disableRetryErrors bool,
 	requestTimeout time.Duration,
 ) *restorer {
 	return &restorer{
 		decoder:               decoder,
-		schema:                schema,
+		rewriter:              rw,
 		client:                client,
-		prefixFilter:          prefixFilter,
 		requestTimeout:        requestTimeout,
 		batchSize:             batchSize,
 		batchesPerTransaction: batchesPerTransaction,
@@ -97,6 +96,11 @@ func newRestorer(schema string, decoder *backupformat.Decoder, client client.Cli
 }
 
 func (r *restorer) restoreFromDecoder(ctx context.Context) error {
+	schema, err := r.rewriter.RewriteSchema(r.decoder.Schema())
+	if err != nil {
+		return err
+	}
+
 	relationshipWriteStart := time.Now()
 	defer func() {
 		if err := r.bar.Finish(); err != nil {
@@ -106,7 +110,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 
 	r.bar.Describe("restoring schema from backup")
 	if _, err := r.client.WriteSchema(ctx, &v1.WriteSchemaRequest{
-		Schema: r.schema,
+		Schema: schema,
 	}); err != nil {
 		return fmt.Errorf("unable to write schema: %w", err)
 	}
@@ -125,12 +129,14 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 			return fmt.Errorf("aborted restore: %w", err)
 		}
 
-		if !hasRelPrefix(rel, r.prefixFilter) {
+		rewritten, err := r.rewriter.RewriteRelationship(rel)
+		if err != nil {
+			return fmt.Errorf("failed to rewrite relationship: %w", err)
+		} else if rewritten == nil {
 			r.filteredOutRels++
 			continue
 		}
-
-		batch = append(batch, rel)
+		batch = append(batch, rewritten)
 
 		if uint(len(batch))%r.batchSize == 0 {
 			batchesToBeCommitted = append(batchesToBeCommitted, batch)
@@ -427,10 +433,8 @@ func isGRPCCode(err error, codes ...codes.Code) bool {
 	}
 
 	if s, ok := status.FromError(err); ok {
-		for _, code := range codes {
-			if s.Code() == code {
-				return true
-			}
+		if slices.Contains(codes, s.Code()) {
+			return true
 		}
 	}
 

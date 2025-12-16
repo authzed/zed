@@ -24,9 +24,7 @@ import (
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	corev1 "github.com/authzed/spicedb/pkg/proto/core/v1"
-	schemapkg "github.com/authzed/spicedb/pkg/schema"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
-	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
@@ -141,12 +139,12 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	registerBackupRestoreFlags(restoreCmd)
 
 	backupCmd.AddCommand(backupParseSchemaCmd)
-	backupParseSchemaCmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
-	backupParseSchemaCmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
+	registerRewriterFlags(backupParseSchemaCmd)
 
 	backupCmd.AddCommand(backupParseRevisionCmd)
+
 	backupCmd.AddCommand(backupParseRelsCmd)
-	backupParseRelsCmd.Flags().String("prefix-filter", "", "Include only relationships with a given prefix")
+	registerRewriterFlags(backupParseRelsCmd)
 }
 
 func registerBackupRestoreFlags(cmd *cobra.Command) {
@@ -154,15 +152,13 @@ func registerBackupRestoreFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint("batches-per-transaction", 10, "number of batches per transaction")
 	cmd.Flags().String("conflict-strategy", "fail", "strategy used when a conflicting relationship is found. Possible values: fail, skip, touch")
 	cmd.Flags().Bool("disable-retries", false, "retries when an errors is determined to be retryable (e.g. serialization errors)")
-	cmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
-	cmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
 	cmd.Flags().Duration("request-timeout", 30*time.Second, "timeout for each request performed during restore")
+	registerRewriterFlags(cmd)
 }
 
 func registerBackupCreateFlags(cmd *cobra.Command) {
-	cmd.Flags().String("prefix-filter", "", "include only schema and relationships with a given prefix")
-	cmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
 	cmd.Flags().Uint32("page-limit", 0, "defines the number of relationships to be read by requested page during backup")
+	registerRewriterFlags(cmd)
 }
 
 func createBackupFile(filename string, returnIfExists bool) (*os.File, bool, error) {
@@ -192,80 +188,6 @@ func createBackupFile(filename string, returnIfExists bool) (*os.File, bool, err
 	}
 
 	return f, false, nil
-}
-
-var (
-	missingAllowedTypes = regexp.MustCompile(`(\s*)(relation)(.+)(/\* missing allowed types \*/)(.*)`)
-	shortRelations      = regexp.MustCompile(`(\s*)relation [a-z][a-z0-9_]:(.+)`)
-)
-
-func partialPrefixMatch(name, prefix string) bool {
-	return strings.HasPrefix(name, prefix+"/")
-}
-
-func filterSchemaDefs(schema, prefix string) (filteredSchema string, err error) {
-	if schema == "" || prefix == "" {
-		return schema, nil
-	}
-
-	compiledSchema, err := compiler.Compile(
-		compiler.InputSchema{Source: "schema", SchemaString: schema},
-		compiler.AllowUnprefixedObjectType(),
-		compiler.SkipValidation(),
-	)
-	if err != nil {
-		return "", fmt.Errorf("error reading schema: %w", err)
-	}
-
-	var prefixedDefs []compiler.SchemaDefinition
-	for _, def := range compiledSchema.ObjectDefinitions {
-		if partialPrefixMatch(def.Name, prefix) {
-			prefixedDefs = append(prefixedDefs, def)
-		}
-	}
-	for _, def := range compiledSchema.CaveatDefinitions {
-		if partialPrefixMatch(def.Name, prefix) {
-			prefixedDefs = append(prefixedDefs, def)
-		}
-	}
-
-	if len(prefixedDefs) == 0 {
-		return "", errors.New("filtered all definitions from schema")
-	}
-
-	filteredSchema, _, err = generator.GenerateSchema(prefixedDefs)
-	if err != nil {
-		return "", fmt.Errorf("error generating filtered schema: %w", err)
-	}
-
-	// Validate that the type system for the generated schema is comprehensive.
-	compiledFilteredSchema, err := compiler.Compile(
-		compiler.InputSchema{Source: "generated-schema", SchemaString: filteredSchema},
-		compiler.AllowUnprefixedObjectType(),
-	)
-	if err != nil {
-		return "", fmt.Errorf("generated invalid schema: %w", err)
-	}
-
-	for _, rawDef := range compiledFilteredSchema.ObjectDefinitions {
-		ts := schemapkg.NewTypeSystem(schemapkg.ResolverForCompiledSchema(*compiledFilteredSchema))
-		def, err := schemapkg.NewDefinition(ts, rawDef)
-		if err != nil {
-			return "", fmt.Errorf("generated invalid schema: %w", err)
-		}
-		if _, err := def.Validate(context.Background()); err != nil {
-			return "", fmt.Errorf("generated invalid schema: %w", err)
-		}
-	}
-
-	return filteredSchema, nil
-}
-
-// hasRelPrefix returns false if any resources within the relationship do not
-// contain the prefix.
-func hasRelPrefix(rel *v1.Relationship, prefix string) bool {
-	return strings.HasPrefix(rel.Resource.ObjectType, prefix) &&
-		strings.HasPrefix(rel.Subject.Object.ObjectType, prefix)
 }
 
 // revisionForServerless determines the latest revision to use for the backup
@@ -528,24 +450,6 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 		log.Debug().Str("revision", loadedToken.Token).Msg("parsed revision")
 	}
 
-	schema := decoder.Schema()
-
-	// Remove any invalid relations generated from old, backwards-incompat
-	// Serverless permission systems.
-	if cobrautil.MustGetBool(cmd, "rewrite-legacy") {
-		schema = rewriteLegacy(schema)
-	}
-
-	// Skip any definitions without the provided prefix
-	prefixFilter := cobrautil.MustGetString(cmd, "prefix-filter")
-	if prefixFilter != "" {
-		schema, err = filterSchemaDefs(schema, prefixFilter)
-		if err != nil {
-			return err
-		}
-	}
-	log.Debug().Str("schema", schema).Bool("filtered", prefixFilter != "").Msg("parsed schema")
-
 	c, err := client.NewClient(cmd)
 	if err != nil {
 		return fmt.Errorf("unable to initialize client: %w", err)
@@ -561,7 +465,7 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 	disableRetries := cobrautil.MustGetBool(cmd, "disable-retries")
 	requestTimeout := cobrautil.MustGetDuration(cmd, "request-timeout")
 
-	return newRestorer(schema, decoder, c, prefixFilter, batchSize, batchesPerTransaction, strategy,
+	return newRestorer(rewriterFromFlags(cmd), decoder, c, batchSize, batchesPerTransaction, strategy,
 		disableRetries, requestTimeout).restoreFromDecoder(cmd.Context())
 }
 
@@ -582,24 +486,12 @@ func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) 
 	if err != nil {
 		return err
 	}
-
 	defer func(e *error) { *e = errors.Join(*e, closer.Close()) }(&err)
 	defer func(e *error) { *e = errors.Join(*e, decoder.Close()) }(&err)
 
-	schema := decoder.Schema()
-
-	// Remove any invalid relations generated from old, backwards-incompat
-	// Serverless permission systems.
-	if cobrautil.MustGetBool(cmd, "rewrite-legacy") {
-		schema = rewriteLegacy(schema)
-	}
-
-	// Skip any definitions without the provided prefix
-	if prefixFilter := cobrautil.MustGetString(cmd, "prefix-filter"); prefixFilter != "" {
-		schema, err = filterSchemaDefs(schema, prefixFilter)
-		if err != nil {
-			return err
-		}
+	schema, err := rewriterFromFlags(cmd).RewriteSchema(decoder.Schema())
+	if err != nil {
+		return err
 	}
 
 	_, err = fmt.Fprintln(out, schema)
@@ -718,17 +610,19 @@ func backupRedactCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func backupParseRelsCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
-	prefix := cobrautil.MustGetString(cmd, "prefix-filter")
+	rewriter := rewriterFromFlags(cmd)
 	decoder, closer, err := decoderFromArgs(args...)
 	if err != nil {
 		return err
 	}
-
 	defer func(e *error) { *e = errors.Join(*e, closer.Close()) }(&err)
 	defer func(e *error) { *e = errors.Join(*e, decoder.Close()) }(&err)
 
 	for rel, err := decoder.Next(); rel != nil && err == nil; rel, err = decoder.Next() {
-		if !hasRelPrefix(rel, prefix) {
+		rel, err = rewriter.RewriteRelationship(rel)
+		if err != nil {
+			return err
+		} else if rel == nil {
 			continue
 		}
 
@@ -767,11 +661,6 @@ func decoderFromArgs(args ...string) (*backupformat.Decoder, io.Closer, error) {
 func replaceRelString(rel string) string {
 	rel = strings.Replace(rel, "@", " ", 1)
 	return strings.Replace(rel, "#", " ", 1)
-}
-
-func rewriteLegacy(schema string) string {
-	schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
-	return string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
 }
 
 var sizeErrorRegEx = regexp.MustCompile(`received message larger than max \((\d+) vs. (\d+)\)`)

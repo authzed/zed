@@ -17,7 +17,7 @@ import (
 func mapRelationshipTuplesToCLIOutput(t *testing.T, input []string) []string {
 	t.Helper()
 
-	return lo.Map[string, string](input, func(item string, _ int) string {
+	return lo.Map(input, func(item string, _ int) string {
 		return replaceRelString(item)
 	})
 }

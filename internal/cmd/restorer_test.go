@@ -27,6 +27,36 @@ var (
 	oneConflictError      = []error{errConflict}
 )
 
+func TestRestorerFiltered(t *testing.T) {
+	for _, tt := range []struct {
+		name         string
+		prefixFilter string
+		expectedErr  string
+	}{
+		{"handles gracefully all rels as filtered", "invalid", "filtered all definitions"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			backupFileName := createTestBackup(t, testSchema, nil)
+			d, closer, err := decoderFromArgs(backupFileName)
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, closer.Close()) })
+
+			c := &mockClientForRestore{t: t, schema: testSchema}
+
+			var rewriter Rewriter = &NoopRewriter{}
+			if tt.prefixFilter != "" {
+				rewriter = &PrefixFilterer{tt.prefixFilter}
+			}
+
+			r := newRestorer(rewriter, d, c, 1, 1, Fail, false, 0*time.Second)
+			err = r.restoreFromDecoder(t.Context())
+			if tt.expectedErr != "" {
+				require.ErrorContains(t, err, tt.expectedErr)
+			}
+		})
+	}
+}
+
 func TestRestorer(t *testing.T) {
 	for _, tt := range []struct {
 		name                  string
@@ -57,9 +87,7 @@ func TestRestorer(t *testing.T) {
 		{"fails fast if conflict-triggered touch fails with an unrecoverable error", "", 1, 1, Touch, false, nil, oneConflictError, oneUnrecoverableError, testRelationships},
 		{"retries if error happens right after sending a batch over the stream", "", 1, 1, Touch, false, oneConflictError, oneConflictError, nil, testRelationships},
 		{"filters relationships", "test", 1, 1, Fail, false, nil, nil, nil, append([]string{"foo/resource:1#reader@foo/user:1"}, testRelationships...)},
-		{"handles gracefully all rels as filtered", "invalid", 1, 1, Fail, false, nil, nil, nil, testRelationships},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			backupFileName := createTestBackup(t, testSchema, tt.relationships)
@@ -69,13 +97,19 @@ func TestRestorer(t *testing.T) {
 				require.NoError(closer.Close())
 			})
 
+			var rewriter Rewriter = &NoopRewriter{}
+			if tt.prefixFilter != "" {
+				rewriter = &PrefixFilterer{tt.prefixFilter}
+			}
+
 			expectedFilteredRels := make([]string, 0, len(tt.relationships))
 			for _, rel := range tt.relationships {
-				if !hasRelPrefix(tuple.MustParseV1Rel(rel), tt.prefixFilter) {
+				r, err := rewriter.RewriteRelationship(tuple.MustParseV1Rel(rel))
+				require.NoError(err)
+				if r == nil {
 					continue
 				}
-
-				expectedFilteredRels = append(expectedFilteredRels, rel)
+				expectedFilteredRels = append(expectedFilteredRels, tuple.MustV1RelString(r))
 			}
 
 			expectedBatches := uint(len(expectedFilteredRels)) / tt.batchSize
@@ -157,7 +191,7 @@ func TestRestorer(t *testing.T) {
 				expectedSkippedRels += expectedConflicts * tt.batchSize
 			}
 
-			r := newRestorer(testSchema, d, c, tt.prefixFilter, tt.batchSize, tt.batchesPerTransaction, tt.conflictStrategy, tt.disableRetryErrors, 0*time.Second)
+			r := newRestorer(rewriter, d, c, tt.batchSize, tt.batchesPerTransaction, tt.conflictStrategy, tt.disableRetryErrors, 0*time.Second)
 			err = r.restoreFromDecoder(t.Context())
 			if expectsError != nil || (expectedConflicts > 0 && tt.conflictStrategy == Fail) {
 				require.ErrorIs(err, expectsError)
