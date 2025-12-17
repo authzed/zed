@@ -209,8 +209,7 @@ func redactSchema(schema string, opts RedactionOptions) (string, RedactionMap, e
 						}
 
 						if opts.RedactRelations {
-							switch t := allowedDirect.RelationOrWildcard.(type) {
-							case *core.AllowedRelation_Relation:
+							if t, ok := allowedDirect.RelationOrWildcard.(*core.AllowedRelation_Relation); ok {
 								t.Relation = redactionMap.Relations[t.Relation]
 							}
 						}

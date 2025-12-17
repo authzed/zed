@@ -113,9 +113,7 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 		Use:   "redact <filename>",
 		Short: "Redact a backup file to remove sensitive information",
 		Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return backupRedactCmdFunc(cmd, args)
-		},
+		RunE:  backupRedactCmdFunc,
 	}
 
 	rootCmd.AddCommand(backupCmd)
@@ -364,11 +362,12 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 			Uint64("processed", relsProcessed).
 			Uint64("throughput", perSec(relsProcessed, time.Since(relationshipReadStart))).
 			Stringer("elapsed", time.Since(relationshipReadStart).Round(time.Second))
-		if isCanceled(err) {
+		switch {
+		case isCanceled(err):
 			evt.Msg("backup canceled - resume by restarting the backup command")
-		} else if err != nil {
+		case err != nil:
 			evt.Msg("backup failed")
-		} else {
+		default:
 			evt.Msg("finished backup")
 		}
 	}()
@@ -490,7 +489,7 @@ func encoderForNewBackup(cmd *cobra.Command, c client.Client, backupFile *os.Fil
 		return nil, nil, fmt.Errorf("error reading schema: %w", err)
 	}
 	if schemaResp.ReadAt == nil {
-		return nil, nil, fmt.Errorf("`backup` is not supported on this version of SpiceDB")
+		return nil, nil, errors.New("`backup` is not supported on this version of SpiceDB")
 	}
 	schema := schemaResp.SchemaText
 
@@ -550,17 +549,20 @@ func openProgressFile(backupFileName string, backupAlreadyExisted bool) (*os.Fil
 	// if a backup existed
 	var fileMode int
 	readCursor, err := os.ReadFile(progressFileName)
-	if backupAlreadyExisted && (os.IsNotExist(err) || len(readCursor) == 0) {
-		return nil, nil, fmt.Errorf("backup file %s already exists", backupFileName)
-	} else if backupAlreadyExisted && err == nil {
-		cursor = &v1.Cursor{
-			Token: string(readCursor),
+	if backupAlreadyExisted {
+		if os.IsNotExist(err) || len(readCursor) == 0 {
+			return nil, nil, fmt.Errorf("backup file %s already exists", backupFileName)
 		}
+		if err == nil {
+			cursor = &v1.Cursor{
+				Token: string(readCursor),
+			}
 
-		// if backup existed and there is a progress marker, the latter should not be truncated to make sure the
-		// cursor stays around in case of a failure before we even start ingesting from bulk export
-		fileMode = os.O_WRONLY | os.O_CREATE
-		log.Info().Str("filename", backupFileName).Msg("backup file already exists, will resume")
+			// if backup existed and there is a progress marker, the latter should not be truncated to make sure the
+			// cursor stays around in case of a failure before we even start ingesting from bulk export
+			fileMode = os.O_WRONLY | os.O_CREATE
+			log.Info().Str("filename", backupFileName).Msg("backup file already exists, will resume")
+		}
 	} else {
 		// if a backup did not exist, make sure to truncate the progress file
 		fileMode = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
@@ -733,7 +735,7 @@ func backupParseRevisionCmdFunc(_ *cobra.Command, out io.Writer, args []string) 
 
 	loadedToken := decoder.ZedToken()
 	if loadedToken == nil {
-		return fmt.Errorf("failed to parse decoded revision")
+		return errors.New("failed to parse decoded revision")
 	}
 
 	_, err = fmt.Fprintln(out, loadedToken.Token)

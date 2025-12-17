@@ -3,9 +3,11 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -33,15 +35,15 @@ type spiceDBMCPServer struct {
 }
 
 type RelationshipDef struct {
-	ResourceType    string                 `json:"resource_type"`
-	ResourceID      string                 `json:"resource_id"`
-	Relation        string                 `json:"relation"`
-	SubjectType     string                 `json:"subject_type"`
-	SubjectID       string                 `json:"subject_id"`
-	SubjectRelation string                 `json:"optional_subject_relation,omitempty"`
-	CaveatName      string                 `json:"caveat_name,omitempty"`
-	CaveatContext   map[string]interface{} `json:"caveat_context,omitempty"`
-	Expiration      *time.Time             `json:"expiration,omitempty"`
+	ResourceType    string         `json:"resource_type"`
+	ResourceID      string         `json:"resource_id"`
+	Relation        string         `json:"relation"`
+	SubjectType     string         `json:"subject_type"`
+	SubjectID       string         `json:"subject_id"`
+	SubjectRelation string         `json:"optional_subject_relation,omitempty"`
+	CaveatName      string         `json:"caveat_name,omitempty"`
+	CaveatContext   map[string]any `json:"caveat_context,omitempty"`
+	Expiration      *time.Time     `json:"expiration,omitempty"`
 }
 
 type ValidationFile struct {
@@ -349,7 +351,7 @@ func (smcp *spiceDBMCPServer) Run(portNumber int) error {
 
 	// Start the HTTP server in a goroutine
 	wg.Go(func() error {
-		err := httpServer.Start(":" + fmt.Sprint(portNumber))
+		err := httpServer.Start(":" + strconv.Itoa(portNumber))
 		if err != nil {
 			console.Errorf("Failed to start MCP server: %v\n", err)
 			return fmt.Errorf("failed to start MCP server: %w", err)
@@ -388,7 +390,7 @@ func (smcp *spiceDBMCPServer) Run(portNumber int) error {
 			return nil
 		case <-time.After(3 * time.Second):
 			console.Printf("Shutdown timeout reached, forcing exit\n")
-			return fmt.Errorf("shutdown timeout")
+			return errors.New("shutdown timeout")
 		}
 
 	case <-ctx.Done():
@@ -681,7 +683,7 @@ func (smcp *spiceDBMCPServer) getAllRelationshipsHandler(ctx context.Context, re
 	}
 
 	console.Printf("relationships://all: Retrieved %d relationships\n", len(relationshipStrings))
-	jsonData, err := json.MarshalIndent(map[string]interface{}{
+	jsonData, err := json.MarshalIndent(map[string]any{
 		"relationships": relationshipStrings,
 		"count":         len(relationshipStrings),
 	}, "", "  ")
@@ -753,7 +755,7 @@ func (smcp *spiceDBMCPServer) checkPermissionHandler(ctx context.Context, reques
 	caveatContextString := request.GetString("optional_caveat_context_json", "")
 	var caveatContext *structpb.Struct
 	if caveatContextString != "" {
-		caveatContextMap := make(map[string]interface{})
+		caveatContextMap := make(map[string]any)
 		if err := json.Unmarshal([]byte(caveatContextString), &caveatContextMap); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to parse caveat context: %v", err)), nil
 		}
@@ -842,7 +844,7 @@ func (smcp *spiceDBMCPServer) lookupResourcesHandler(ctx context.Context, reques
 	caveatContextString := request.GetString("optional_caveat_context_json", "")
 	var caveatContext *structpb.Struct
 	if caveatContextString != "" {
-		caveatContextMap := make(map[string]interface{})
+		caveatContextMap := make(map[string]any)
 		if err := json.Unmarshal([]byte(caveatContextString), &caveatContextMap); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to parse caveat context: %v", err)), nil
 		}
@@ -881,7 +883,7 @@ func (smcp *spiceDBMCPServer) lookupResourcesHandler(ctx context.Context, reques
 	}
 
 	console.Printf("lookup_resources: Found %d resources\n", len(resources))
-	result, err := json.MarshalIndent(map[string]interface{}{
+	result, err := json.MarshalIndent(map[string]any{
 		"resources": resources,
 		"count":     len(resources),
 	}, "", "  ")
@@ -928,7 +930,7 @@ func (smcp *spiceDBMCPServer) lookupSubjectsHandler(ctx context.Context, request
 	caveatContextString := request.GetString("optional_caveat_context_json", "")
 	var caveatContext *structpb.Struct
 	if caveatContextString != "" {
-		caveatContextMap := make(map[string]interface{})
+		caveatContextMap := make(map[string]any)
 		if err := json.Unmarshal([]byte(caveatContextString), &caveatContextMap); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to parse caveat context: %v", err)), nil
 		}
@@ -973,7 +975,7 @@ func (smcp *spiceDBMCPServer) lookupSubjectsHandler(ctx context.Context, request
 	}
 
 	console.Printf("lookup_subjects: Found %d subjects\n", len(subjects))
-	result, err := json.MarshalIndent(map[string]interface{}{
+	result, err := json.MarshalIndent(map[string]any{
 		"subjects": subjects,
 		"count":    len(subjects),
 	}, "", "  ")

@@ -45,7 +45,7 @@ func TestReadSchema(t *testing.T) {
 		schema, err := server.readSchema(ctx)
 
 		// SpiceDB returns an error when no schema is defined, which is expected
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "No schema has been defined")
 		assert.Empty(t, schema)
 	})
@@ -66,7 +66,7 @@ definition user {}`
 		// Now read it back
 		schema, err := server.readSchema(ctx)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, expectedSchema, schema)
 	})
 }
@@ -91,7 +91,7 @@ definition user {}`
 
 		relationships, err := server.readRelationships(ctx)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Empty(t, relationships)
 	})
 
@@ -139,7 +139,7 @@ definition user {
 
 		relationships, err := server.readRelationships(ctx)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, relationships, 2)
 
 		// Check for expected relationships (order may vary)
@@ -194,7 +194,7 @@ definition user {}`
 
 		contents, err := server.getValidationFileHandler(ctx, request)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, contents, 1)
 
 		content := contents[0].(mcp.TextResourceContents)
@@ -204,7 +204,7 @@ definition user {}`
 		// Parse and verify YAML content
 		var validationFile ValidationFile
 		err = yaml.Unmarshal([]byte(content.Text), &validationFile)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, expectedSchema, validationFile.Schema)
 		assert.Len(t, validationFile.Relationships, 1)
 		assert.Equal(t, "document:doc1#viewer@user:alice", validationFile.Relationships[0])
@@ -234,7 +234,7 @@ definition user {}`
 
 		contents, err := server.getCurrentSchemaHandler(ctx, request)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, contents, 1)
 
 		content := contents[0].(mcp.TextResourceContents)
@@ -285,7 +285,7 @@ definition user {}`
 
 		contents, err := server.getAllRelationshipsHandler(ctx, request)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, contents, 1)
 
 		content := contents[0].(mcp.TextResourceContents)
@@ -311,7 +311,7 @@ definition user {}`
 		// Create mock request
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
-				Arguments: map[string]interface{}{
+				Arguments: map[string]any{
 					"schema": schemaText,
 				},
 			},
@@ -319,12 +319,12 @@ definition user {}`
 
 		result, err := server.writeSchemaHandler(ctx, request)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 
 		// Verify the schema was actually written by reading it back
 		schema, err := server.readSchema(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, schemaText, schema)
 	})
 }
@@ -344,7 +344,7 @@ func TestBuildRelationship(t *testing.T) {
 
 		relationship, err := server.buildRelationship(rel)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "document", relationship.Resource.ObjectType)
 		assert.Equal(t, "doc1", relationship.Resource.ObjectId)
 		assert.Equal(t, "viewer", relationship.Relation)
@@ -365,7 +365,7 @@ func TestBuildRelationship(t *testing.T) {
 
 		relationship, err := server.buildRelationship(rel)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "member", relationship.Subject.OptionalRelation)
 	})
 
@@ -377,12 +377,12 @@ func TestBuildRelationship(t *testing.T) {
 			SubjectType:   "user",
 			SubjectID:     "alice",
 			CaveatName:    "ip_range",
-			CaveatContext: map[string]interface{}{"max_attempts": 3, "enabled": true},
+			CaveatContext: map[string]any{"max_attempts": 3, "enabled": true},
 		}
 
 		relationship, err := server.buildRelationship(rel)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, relationship.OptionalCaveat)
 		assert.Equal(t, "ip_range", relationship.OptionalCaveat.CaveatName)
 		// Context should be set (not nil) when caveat context is provided
@@ -401,11 +401,11 @@ func TestValidationFileStruct(t *testing.T) {
 		}
 
 		yamlData, err := yaml.Marshal(vf)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		var parsed ValidationFile
 		err = yaml.Unmarshal(yamlData, &parsed)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, vf.Schema, parsed.Schema)
 		assert.Equal(t, vf.Relationships, parsed.Relationships)
@@ -415,11 +415,11 @@ func TestValidationFileStruct(t *testing.T) {
 		vf := ValidationFile{}
 
 		yamlData, err := yaml.Marshal(vf)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		var parsed ValidationFile
 		err = yaml.Unmarshal(yamlData, &parsed)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		assert.Empty(t, parsed.Schema)
 		assert.Empty(t, parsed.Relationships)

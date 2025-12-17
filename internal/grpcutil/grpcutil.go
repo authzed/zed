@@ -31,7 +31,7 @@ var once sync.Once
 func CheckServerVersion(
 	ctx context.Context,
 	method string,
-	req, reply interface{},
+	req, reply any,
 	cc *grpc.ClientConn,
 	invoker grpc.UnaryInvoker,
 	callOpts ...grpc.CallOption,
@@ -47,11 +47,12 @@ func CheckServerVersion(
 		versionFromHeader := headerMD.Get(string(responsemeta.ServerVersion))
 		versionFromTrailer := trailerMD.Get(string(responsemeta.ServerVersion))
 		currentVersion := ""
-		if len(versionFromHeader) == 0 && len(versionFromTrailer) == 0 {
+		switch {
+		case len(versionFromHeader) == 0 && len(versionFromTrailer) == 0:
 			log.Debug().Msg("error reading server version response header and trailer; it may be disabled on the server")
-		} else if len(versionFromHeader) == 1 {
+		case len(versionFromHeader) == 1:
 			currentVersion = versionFromHeader[0]
-		} else if len(versionFromTrailer) == 1 {
+		case len(versionFromTrailer) == 1:
 			currentVersion = versionFromTrailer[0]
 		}
 
@@ -101,7 +102,7 @@ func CheckServerVersion(
 func LogDispatchTrailers(
 	ctx context.Context,
 	method string,
-	req, reply interface{},
+	req, reply any,
 	cc *grpc.ClientConn,
 	invoker grpc.UnaryInvoker,
 	callOpts ...grpc.CallOption,
@@ -159,7 +160,7 @@ type wrappedStream struct {
 	grpc.ClientStream
 }
 
-func (w *wrappedStream) RecvMsg(m interface{}) error {
+func (w *wrappedStream) RecvMsg(m any) error {
 	err := w.ClientStream.RecvMsg(m)
 	if err != nil && errors.Is(err, io.EOF) {
 		outputDispatchTrailers(w.Trailer())

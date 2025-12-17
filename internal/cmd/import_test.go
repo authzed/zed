@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -29,7 +30,7 @@ func TestImportCmdHappyPath(t *testing.T) {
 	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
-		require.NoError(srv.Run(ctx))
+		assert.NoError(t, srv.Run(ctx))
 	}()
 	conn, err := srv.GRPCDialContext(ctx)
 	require.NoError(err)
@@ -57,5 +58,5 @@ func TestImportCmdHappyPath(t *testing.T) {
 		Resource:    &v1.ObjectReference{ObjectType: "resource", ObjectId: "1"},
 	})
 	require.NoError(err)
-	require.Equal(resp.Permissionship, v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION)
+	require.Equal(v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION, resp.Permissionship)
 }

@@ -33,8 +33,8 @@ func TestTokenWithOverride(t *testing.T) {
 	require.Equal(t, "n1", result.Name)
 	require.Equal(t, "e2", result.Endpoint)
 	require.Equal(t, "a2", result.APIToken)
-	require.Equal(t, false, *result.Insecure)
-	require.Equal(t, false, *result.NoVerifyCA)
+	require.False(t, *result.Insecure)
+	require.False(t, *result.NoVerifyCA)
 	require.Equal(t, 0, bytes.Compare([]byte("c2"), result.CACert))
 
 	result, err = TokenWithOverride(Token{}, referenceToken)
@@ -42,7 +42,7 @@ func TestTokenWithOverride(t *testing.T) {
 	require.Equal(t, "n1", result.Name)
 	require.Equal(t, "e1", result.Endpoint)
 	require.Equal(t, "a1", result.APIToken)
-	require.Equal(t, true, *result.Insecure)
-	require.Equal(t, true, *result.NoVerifyCA)
+	require.True(t, *result.Insecure)
+	require.True(t, *result.NoVerifyCA)
 	require.Equal(t, 0, bytes.Compare([]byte("c1"), result.CACert))
 }

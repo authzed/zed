@@ -1,6 +1,10 @@
 package mcp
 
-import "github.com/authzed/zed/internal/schemaexamples"
+import (
+	"strings"
+
+	"github.com/authzed/zed/internal/schemaexamples"
+)
 
 const baseInstructions = `
   You are a helpful AI Agent tasked with helping the user develop, test and iterate on SpiceDB schema (*.zed files) and associated *test* relationship tuples.
@@ -73,17 +77,20 @@ const baseInstructions = `
 `
 
 func buildInstructions() (string, error) {
-	instructions := baseInstructions
+	var instructions strings.Builder
+	instructions.WriteString(baseInstructions)
 
 	examples, err := schemaexamples.ListExampleSchemas()
 	if err != nil {
 		return "", err
 	}
 
-	instructions += "\n  Example schemas you can draw inspiration from include:\n"
+	instructions.WriteString("\n  Example schemas you can draw inspiration from include:\n")
 	for _, example := range examples {
-		instructions += "<example>" + string(example) + "</example>\n"
+		instructions.WriteString("<example>")
+		instructions.Write(example)
+		instructions.WriteString("</example>\n")
 	}
 
-	return instructions, nil
+	return instructions.String(), nil
 }

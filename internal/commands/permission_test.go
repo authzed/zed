@@ -2,11 +2,13 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
@@ -42,7 +44,7 @@ func (m *mockCheckClient) CheckPermission(_ context.Context, _ *v1.CheckPermissi
 		protoText = "invalid"
 	}
 
-	err := spiceerrors.WithCodeAndDetailsAsError(fmt.Errorf("test"), codes.FailedPrecondition, &errdetails.ErrorInfo{
+	err := spiceerrors.WithCodeAndDetailsAsError(errors.New("test"), codes.FailedPrecondition, &errdetails.ErrorInfo{
 		Reason: v1.ErrorReason_name[int32(v1.ErrorReason_ERROR_REASON_MAXIMUM_DEPTH_EXCEEDED)],
 		Domain: "test",
 		Metadata: map[string]string{
@@ -73,7 +75,7 @@ func TestCheckErrorWithDebugInformation(t *testing.T) {
 	registerConsistencyFlags(cmd.Flags())
 
 	err := checkCmdFunc(cmd, []string{"object:1", "perm", "object:2"})
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.ErrorContains(t, err, "test")
 }
 
@@ -98,7 +100,7 @@ func TestCheckErrorWithInvalidDebugInformation(t *testing.T) {
 	registerConsistencyFlags(cmd.Flags())
 
 	err := checkCmdFunc(cmd, []string{"object:1", "perm", "object:2"})
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.ErrorContains(t, err, "unknown field: invalid")
 }
 
@@ -107,7 +109,7 @@ func TestLookupResourcesCommand(t *testing.T) {
 	defer cancel()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
-		require.NoError(t, srv.Run(ctx))
+		assert.NoError(t, srv.Run(ctx))
 	}()
 	conn, err := srv.GRPCDialContext(ctx)
 	require.NoError(t, err)
@@ -160,7 +162,7 @@ func TestLookupResourcesCommand(t *testing.T) {
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
 	require.Equal(t, 10, count)
-	require.EqualValues(t, []uint{10}, receivedPageSizes)
+	require.Equal(t, []uint{10}, receivedPageSizes)
 
 	// use page size same as number of elements
 	count = 0
@@ -169,7 +171,7 @@ func TestLookupResourcesCommand(t *testing.T) {
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
 	require.Equal(t, 10, count)
-	require.EqualValues(t, []uint{10, 0}, receivedPageSizes)
+	require.Equal(t, []uint{10, 0}, receivedPageSizes)
 
 	// use odd page size
 	count = 0
@@ -178,7 +180,7 @@ func TestLookupResourcesCommand(t *testing.T) {
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
 	require.Equal(t, 10, count)
-	require.EqualValues(t, []uint{3, 3, 3, 1}, receivedPageSizes)
+	require.Equal(t, []uint{3, 3, 3, 1}, receivedPageSizes)
 }
 
 func testLookupResourcesCommand(t *testing.T, limit uint32) *cobra.Command {
