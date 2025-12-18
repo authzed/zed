@@ -202,7 +202,7 @@ func (fe *OcfFileEncoder) lockFileName() string {
 func (fe *OcfFileEncoder) Cursor() (string, error) {
 	cursorBytes, err := os.ReadFile(fe.lockFileName())
 	if os.IsNotExist(err) {
-		return "", fmt.Errorf("completed backup file already exists")
+		return "", errors.New("completed backup file already exists")
 	} else if err != nil {
 		return "", err
 	}

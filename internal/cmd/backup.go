@@ -531,7 +531,7 @@ func backupParseRevisionCmdFunc(cmd *cobra.Command, out io.Writer, args []string
 
 	loadedToken, err := decoder.ZedToken()
 	if loadedToken == nil || err != nil {
-		return fmt.Errorf("failed to parse decoded revision")
+		return errors.New("failed to parse decoded revision")
 	}
 
 	_, err = fmt.Fprintln(out, loadedToken.Token)
