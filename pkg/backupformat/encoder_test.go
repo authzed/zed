@@ -40,13 +40,6 @@ func TestNewEncoder(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "nil token",
-			schema:      "definition user {}",
-			token:       nil,
-			expectError: true,
-			errorMsg:    "missing expected token",
-		},
-		{
 			name:        "empty token",
 			schema:      "definition user {}",
 			token:       &v1.ZedToken{Token: ""},
@@ -57,7 +50,8 @@ func TestNewEncoder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			enc, err := NewEncoder(&buf, tt.schema, tt.token)
+			enc := NewOcfEncoder(&buf)
+			err := enc.WriteSchema(tt.schema, tt.token.Token)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -72,15 +66,6 @@ func TestNewEncoder(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestNewEncoderForExisting(t *testing.T) {
-	var buf bytes.Buffer
-	enc, err := NewEncoderForExisting(&buf)
-
-	require.NoError(t, err)
-	require.NotNil(t, enc)
-	require.NotNil(t, enc.enc)
 }
 
 func TestOcfEncoder_Append(t *testing.T) {
@@ -195,7 +180,8 @@ func TestOcfEncoder_Append(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			enc, err := NewEncoder(&buf, "definition test {}", &v1.ZedToken{Token: "test"})
+			enc := NewOcfEncoder(&buf)
+			err := enc.WriteSchema("definition test {}", "test")
 			require.NoError(t, err)
 
 			err = enc.Append(tt.relationship, tt.cursor)
@@ -212,7 +198,8 @@ func TestOcfEncoder_Append(t *testing.T) {
 
 func TestOcfEncoder_AppendNilRelationship(t *testing.T) {
 	var buf bytes.Buffer
-	enc, err := NewEncoder(&buf, "definition test {}", &v1.ZedToken{Token: "test"})
+	enc := NewOcfEncoder(&buf)
+	err := enc.WriteSchema("definition test {}", "test")
 	require.NoError(t, err)
 	defer require.NoError(t, enc.Close())
 
@@ -246,7 +233,8 @@ func TestOcfEncoder_Close(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			enc, err := NewEncoder(&buf, "definition user {}", &v1.ZedToken{Token: "test"})
+			enc := NewOcfEncoder(&buf)
+			err := enc.WriteSchema("definition test {}", "test")
 			require.NoError(t, err)
 
 			if tt.appendData {
@@ -282,7 +270,8 @@ func TestOcfEncoder_Close(t *testing.T) {
 
 func TestOcfEncoder_MarkComplete(t *testing.T) {
 	var buf bytes.Buffer
-	enc, err := NewEncoder(&buf, "definition user {}", &v1.ZedToken{Token: "test"})
+	enc := NewOcfEncoder(&buf)
+	err := enc.WriteSchema("definition test {}", "test")
 	require.NoError(t, err)
 	defer require.NoError(t, enc.Close())
 
@@ -296,7 +285,8 @@ func TestOcfEncoder_MarkComplete(t *testing.T) {
 
 func TestOcfEncoder_MultipleOperations(t *testing.T) {
 	var buf bytes.Buffer
-	enc, err := NewEncoder(&buf, "definition user {}\ndefinition document { relation viewer: user }", &v1.ZedToken{Token: "test_token"})
+	enc := NewOcfEncoder(&buf)
+	err := enc.WriteSchema("definition user {}\ndefinition document { relation viewer: user }", "test_token")
 	require.NoError(t, err)
 	defer require.NoError(t, enc.Close())
 
@@ -333,7 +323,8 @@ func TestOcfEncoder_MultipleOperations(t *testing.T) {
 
 func TestOcfEncoder_InvalidCaveatContext(t *testing.T) {
 	var buf bytes.Buffer
-	enc, err := NewEncoder(&buf, "definition user {}", &v1.ZedToken{Token: "test"})
+	enc := NewOcfEncoder(&buf)
+	err := enc.WriteSchema("definition test {}", "test")
 	require.NoError(t, err)
 	defer require.NoError(t, enc.Close())
 
@@ -363,7 +354,8 @@ func TestOcfEncoder_InvalidCaveatContext(t *testing.T) {
 
 func TestOcfEncoder_1kRels(t *testing.T) {
 	var buf bytes.Buffer
-	enc, err := NewEncoder(&buf, "definition user {}\ndefinition document { relation viewer: user }", &v1.ZedToken{Token: "large_test"})
+	enc := NewOcfEncoder(&buf)
+	err := enc.WriteSchema("definition user {}\ndefinition document { relation viewer: user }", "large_test")
 	require.NoError(t, err)
 	defer require.NoError(t, enc.Close())
 
@@ -423,7 +415,10 @@ func TestNewFileEncoder(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			enc, err := NewFileEncoder(tt.filename, tt.schema, tt.token)
+			enc, existed, err := NewFileEncoder(tt.filename)
+			if !existed {
+				enc.WriteSchema(tt.schema, tt.token.Token)
+			}
 			if tt.expectError {
 				require.Error(t, err)
 				require.Nil(t, enc)
@@ -442,10 +437,6 @@ func TestNewFileEncoder(t *testing.T) {
 }
 
 func TestWithProgress(t *testing.T) {
-	var buf bytes.Buffer
-	baseEnc, err := NewEncoder(&buf, "definition user {}", &v1.ZedToken{Token: "test"})
-	require.NoError(t, err)
-
 	tests := []struct {
 		name   string
 		prefix string
@@ -466,10 +457,14 @@ func TestWithProgress(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			progEnc := WithProgress(tt.prefix, baseEnc)
+			var buf bytes.Buffer
+			enc := NewOcfEncoder(&buf)
+			err := enc.WriteSchema("definition user {}", "test")
+			require.NoError(t, err)
+
+			rw := &PrefixFilterer{Prefix: tt.prefix}
+			progEnc := WithProgress(WithRewriter(rw, enc))
 			require.NotNil(t, progEnc)
-			require.Equal(t, tt.prefix, progEnc.prefix)
-			require.Equal(t, baseEnc, progEnc.Encoder)
 			require.NotNil(t, progEnc.startTime)
 			require.NotNil(t, progEnc.ticker)
 		})
@@ -522,14 +517,16 @@ func TestProgressRenderingEncoder_Append(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var innerBuf bytes.Buffer
-			innerEnc, err := NewEncoder(&innerBuf, "definition user {}\ndefinition document { relation viewer: user }", &v1.ZedToken{Token: "test"})
+			innerEnc := NewOcfEncoder(&innerBuf)
+			err := innerEnc.WriteSchema("definition user {}\ndefinition document { relation viewer: user }", "test")
 			require.NoError(t, err)
 			defer innerEnc.Close()
 
-			progEnc := WithProgress(tt.prefix, innerEnc)
+			rw := &PrefixFilterer{Prefix: tt.prefix}
+			progEnc := WithProgress(WithRewriter(rw, innerEnc))
 
 			initialProcessed := progEnc.relsProcessed
-			initialFiltered := progEnc.relsFilteredOut
+			initialFiltered := rw.skipped
 
 			err = progEnc.Append(tt.relationship, "cursor123")
 			if tt.expectError {
@@ -537,17 +534,13 @@ func TestProgressRenderingEncoder_Append(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 
-				// Should always increment processed count
-				require.Equal(t, initialProcessed+1, progEnc.relsProcessed)
+				require.Equal(t, initialProcessed+1, progEnc.relsProcessed, "should always increment processed count")
 
 				if tt.expectStored {
-					// Should not increment filtered count
-					require.Equal(t, initialFiltered, progEnc.relsFilteredOut)
-					// Should have data in buffer
-					require.NotEmpty(t, innerBuf.Bytes())
+					require.Equal(t, initialFiltered, rw.skipped, "should not increment filtered count")
+					require.NotEmpty(t, innerBuf.Bytes(), "should have data in buffer")
 				} else {
-					// Should increment filtered count
-					require.Equal(t, initialFiltered+1, progEnc.relsFilteredOut)
+					require.Equal(t, initialFiltered+1, rw.skipped, "should increment filtered count")
 				}
 			}
 		})

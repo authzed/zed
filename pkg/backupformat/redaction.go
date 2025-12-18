@@ -71,17 +71,25 @@ func (rm RedactionMap) Invert() RedactionMap {
 }
 
 // NewRedactor creates a new redactor that will redact the data as it is written.
-func NewRedactor(dec *Decoder, w io.Writer, opts RedactionOptions) (*Redactor, error) {
+func NewRedactor(dec Decoder, w io.Writer, opts RedactionOptions) (*Redactor, error) {
+	schema, err := dec.Schema()
+	if err != nil {
+		return nil, err
+	}
 	// Rewrite the schema to redact as requested.
-	redactedSchema, redactionMap, err := redactSchema(dec.Schema(), opts)
+	redactedSchema, redactionMap, err := redactSchema(schema, opts)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create a new encoder with the redacted schema.
-	token := dec.ZedToken()
-	encoder, err := NewEncoder(w, redactedSchema, token)
+	token, err := dec.ZedToken()
 	if err != nil {
+		return nil, err
+	}
+
+	encoder := &OcfEncoder{w: w}
+	if err := encoder.WriteSchema(redactedSchema, token.Token); err != nil {
 		return nil, err
 	}
 
@@ -89,7 +97,7 @@ func NewRedactor(dec *Decoder, w io.Writer, opts RedactionOptions) (*Redactor, e
 }
 
 type Redactor struct {
-	dec          *Decoder
+	dec          Decoder
 	opts         RedactionOptions
 	enc          Encoder
 	redactionMap RedactionMap
@@ -129,7 +137,13 @@ func (r *Redactor) Close() error {
 		}
 	}
 
-	return r.dec.Close()
+	if closer, ok := r.dec.(io.Closer); ok {
+		if err := closer.Close(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func redactSchema(schema string, opts RedactionOptions) (string, RedactionMap, error) {

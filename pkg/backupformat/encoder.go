@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/hamba/avro/v2/ocf"
@@ -22,51 +21,11 @@ import (
 	"github.com/authzed/zed/internal/console"
 )
 
-func NewEncoderForExisting(w io.Writer) (*OcfEncoder, error) {
-	avroSchema, err := avroSchemaV1()
-	if err != nil {
-		return nil, fmt.Errorf("unable to create avro schema: %w", err)
-	}
-
-	enc, err := ocf.NewEncoder(avroSchema, w, ocf.WithCodec(ocf.Snappy))
-	if err != nil {
-		return nil, fmt.Errorf("unable to create encoder: %w", err)
-	}
-
-	return &OcfEncoder{enc}, nil
-}
-
-func NewEncoder(w io.Writer, schema string, token *v1.ZedToken) (*OcfEncoder, error) {
-	avroSchema, err := avroSchemaV1()
-	if err != nil {
-		return nil, fmt.Errorf("unable to create avro schema: %w", err)
-	}
-
-	if token == nil {
-		return nil, errors.New("missing expected token")
-	}
-
-	md := map[string][]byte{
-		metadataKeyZT: []byte(token.Token),
-	}
-
-	enc, err := ocf.NewEncoder(avroSchema, w, ocf.WithCodec(ocf.Snappy), ocf.WithMetadata(md))
-	if err != nil {
-		return nil, fmt.Errorf("unable to create encoder: %w", err)
-	}
-
-	if err := enc.Encode(SchemaV1{
-		SchemaText: schema,
-	}); err != nil {
-		return nil, fmt.Errorf("unable to encode SpiceDB schema object: %w", err)
-	}
-
-	return &OcfEncoder{enc}, nil
-}
-
 // Encoder represents the operations required to iteratively encode a backup
 // of SpiceDB relationship data.
 type Encoder interface {
+	WriteSchema(schema, revision string) error
+
 	// Append encodes an additional Relationship using the provided cursor to
 	// keep track of progress.
 	Append(r *v1.Relationship, cursor string) error
@@ -78,6 +37,7 @@ type Encoder interface {
 
 var (
 	_ Encoder = (*MockEncoder)(nil)
+	_ Encoder = (*RewriteEncoder)(nil)
 	_ Encoder = (*OcfEncoder)(nil)
 	_ Encoder = (*OcfFileEncoder)(nil)
 	_ Encoder = (*ProgressRenderingEncoder)(nil)
@@ -95,11 +55,91 @@ func (m *MockEncoder) Append(r *v1.Relationship, cursor string) error {
 	return nil
 }
 
-func (m *MockEncoder) MarkComplete() { m.Complete = true }
+func (m *MockEncoder) WriteSchema(_, _ string) error { return nil }
+func (m *MockEncoder) MarkComplete()                 { m.Complete = true }
+
+func WithRewriter(rw Rewriter, e Encoder) *RewriteEncoder {
+	return &RewriteEncoder{Rewriter: rw, Encoder: e}
+}
+
+// RewriteEncoder implements `Encoder` by rewriting any relationships before
+// passing it on to the provided Encoder.
+type RewriteEncoder struct {
+	Rewriter
+	Encoder
+}
+
+func (e *RewriteEncoder) Append(r *v1.Relationship, cursor string) error {
+	rel, err := e.RewriteRelationship(r)
+	if err != nil {
+		return err
+	} else if rel == nil {
+		return nil
+	}
+	return e.Encoder.Append(rel, cursor)
+}
+
+func (e *RewriteEncoder) MarshalZerologObject(event *zerolog.Event) {
+	if obj, ok := e.Rewriter.(zerolog.LogObjectMarshaler); ok {
+		event.EmbedObject(obj)
+	}
+
+	if obj, ok := e.Encoder.(zerolog.LogObjectMarshaler); ok {
+		event.EmbedObject(obj)
+	}
+}
+
+func (e *RewriteEncoder) Close() error {
+	if closer, ok := e.Encoder.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
 
 // OcfEncoder implements `Encoder` by formatting data in the AVRO OCF format.
 type OcfEncoder struct {
+	w   io.Writer
 	enc *ocf.Encoder
+}
+
+func NewOcfEncoder(w io.Writer) *OcfEncoder {
+	return &OcfEncoder{w: w}
+}
+
+func (e *OcfEncoder) encoder(revision string) (*ocf.Encoder, error) {
+	if e.enc != nil {
+		return e.enc, nil
+	}
+
+	avroSchema, err := avroSchemaV1()
+	if err != nil {
+		return nil, fmt.Errorf("unable to create avro schema: %w", err)
+	}
+
+	opts := []ocf.EncoderFunc{ocf.WithCodec(ocf.Snappy)}
+	if revision != "" {
+		opts = append(opts, ocf.WithMetadata(map[string][]byte{metadataKeyZT: []byte(revision)}))
+	}
+
+	e.enc, err = ocf.NewEncoder(avroSchema, e.w, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create encoder: %w", err)
+	}
+
+	return e.enc, nil
+}
+
+func (e *OcfEncoder) WriteSchema(schema, revision string) error {
+	enc, err := e.encoder(revision)
+	if err != nil {
+		return err
+	}
+
+	if err := enc.Encode(SchemaV1{SchemaText: schema}); err != nil {
+		return fmt.Errorf("unable to encode SpiceDB schema object: %w", err)
+	}
+
+	return nil
 }
 
 func (e *OcfEncoder) MarshalZerologObject(event *zerolog.Event) {
@@ -125,7 +165,12 @@ func (e *OcfEncoder) Append(r *v1.Relationship, _ string) error {
 		toEncode.CaveatContext = contextBytes
 	}
 
-	if err := e.enc.Encode(toEncode); err != nil {
+	encoder, err := e.encoder("")
+	if err != nil {
+		return err
+	}
+
+	if err := encoder.Encode(toEncode); err != nil {
 		return fmt.Errorf("unable to encode relationship: %w", err)
 	}
 
@@ -154,68 +199,32 @@ func (fe *OcfFileEncoder) lockFileName() string {
 	return fe.file.Name() + ".lock"
 }
 
-func NewOrExistingFileEncoder(filename, schema string, revision *v1.ZedToken) (e *OcfFileEncoder, cursor string, err error) {
-	if _, err := os.Stat(filename); filename != "-" && err == nil {
-		return NewExistingFileEncoder(filename)
+func (fe *OcfFileEncoder) Cursor() (string, error) {
+	cursorBytes, err := os.ReadFile(fe.lockFileName())
+	if os.IsNotExist(err) {
+		return "", fmt.Errorf("completed backup file already exists")
+	} else if err != nil {
+		return "", err
 	}
-	enc, err := NewFileEncoder(filename, schema, revision)
-	return enc, "", err
+	return string(cursorBytes), nil
 }
 
-func NewExistingFileEncoder(filename string) (e *OcfFileEncoder, cursor string, err error) {
+func NewFileEncoder(filename string) (e *OcfFileEncoder, existed bool, err error) {
+	_, err = os.Stat(filename)
+	backupExisted := filename != "-" && err == nil
+
 	var f *os.File
-	if filename == "" {
+	if filename == "-" {
 		f = os.Stdout
 	} else {
-		if _, err := os.Stat(filename); err != nil {
-			return nil, "", fmt.Errorf("unable to open existing backup file: %w", err)
-		}
-
-		f, err = os.OpenFile(filename, os.O_RDWR|os.O_APPEND, 0o644)
+		var err error
+		f, err = os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o644)
 		if err != nil {
-			return nil, "", fmt.Errorf("unable to open existing backup file: %w", err)
+			return nil, backupExisted, fmt.Errorf("unable to open backup file: %w", err)
 		}
 	}
 
-	encoder, err := NewEncoderForExisting(f)
-	if err != nil {
-		return nil, "", err
-	}
-
-	fileEncoder := &OcfFileEncoder{file: f, OcfEncoder: encoder}
-	cursorBytes, err := os.ReadFile(fileEncoder.lockFileName())
-	if os.IsNotExist(err) {
-		return nil, "", fmt.Errorf("completed backup file %s already exists", filename)
-	} else if err != nil {
-		return nil, "", err
-	}
-
-	return fileEncoder, string(cursorBytes), nil
-}
-
-func NewFileEncoder(filename, schema string, revision *v1.ZedToken) (*OcfFileEncoder, error) {
-	if filename == "-" {
-		return encoderForFile(os.Stdout, schema, revision)
-	}
-
-	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o644)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create backup file: %w", err)
-	}
-
-	return encoderForFile(f, schema, revision)
-}
-
-func encoderForFile(file *os.File, schema string, revision *v1.ZedToken) (*OcfFileEncoder, error) {
-	encoder, err := NewEncoder(file, schema, revision)
-	if err != nil {
-		return nil, err
-	}
-
-	return &OcfFileEncoder{
-		file:       file,
-		OcfEncoder: encoder,
-	}, nil
+	return &OcfFileEncoder{file: f, OcfEncoder: &OcfEncoder{w: f}}, backupExisted, nil
 }
 
 func (fe *OcfFileEncoder) Append(r *v1.Relationship, cursor string) error {
@@ -237,9 +246,10 @@ func (fe *OcfFileEncoder) MarkComplete() { fe.completed = true }
 
 func (fe *OcfFileEncoder) Close() error {
 	// Don't throw any errors if the file is nil when flushing/closing.
-	closeFile := func(f *os.File) error {
-		if f != nil {
-			return errors.Join(f.Sync(), f.Close())
+	safeClose := func() error {
+		if fe.file != nil && fe.enc != nil {
+			fe.OcfEncoder.Close()
+			return errors.Join(fe.file.Sync(), fe.file.Close())
 		}
 		return nil
 	}
@@ -252,8 +262,7 @@ func (fe *OcfFileEncoder) Close() error {
 	}
 
 	return errors.Join(
-		fe.OcfEncoder.Close(),
-		closeFile(fe.file),
+		safeClose(),
 		removeCompleted(fe.lockFileName()),
 	)
 }
@@ -267,18 +276,15 @@ func (fe *OcfFileEncoder) MarshalZerologObject(e *zerolog.Event) {
 // ProgressRenderingEncoder implements `Encoder` by wrapping an existing Encoder
 // and displaying its progress to the current tty.
 type ProgressRenderingEncoder struct {
-	prefix          string
-	relsProcessed   uint64
-	relsFilteredOut uint64
-	progressBar     *progressbar.ProgressBar
-	startTime       time.Time
-	ticker          <-chan time.Time
+	relsProcessed uint64
+	progressBar   *progressbar.ProgressBar
+	startTime     time.Time
+	ticker        <-chan time.Time
 	Encoder
 }
 
-func WithProgress(prefix string, e Encoder) *ProgressRenderingEncoder {
+func WithProgress(e Encoder) *ProgressRenderingEncoder {
 	return &ProgressRenderingEncoder{
-		prefix:    prefix,
 		startTime: time.Now(),
 		ticker:    time.Tick(5 * time.Second),
 		Encoder:   e,
@@ -309,21 +315,16 @@ func (pre *ProgressRenderingEncoder) MarshalZerologObject(e *zerolog.Event) {
 	}
 
 	e.
-		Uint64("filtered", pre.relsFilteredOut).
 		Uint64("processed", pre.relsProcessed).
 		Uint64("throughput", perSec(pre.relsProcessed, time.Since(pre.startTime))).
 		Stringer("elapsed", time.Since(pre.startTime).Round(time.Second))
 }
 
 func (pre *ProgressRenderingEncoder) Append(r *v1.Relationship, cursor string) error {
-	if hasRelPrefix(r, pre.prefix) {
-		if err := pre.Encoder.Append(r, cursor); err != nil {
-			return err
-		}
-	} else {
-		pre.relsFilteredOut++
-	}
 	pre.relsProcessed++
+	if err := pre.Encoder.Append(r, cursor); err != nil {
+		return err
+	}
 
 	if err := pre.bar().Add(1); err != nil {
 		return fmt.Errorf("error incrementing progress bar: %w", err)
@@ -336,12 +337,6 @@ func (pre *ProgressRenderingEncoder) Append(r *v1.Relationship, cursor string) e
 		}
 	}
 	return nil
-}
-
-func hasRelPrefix(rel *v1.Relationship, prefix string) bool {
-	// Skip any relationships without the prefix on both sides.
-	return strings.HasPrefix(rel.Resource.ObjectType, prefix) &&
-		strings.HasPrefix(rel.Subject.Object.ObjectType, prefix)
 }
 
 func perSec(i uint64, d time.Duration) uint64 {

@@ -57,8 +57,7 @@ var (
 )
 
 type restorer struct {
-	rewriter              Rewriter
-	decoder               *backupformat.Decoder
+	decoder               backupformat.Decoder
 	client                client.Client
 	batchSize             uint
 	batchesPerTransaction uint
@@ -78,13 +77,12 @@ type restorer struct {
 	requestTimeout   time.Duration
 }
 
-func newRestorer(rw Rewriter, decoder *backupformat.Decoder, client client.Client, batchSize uint,
+func newRestorer(decoder backupformat.Decoder, client client.Client, batchSize uint,
 	batchesPerTransaction uint, conflictStrategy ConflictStrategy, disableRetryErrors bool,
 	requestTimeout time.Duration,
 ) *restorer {
 	return &restorer{
 		decoder:               decoder,
-		rewriter:              rw,
 		client:                client,
 		requestTimeout:        requestTimeout,
 		batchSize:             batchSize,
@@ -96,7 +94,7 @@ func newRestorer(rw Rewriter, decoder *backupformat.Decoder, client client.Clien
 }
 
 func (r *restorer) restoreFromDecoder(ctx context.Context) error {
-	schema, err := r.rewriter.RewriteSchema(r.decoder.Schema())
+	schema, err := r.decoder.Schema()
 	if err != nil {
 		return err
 	}
@@ -129,15 +127,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 			return fmt.Errorf("aborted restore: %w", err)
 		}
 
-		rewritten, err := r.rewriter.RewriteRelationship(rel)
-		if err != nil {
-			return fmt.Errorf("failed to rewrite relationship: %w", err)
-		} else if rewritten == nil {
-			r.filteredOutRels++
-			continue
-		}
-		batch = append(batch, rewritten)
-
+		batch = append(batch, rel)
 		if uint(len(batch))%r.batchSize == 0 {
 			batchesToBeCommitted = append(batchesToBeCommitted, batch)
 			err := relationshipWriter.Send(&v1.ImportBulkRelationshipsRequest{
@@ -330,7 +320,7 @@ func (r *restorer) writeBatchesWithRetry(ctx context.Context, batches [][]*v1.Re
 
 	var currentRetries, totalRetries, loadedRels uint
 	for _, batch := range batches {
-		updates := lo.Map[*v1.Relationship, *v1.RelationshipUpdate](batch, func(item *v1.Relationship, _ int) *v1.RelationshipUpdate {
+		updates := lo.Map(batch, func(item *v1.Relationship, _ int) *v1.RelationshipUpdate {
 			return &v1.RelationshipUpdate{
 				Relationship: item,
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,

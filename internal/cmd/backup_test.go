@@ -128,7 +128,7 @@ func TestFilterSchemaDefs(t *testing.T) {
 			tt := tt
 			t.Parallel()
 
-			outputSchema, err := (&PrefixFilterer{prefix: tt.inputPrefix}).RewriteSchema(tt.inputSchema)
+			outputSchema, err := (&backupformat.PrefixFilterer{Prefix: tt.inputPrefix}).RewriteSchema(tt.inputSchema)
 			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
 			} else {
@@ -180,7 +180,7 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 				zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: tt.filter},
 				zedtesting.BoolFlag{FlagName: "rewrite-legacy"},
 			)
-			backupName := createTestBackup(t, tt.schema, tt.relationships)
+			backupName := createTestBackup(t, cmd, tt.schema, tt.relationships)
 			f, err := os.CreateTemp(t.TempDir(), "parse-output")
 			require.NoError(t, err)
 			t.Cleanup(func() {
@@ -200,7 +200,7 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 func TestBackupParseRevisionCmdFunc(t *testing.T) {
 	t.Parallel()
 	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t)
-	backupName := createTestBackup(t, testSchema, testRelationships)
+	backupName := createTestBackup(t, cmd, testSchema, testRelationships)
 	f, err := os.CreateTemp(t.TempDir(), "parse-output")
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -260,7 +260,7 @@ func TestBackupParseSchemaCmdFunc(t *testing.T) {
 				zedtesting.StringToStringFlag{FlagName: "prefix-replacements"},
 				zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: tt.filter},
 				zedtesting.BoolFlag{FlagName: "rewrite-legacy", FlagValue: tt.rewriteLegacy})
-			backupName := createTestBackup(t, tt.schema, nil)
+			backupName := createTestBackup(t, cmd, tt.schema, nil)
 			f, err := os.CreateTemp(t.TempDir(), "parse-output")
 			require.NoError(t, err)
 			t.Cleanup(func() {
@@ -490,15 +490,23 @@ func validateBackupWithFunc(t testing.TB, backupFileName, schema string, token *
 ) {
 	t.Helper()
 
-	d, closer, err := decoderFromArgs(backupFileName)
+	d, closer, err := decoderFromArgs(nil, backupFileName)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_ = d.Close()
+		if closer, ok := d.(io.Closer); ok {
+			closer.Close()
+		}
 		_ = closer.Close()
 	})
 
-	require.Equal(t, schema, d.Schema())
-	require.Equal(t, token.Token, d.ZedToken().Token)
+	decodedSchema, err := d.Schema()
+	require.NoError(t, err)
+	require.Equal(t, schema, decodedSchema)
+
+	decodedZedtoken, err := d.ZedToken()
+	require.NoError(t, err)
+	require.Equal(t, token.Token, decodedZedtoken.Token)
+
 	var received []string
 	for {
 		rel, err := d.Next()
@@ -524,7 +532,7 @@ func TestBackupRestoreCmdFunc(t *testing.T) {
 		zedtesting.UintFlag{FlagName: "batches-per-transaction", FlagValue: 10},
 		zedtesting.DurationFlag{FlagName: "request-timeout"},
 	)
-	backupName := createTestBackup(t, testSchema, testRelationships)
+	backupName := createTestBackup(t, cmd, testSchema, testRelationships)
 
 	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
@@ -680,8 +688,9 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 	}
 
 	encoder := &backupformat.MockEncoder{}
+	rw := &backupformat.NoopRewriter{}
 
-	err := takeBackup(t.Context(), client, encoder, "ignored", "", 0)
+	err := takeBackup(t.Context(), client, encoder, "ignored", rw, 0)
 	require.NoError(t, err)
 
 	require.True(t, encoder.Complete, "expecting encoder to be marked complete")
@@ -695,8 +704,7 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 type mockClientForBackup struct {
 	client.Client
 	grpc.ServerStreamingClient[v1.ExportBulkRelationshipsResponse]
-	t *testing.T
-	backupformat.OcfEncoder
+	t                *testing.T
 	schemaCalls      []func() (*v1.ReadSchemaResponse, error)
 	schemaCallsIndex int
 	recvCalls        []func() (*v1.ExportBulkRelationshipsResponse, error)

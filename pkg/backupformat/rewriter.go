@@ -1,4 +1,4 @@
-package cmd
+package backupformat
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/jzelinskie/cobrautil/v2"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -17,33 +17,34 @@ import (
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 )
 
-func registerRewriterFlags(cmd *cobra.Command) {
+func RegisterRewriterFlags(cmd *cobra.Command) {
 	cmd.Flags().StringToString("prefix-replacements", nil, "potentially modify the schema to replace desired prefixes")
 	cmd.Flags().String("prefix-filter", "", "include only schema definitions and relationships with a given prefix")
 	cmd.Flags().Bool("rewrite-legacy", false, "potentially modify the schema to exclude legacy/broken syntax")
 	_ = cmd.Flags().MarkHidden("rewrite-legacy")
 }
 
-func rewriterFromFlags(cmd *cobra.Command) Rewriter {
-	var rws []Rewriter
-	if cobrautil.MustGetBool(cmd, "rewrite-legacy") {
+func RewriterFromFlags(cmd *cobra.Command) Rewriter {
+	if cmd == nil {
+		return &NoopRewriter{}
+	}
+
+	rws := []Rewriter{&NoopRewriter{}}
+	if set, err := cmd.Flags().GetBool("rewrite-legacy"); err == nil && set {
 		rws = append(rws, &LegacyRewriter{})
 	}
 
-	if prefix := cobrautil.MustGetString(cmd, "prefix-filter"); prefix != "" {
-		rws = append(rws, &PrefixFilterer{prefix})
+	if prefix, err := cmd.Flags().GetString("prefix-filter"); err == nil && prefix != "" {
+		rws = append(rws, &PrefixFilterer{Prefix: prefix})
 	}
 
-	if replacements := cobrautil.MustGetStringToString(cmd, "prefix-replacements"); len(replacements) > 0 {
-		rws = append(rws, &PrefixReplacer{replacements})
-	}
-
-	if len(rws) == 0 {
-		return &NoopRewriter{}
+	if replacements, err := cmd.Flags().GetStringToString("prefix-replacements"); err == nil && len(replacements) > 0 {
+		rws = append(rws, &PrefixReplacer{replacements: replacements})
 	}
 	return &ChainRewriter{rws}
 }
 
+// Rewriter is used to transform a backup while encoding or decoding.
 type Rewriter interface {
 	// RewriteSchema transforms a schema.
 	RewriteSchema(schema string) (string, error)
@@ -99,6 +100,14 @@ func (cr *ChainRewriter) RewriteRelationship(r *v1.Relationship) (*v1.Relationsh
 	return r, nil
 }
 
+func (cr *ChainRewriter) MarshalZerologObject(e *zerolog.Event) {
+	for _, rw := range cr.rewriters {
+		if obj, ok := rw.(zerolog.LogObjectMarshaler); ok {
+			e.EmbedObject(obj)
+		}
+	}
+}
+
 type LegacyRewriter struct{}
 
 func (lr *LegacyRewriter) RewriteRelationship(r *v1.Relationship) (*v1.Relationship, error) {
@@ -117,14 +126,20 @@ func (lr *LegacyRewriter) RewriteSchema(schema string) (string, error) {
 	return schema, nil
 }
 
-// PrefixFilterer selects a subset of relationships and schema definitions
-// that match the provided prefix.
+// PrefixFilterer implements Rewriter by filtering any definitions and
+// relationships that do not have the included prefix.
 type PrefixFilterer struct {
-	prefix string
+	Prefix  string
+	skipped uint64
+	kept    uint64
+}
+
+func (sf *PrefixFilterer) MarshalZerologObject(e *zerolog.Event) {
+	e.Str("prefix", sf.Prefix).Uint64("skippedRels", sf.skipped).Uint64("keptRels", sf.kept)
 }
 
 func (sf *PrefixFilterer) RewriteSchema(schema string) (string, error) {
-	if schema == "" || sf.prefix == "" {
+	if schema == "" || sf.Prefix == "" {
 		return schema, nil
 	}
 
@@ -135,13 +150,13 @@ func (sf *PrefixFilterer) RewriteSchema(schema string) (string, error) {
 
 	var defs []compiler.SchemaDefinition
 	for _, def := range compiledSchema.ObjectDefinitions {
-		if strings.HasPrefix(def.Name, sf.prefix+"/") {
+		if strings.HasPrefix(def.Name, sf.Prefix+"/") {
 			defs = append(defs, def.CloneVT())
 		}
 	}
 
 	for _, def := range compiledSchema.CaveatDefinitions {
-		if strings.HasPrefix(def.Name, sf.prefix+"/") {
+		if strings.HasPrefix(def.Name, sf.Prefix+"/") {
 			defs = append(defs, def.CloneVT())
 		}
 	}
@@ -150,10 +165,12 @@ func (sf *PrefixFilterer) RewriteSchema(schema string) (string, error) {
 }
 
 func (sf *PrefixFilterer) RewriteRelationship(r *v1.Relationship) (*v1.Relationship, error) {
-	if strings.HasPrefix(r.Resource.ObjectType, sf.prefix) ||
-		strings.HasPrefix(r.Subject.Object.ObjectType, sf.prefix) {
-		return r, nil
+	if strings.HasPrefix(r.Resource.ObjectType, sf.Prefix) &&
+		strings.HasPrefix(r.Subject.Object.ObjectType, sf.Prefix) {
+		sf.kept++
+		return r.CloneVT(), nil
 	}
+	sf.skipped++
 	return nil, nil
 }
 
@@ -161,6 +178,7 @@ func (sf *PrefixFilterer) RewriteRelationship(r *v1.Relationship) (*v1.Relations
 // pairs and replaces those prefixes in definitions and relationships.
 type PrefixReplacer struct {
 	replacements map[string]string
+	replacedRels uint64
 }
 
 func (pr *PrefixReplacer) replaceName(name string) string {
@@ -226,6 +244,11 @@ func (pr *PrefixReplacer) RewriteRelationship(r *v1.Relationship) (*v1.Relations
 	prefix, name, prefixExists = strings.Cut(r.Subject.Object.ObjectType, "/")
 	if replacement, foundReplacement := pr.replacements[prefix]; prefixExists && foundReplacement {
 		newRel.Subject.Object.ObjectType = replacement + "/" + name
+	}
+
+	if newRel.Resource.ObjectType != r.Resource.ObjectType ||
+		newRel.Subject.Object.ObjectType != r.Subject.Object.ObjectType {
+		pr.replacedRels++
 	}
 
 	return newRel, nil

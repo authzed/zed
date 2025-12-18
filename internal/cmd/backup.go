@@ -139,12 +139,12 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	registerBackupRestoreFlags(restoreCmd)
 
 	backupCmd.AddCommand(backupParseSchemaCmd)
-	registerRewriterFlags(backupParseSchemaCmd)
+	backupformat.RegisterRewriterFlags(backupParseSchemaCmd)
 
 	backupCmd.AddCommand(backupParseRevisionCmd)
 
 	backupCmd.AddCommand(backupParseRelsCmd)
-	registerRewriterFlags(backupParseRelsCmd)
+	backupformat.RegisterRewriterFlags(backupParseRelsCmd)
 }
 
 func registerBackupRestoreFlags(cmd *cobra.Command) {
@@ -153,12 +153,12 @@ func registerBackupRestoreFlags(cmd *cobra.Command) {
 	cmd.Flags().String("conflict-strategy", "fail", "strategy used when a conflicting relationship is found. Possible values: fail, skip, touch")
 	cmd.Flags().Bool("disable-retries", false, "retries when an errors is determined to be retryable (e.g. serialization errors)")
 	cmd.Flags().Duration("request-timeout", 30*time.Second, "timeout for each request performed during restore")
-	registerRewriterFlags(cmd)
+	backupformat.RegisterRewriterFlags(cmd)
 }
 
 func registerBackupCreateFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint32("page-limit", 0, "defines the number of relationships to be read by requested page during backup")
-	registerRewriterFlags(cmd)
+	backupformat.RegisterRewriterFlags(cmd)
 }
 
 func createBackupFile(filename string, returnIfExists bool) (*os.File, bool, error) {
@@ -221,9 +221,6 @@ func CloseAndJoin(e *error, maybeCloser any) {
 }
 
 func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
-	prefixFilter := cobrautil.MustGetString(cmd, "prefix-filter")
-	pageLimit := cobrautil.MustGetUint32(cmd, "page-limit")
-
 	backupFileName, err := computeBackupFileName(cmd, args)
 	if err != nil {
 		return err
@@ -234,10 +231,17 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("unable to initialize client: %w", err)
 	}
 
-	return takeBackup(cmd.Context(), spiceClient, nil, backupFileName, prefixFilter, pageLimit)
+	return takeBackup(
+		cmd.Context(),
+		spiceClient,
+		nil,
+		backupFileName,
+		backupformat.RewriterFromFlags(cmd),
+		cobrautil.MustGetUint32(cmd, "page-limit"),
+	)
 }
 
-func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupformat.Encoder, backupFileName, prefixFilter string, pageLimit uint32) error {
+func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupformat.Encoder, backupFileName string, rw backupformat.Rewriter, pageLimit uint32) error {
 	schemaResp, err := spiceClient.ReadSchema(ctx, &v1.ReadSchemaRequest{})
 	if err != nil {
 		return fmt.Errorf("error reading schema: %w", err)
@@ -263,12 +267,22 @@ func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupfo
 
 		var cursor string
 		if encoder == nil {
-			var fencoder *backupformat.OcfFileEncoder
-			fencoder, cursor, err = backupformat.NewOrExistingFileEncoder(backupFileName, schemaResp.SchemaText, revision)
+			fencoder, backupExisted, err := backupformat.NewFileEncoder(backupFileName)
 			if err != nil {
 				return err
 			}
-			encoder = backupformat.WithProgress(prefixFilter, fencoder)
+			encoder = backupformat.WithProgress(backupformat.WithRewriter(rw, fencoder))
+			defer CloseAndJoin(&err, encoder)
+			if backupExisted {
+				cursor, err = fencoder.Cursor()
+				if err != nil {
+					return err
+				}
+			} else {
+				if err := encoder.WriteSchema(schemaResp.SchemaText, revision.Token); err != nil {
+					return err
+				}
+			}
 		}
 		defer CloseAndJoin(&err, encoder)
 
@@ -276,7 +290,7 @@ func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupfo
 			return def.Name
 		})).Msg("parsed object definitions")
 
-		var cursorObj string
+		var cursorObj string // Tracks the definition the cursor was on
 		for _, def := range compiledSchema.ObjectDefinitions {
 			req := &v1.ReadRelationshipsRequest{
 				RelationshipFilter: &v1.RelationshipFilter{ResourceType: def.Name},
@@ -327,13 +341,23 @@ func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupfo
 	} else {
 		var cursor string
 		if encoder == nil {
-			encoder, cursor, err = backupformat.NewOrExistingFileEncoder(backupFileName, schemaResp.SchemaText, schemaResp.ReadAt)
+			fencoder, backupExisted, err := backupformat.NewFileEncoder(backupFileName)
 			if err != nil {
 				return err
 			}
+			encoder = backupformat.WithProgress(backupformat.WithRewriter(rw, fencoder))
+			defer CloseAndJoin(&err, encoder)
+			if backupExisted {
+				cursor, err = fencoder.Cursor()
+				if err != nil {
+					return err
+				}
+			} else {
+				if err := encoder.WriteSchema(schemaResp.SchemaText, schemaResp.ReadAt.Token); err != nil {
+					return err
+				}
+			}
 		}
-		encoder = backupformat.WithProgress(prefixFilter, encoder)
-		defer CloseAndJoin(&err, encoder)
 
 		req := &v1.ExportBulkRelationshipsRequest{OptionalLimit: pageLimit}
 		if cursor != "" {
@@ -438,15 +462,14 @@ func openRestoreFile(filename string) (*os.File, int64, error) {
 }
 
 func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
-	decoder, closer, err := decoderFromArgs(args...)
+	decoder, closer, err := decoderFromArgs(cmd, args...)
 	if err != nil {
 		return err
 	}
+	defer CloseAndJoin(&err, closer)
+	defer CloseAndJoin(&err, decoder)
 
-	defer func(e *error) { *e = errors.Join(*e, closer.Close()) }(&err)
-	defer func(e *error) { *e = errors.Join(*e, decoder.Close()) }(&err)
-
-	if loadedToken := decoder.ZedToken(); loadedToken != nil {
+	if loadedToken, err := decoder.ZedToken(); err != nil && loadedToken != nil {
 		log.Debug().Str("revision", loadedToken.Token).Msg("parsed revision")
 	}
 
@@ -465,7 +488,7 @@ func backupRestoreCmdFunc(cmd *cobra.Command, args []string) error {
 	disableRetries := cobrautil.MustGetBool(cmd, "disable-retries")
 	requestTimeout := cobrautil.MustGetDuration(cmd, "request-timeout")
 
-	return newRestorer(rewriterFromFlags(cmd), decoder, c, batchSize, batchesPerTransaction, strategy,
+	return newRestorer(decoder, c, batchSize, batchesPerTransaction, strategy,
 		disableRetries, requestTimeout).restoreFromDecoder(cmd.Context())
 }
 
@@ -482,14 +505,14 @@ func GetEnum[E constraints.Integer](cmd *cobra.Command, name string, mapping map
 }
 
 func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
-	decoder, closer, err := decoderFromArgs(args...)
+	decoder, closer, err := decoderFromArgs(cmd, args...)
 	if err != nil {
 		return err
 	}
-	defer func(e *error) { *e = errors.Join(*e, closer.Close()) }(&err)
-	defer func(e *error) { *e = errors.Join(*e, decoder.Close()) }(&err)
+	defer CloseAndJoin(&err, closer)
+	defer CloseAndJoin(&err, decoder)
 
-	schema, err := rewriterFromFlags(cmd).RewriteSchema(decoder.Schema())
+	schema, err := decoder.Schema()
 	if err != nil {
 		return err
 	}
@@ -498,18 +521,17 @@ func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) 
 	return err
 }
 
-func backupParseRevisionCmdFunc(_ *cobra.Command, out io.Writer, args []string) error {
-	decoder, closer, err := decoderFromArgs(args...)
+func backupParseRevisionCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
+	decoder, closer, err := decoderFromArgs(cmd, args...)
 	if err != nil {
 		return err
 	}
+	defer CloseAndJoin(&err, closer)
+	defer CloseAndJoin(&err, decoder)
 
-	defer func(e *error) { *e = errors.Join(*e, closer.Close()) }(&err)
-	defer func(e *error) { *e = errors.Join(*e, decoder.Close()) }(&err)
-
-	loadedToken := decoder.ZedToken()
-	if loadedToken == nil {
-		return errors.New("failed to parse decoded revision")
+	loadedToken, err := decoder.ZedToken()
+	if loadedToken == nil || err != nil {
+		return fmt.Errorf("failed to parse decoded revision")
 	}
 
 	_, err = fmt.Fprintln(out, loadedToken.Token)
@@ -517,21 +539,19 @@ func backupParseRevisionCmdFunc(_ *cobra.Command, out io.Writer, args []string) 
 }
 
 func backupRedactCmdFunc(cmd *cobra.Command, args []string) error {
-	decoder, closer, err := decoderFromArgs(args...)
+	decoder, closer, err := decoderFromArgs(cmd, args...)
 	if err != nil {
 		return fmt.Errorf("error creating restore file decoder: %w", err)
 	}
-
-	defer func(e *error) { *e = errors.Join(*e, closer.Close()) }(&err)
-	defer func(e *error) { *e = errors.Join(*e, decoder.Close()) }(&err)
+	defer CloseAndJoin(&err, closer)
+	defer CloseAndJoin(&err, decoder)
 
 	filename := args[0] + ".redacted"
 	writer, _, err := createBackupFile(filename, doNotReturnIfExists)
 	if err != nil {
 		return err
 	}
-
-	defer func(e *error) { *e = errors.Join(*e, writer.Close()) }(&err)
+	defer CloseAndJoin(&err, writer)
 
 	redactor, err := backupformat.NewRedactor(decoder, writer, backupformat.RedactionOptions{
 		RedactDefinitions: cobrautil.MustGetBool(cmd, "redact-definitions"),
@@ -610,22 +630,14 @@ func backupRedactCmdFunc(cmd *cobra.Command, args []string) error {
 }
 
 func backupParseRelsCmdFunc(cmd *cobra.Command, out io.Writer, args []string) error {
-	rewriter := rewriterFromFlags(cmd)
-	decoder, closer, err := decoderFromArgs(args...)
+	decoder, closer, err := decoderFromArgs(cmd, args...)
 	if err != nil {
 		return err
 	}
-	defer func(e *error) { *e = errors.Join(*e, closer.Close()) }(&err)
-	defer func(e *error) { *e = errors.Join(*e, decoder.Close()) }(&err)
+	defer CloseAndJoin(&err, closer)
+	defer CloseAndJoin(&err, decoder)
 
 	for rel, err := decoder.Next(); rel != nil && err == nil; rel, err = decoder.Next() {
-		rel, err = rewriter.RewriteRelationship(rel)
-		if err != nil {
-			return err
-		} else if rel == nil {
-			continue
-		}
-
 		relString, err := tuple.V1StringRelationship(rel)
 		if err != nil {
 			return err
@@ -639,7 +651,7 @@ func backupParseRelsCmdFunc(cmd *cobra.Command, out io.Writer, args []string) er
 	return nil
 }
 
-func decoderFromArgs(args ...string) (*backupformat.Decoder, io.Closer, error) {
+func decoderFromArgs(cmd *cobra.Command, args ...string) (backupformat.Decoder, io.Closer, error) {
 	filename := "" // Default to stdin.
 	if len(args) > 0 {
 		filename = args[0]
@@ -655,7 +667,7 @@ func decoderFromArgs(args ...string) (*backupformat.Decoder, io.Closer, error) {
 		return nil, nil, fmt.Errorf("error creating restore file decoder: %w", err)
 	}
 
-	return decoder, f, nil
+	return &backupformat.RewriteDecoder{Rewriter: backupformat.RewriterFromFlags(cmd), Decoder: decoder}, f, nil
 }
 
 func replaceRelString(rel string) string {

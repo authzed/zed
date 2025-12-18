@@ -20,7 +20,7 @@ func init() {
 	}.Freeze()
 }
 
-func NewDecoder(r io.Reader) (*Decoder, error) {
+func NewDecoder(r io.Reader) (*OcfDecoder, error) {
 	dec, err := ocf.NewDecoder(r)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ocf decoder: %w", err)
@@ -51,34 +51,72 @@ func NewDecoder(r io.Reader) (*Decoder, error) {
 		return nil, errors.New("avro stream contains no schema object")
 	}
 
-	return &Decoder{
+	return &OcfDecoder{
 		dec,
 		schemaText,
 		zedToken,
 	}, nil
 }
 
-type Decoder struct {
+type Decoder interface {
+	Schema() (string, error)
+	ZedToken() (*v1.ZedToken, error)
+	Next() (*v1.Relationship, error)
+}
+
+var (
+	_ Decoder = (*OcfDecoder)(nil)
+	_ Decoder = (*RewriteDecoder)(nil)
+)
+
+type RewriteDecoder struct {
+	Rewriter
+	Decoder
+}
+
+func (d *RewriteDecoder) Schema() (string, error) {
+	schema, err := d.Decoder.Schema()
+	if err != nil {
+		return "", err
+	}
+	return d.RewriteSchema(schema)
+}
+
+func (d *RewriteDecoder) Next() (*v1.Relationship, error) {
+	r, err := d.Decoder.Next()
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		r, err = d.RewriteRelationship(r)
+		if err != nil {
+			return nil, err
+		} else if r == nil {
+			// The rewriter filtered this relationship, decode another.
+			r, err = d.Decoder.Next()
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+		return r, nil
+	}
+}
+
+type OcfDecoder struct {
 	dec      *ocf.Decoder
 	schema   string
 	zedToken *v1.ZedToken
 }
 
-func (d *Decoder) Schema() string {
-	return d.schema
-}
+func (d *OcfDecoder) Schema() (string, error)         { return d.schema, nil }
+func (d *OcfDecoder) ZedToken() (*v1.ZedToken, error) { return d.zedToken, nil }
+func (d *OcfDecoder) Close() error                    { return nil }
 
-func (d *Decoder) ZedToken() *v1.ZedToken {
-	return d.zedToken
-}
-
-func (d *Decoder) Close() error {
-	return nil
-}
-
-func (d *Decoder) Next() (*v1.Relationship, error) {
+func (d *OcfDecoder) Next() (*v1.Relationship, error) {
 	if !d.dec.HasNext() {
-		return nil, nil
+		return nil, io.EOF
 	}
 
 	var nextRelIFace any
