@@ -20,7 +20,6 @@ import (
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/genutil/mapz"
-	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
@@ -688,79 +687,19 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 		},
 	}
 
-	encoder := &backupformat.MockEncoder{}
-	rw := &backupformat.NoopRewriter{}
-
-	err := takeBackup(t.Context(), client, encoder, "ignored", rw, 0)
-	require.NoError(t, err)
-
-	require.True(t, encoder.Complete, "expecting encoder to be marked complete")
-	require.Len(t, encoder.Relationships, 2, "expecting two rels in the realized list")
-	require.Equal(t, "foo", encoder.Relationships[0].Resource.ObjectId)
-	require.Equal(t, "bar", encoder.Relationships[1].Resource.ObjectId)
-
-	client.assertAllRecvCalls()
-}
-
-func TestRevisionForServerless(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// create a spicedb server
-	srv := zedtesting.NewTestServer(ctx, t)
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- srv.Run(ctx)
-	}()
-	conn, err := srv.GRPCDialContext(ctx)
-	require.NoError(t, err)
-
-	c, err := zedtesting.ClientFromConn(conn)(nil)
-	require.NoError(t, err)
-
-	// write a schema
-	schemaText := `definition user {}
-definition document {
-   relation view: user 
-}`
-	schema, err := compiler.Compile(
-		compiler.InputSchema{Source: "schema", SchemaString: schemaText},
-		compiler.AllowUnprefixedObjectType(),
-		compiler.SkipValidation(),
-	)
-	require.NoError(t, err)
-	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: schemaText})
-	require.NoError(t, err)
-
-	// query for serverless revision when there are no relationships in the system should return error
-	res, err := revisionForServerless(ctx, c, schema)
-	require.ErrorContains(t, err, "no relationships found")
-	require.Nil(t, res)
-
-	// write relationships for the *second* object definition
-	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{
-		Updates: []*v1.RelationshipUpdate{
-			{
-				Operation: v1.RelationshipUpdate_OPERATION_CREATE,
-				Relationship: &v1.Relationship{
-					Resource: &v1.ObjectReference{ObjectType: "document", ObjectId: "1"},
-					Relation: "view",
-					Subject: &v1.SubjectReference{
-						Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "maria"},
-					},
-				},
-			},
-		},
+	req := &v1.ExportBulkRelationshipsRequest{}
+	var collectedRels []*v1.Relationship
+	err := takeBackup(t.Context(), client, req, func(response *v1.ExportBulkRelationshipsResponse) error {
+		collectedRels = append(collectedRels, response.Relationships...)
+		return nil
 	})
 	require.NoError(t, err)
 
-	// now, we should have a result
-	res, err = revisionForServerless(ctx, c, schema)
-	require.NoError(t, err)
-	require.NotNil(t, res)
+	require.Len(t, collectedRels, 2, "expecting two rels in the realized list")
+	require.Equal(t, "foo", collectedRels[0].Resource.ObjectId)
+	require.Equal(t, "bar", collectedRels[1].Resource.ObjectId)
 
-	cancel()
-	require.NoError(t, <-errCh)
+	client.assertAllRecvCalls()
 }
 
 type mockClientForBackup struct {
@@ -820,4 +759,172 @@ func (m *mockClientForBackup) ExportBulkRelationships(_ context.Context, req *v1
 // assertAllRecvCalls asserts that the number of invocations is as expected
 func (m *mockClientForBackup) assertAllRecvCalls() {
 	require.Equal(m.t, len(m.recvCalls), m.recvCallIndex, "the number of provided recvCalls should match the number of invocations")
+}
+
+type mockProgressTracker struct {
+	cursor         *v1.Cursor
+	writtenCursors []*v1.Cursor
+	completed      bool
+}
+
+func (m *mockProgressTracker) GetCursor() *v1.Cursor {
+	return m.cursor
+}
+
+func (m *mockProgressTracker) WriteCursor(cursor *v1.Cursor) error {
+	m.writtenCursors = append(m.writtenCursors, cursor)
+	m.cursor = cursor
+	return nil
+}
+
+func (m *mockProgressTracker) MarkComplete() error {
+	m.completed = true
+	return nil
+}
+
+func (m *mockProgressTracker) Close() error {
+	return nil
+}
+
+func TestBackupCreateImpl(t *testing.T) {
+	t.Parallel()
+
+	testRels := []*v1.Relationship{
+		{
+			Resource: &v1.ObjectReference{ObjectType: "test/resource", ObjectId: "1"},
+			Relation: "reader",
+			Subject:  &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "test/user", ObjectId: "1"}},
+		},
+		{
+			Resource: &v1.ObjectReference{ObjectType: "test/resource", ObjectId: "2"},
+			Relation: "reader",
+			Subject:  &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "test/user", ObjectId: "2"}},
+		},
+	}
+
+	t.Run("successful backup with relationships", func(t *testing.T) {
+		t.Parallel()
+
+		cursor := &v1.Cursor{Token: "after-cursor"}
+		mockClient := &mockClientForBackup{
+			t: t,
+			recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
+				func() (*v1.ExportBulkRelationshipsResponse, error) {
+					return &v1.ExportBulkRelationshipsResponse{
+						Relationships:     testRels,
+						AfterResultCursor: cursor,
+					}, nil
+				},
+			},
+		}
+
+		progressTracker := &mockProgressTracker{}
+		zedToken := &v1.ZedToken{Token: "test-token"}
+		encoder := &backupformat.MockEncoder{}
+		config := BackupConfig{PrefixFilter: "test"}
+
+		completed, err := backupCreateImpl(t.Context(), mockClient, encoder, progressTracker, config, zedToken)
+
+		require.NoError(t, err)
+		require.True(t, completed, "backup should be marked as completed")
+		require.Len(t, progressTracker.writtenCursors, 1, "should have written one cursor")
+		require.Equal(t, cursor.Token, progressTracker.writtenCursors[0].Token)
+
+		mockClient.assertAllRecvCalls()
+	})
+
+	t.Run("returns error when both zedToken and cursor are nil", func(t *testing.T) {
+		t.Parallel()
+
+		mockClient := &mockClientForBackup{t: t}
+		progressTracker := &mockProgressTracker{cursor: nil}
+		encoder := &backupformat.MockEncoder{}
+		config := BackupConfig{}
+
+		completed, err := backupCreateImpl(t.Context(), mockClient, encoder, progressTracker, config, nil)
+
+		require.Error(t, err)
+		require.False(t, completed)
+		require.Contains(t, err.Error(), "malformed existing backup")
+	})
+
+	t.Run("resumes from cursor when zedToken is nil", func(t *testing.T) {
+		t.Parallel()
+
+		existingCursor := &v1.Cursor{Token: "existing-cursor"}
+		newCursor := &v1.Cursor{Token: "new-cursor"}
+		mockClient := &mockClientForBackup{
+			t: t,
+			recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
+				func() (*v1.ExportBulkRelationshipsResponse, error) {
+					return &v1.ExportBulkRelationshipsResponse{
+						Relationships:     testRels,
+						AfterResultCursor: newCursor,
+					}, nil
+				},
+			},
+			exportCalls: []func(t *testing.T, req *v1.ExportBulkRelationshipsRequest){
+				func(t *testing.T, req *v1.ExportBulkRelationshipsRequest) {
+					require.NotNil(t, req.OptionalCursor)
+					require.Equal(t, existingCursor.Token, req.OptionalCursor.Token)
+				},
+			},
+		}
+
+		progressTracker := &mockProgressTracker{cursor: existingCursor}
+		encoder := &backupformat.MockEncoder{}
+		config := BackupConfig{PrefixFilter: "test"}
+
+		completed, err := backupCreateImpl(t.Context(), mockClient, encoder, progressTracker, config, nil)
+
+		require.NoError(t, err)
+		require.True(t, completed)
+
+		mockClient.assertAllRecvCalls()
+	})
+
+	t.Run("filters relationships by prefix", func(t *testing.T) {
+		t.Parallel()
+
+		mixedRels := []*v1.Relationship{
+			{
+				Resource: &v1.ObjectReference{ObjectType: "test/resource", ObjectId: "1"},
+				Relation: "reader",
+				Subject:  &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "test/user", ObjectId: "1"}},
+			},
+			{
+				Resource: &v1.ObjectReference{ObjectType: "other/resource", ObjectId: "2"},
+				Relation: "reader",
+				Subject:  &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "other/user", ObjectId: "2"}},
+			},
+		}
+
+		cursor := &v1.Cursor{Token: "cursor-token"}
+		mockClient := &mockClientForBackup{
+			t: t,
+			recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
+				func() (*v1.ExportBulkRelationshipsResponse, error) {
+					return &v1.ExportBulkRelationshipsResponse{
+						Relationships:     mixedRels,
+						AfterResultCursor: cursor,
+					}, nil
+				},
+			},
+		}
+
+		progressTracker := &mockProgressTracker{}
+		zedToken := &v1.ZedToken{Token: "test-token"}
+		encoder := &backupformat.MockEncoder{}
+		config := BackupConfig{PrefixFilter: "test"}
+
+		completed, err := backupCreateImpl(t.Context(), mockClient, encoder, progressTracker, config, zedToken)
+
+		require.NoError(t, err)
+		require.True(t, completed)
+		// Only the "test/" prefixed relationship should be stored
+		require.Len(t, encoder.Relationships, 1)
+		require.Equal(t, "test/resource", encoder.Relationships[0].Resource.ObjectType)
+
+		mockClient.assertAllRecvCalls()
+	})
 }
