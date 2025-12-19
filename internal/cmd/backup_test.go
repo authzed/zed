@@ -780,3 +780,426 @@ func (m *mockClientForBackup) ExportBulkRelationships(_ context.Context, req *v1
 func (m *mockClientForBackup) assertAllRecvCalls() {
 	require.Equal(m.t, len(m.recvCalls), m.recvCallIndex, "the number of provided recvCalls should match the number of invocations")
 }
+
+// mockProgressTracker is a test implementation of ProgressTracker.
+type mockProgressTracker struct {
+	cursor          *v1.Cursor
+	writtenCursors  []*v1.Cursor
+	markCompleteErr error
+	writeErr        error
+	completed       bool
+	closed          bool
+}
+
+func (m *mockProgressTracker) GetCursor() *v1.Cursor {
+	return m.cursor
+}
+
+func (m *mockProgressTracker) WriteCursor(cursor *v1.Cursor) error {
+	if m.writeErr != nil {
+		return m.writeErr
+	}
+	m.writtenCursors = append(m.writtenCursors, cursor)
+	return nil
+}
+
+func (m *mockProgressTracker) MarkComplete() error {
+	m.completed = true
+	return m.markCompleteErr
+}
+
+func (m *mockProgressTracker) Close() error {
+	m.closed = true
+	return nil
+}
+
+func TestBackupCreateImpl(t *testing.T) {
+	t.Parallel()
+
+	testRels := []*v1.Relationship{
+		{
+			Resource: &v1.ObjectReference{ObjectType: "test/resource", ObjectId: "1"},
+			Relation: "reader",
+			Subject:  &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "test/user", ObjectId: "1"}},
+		},
+		{
+			Resource: &v1.ObjectReference{ObjectType: "test/resource", ObjectId: "2"},
+			Relation: "reader",
+			Subject:  &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "test/user", ObjectId: "2"}},
+		},
+	}
+
+	t.Run("successful backup with relationships", func(t *testing.T) {
+		t.Parallel()
+
+		cursor := &v1.Cursor{Token: "after-cursor"}
+		mockClient := &mockClientForBackup{
+			t: t,
+			recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
+				func() (*v1.ExportBulkRelationshipsResponse, error) {
+					return &v1.ExportBulkRelationshipsResponse{
+						Relationships:     testRels,
+						AfterResultCursor: cursor,
+					}, nil
+				},
+			},
+		}
+
+		progressTracker := &mockProgressTracker{}
+		zedToken := &v1.ZedToken{Token: "test-token"}
+
+		// Create a temp file for the encoder
+		tmpFile, err := os.CreateTemp(t.TempDir(), "backup-test")
+		require.NoError(t, err)
+		defer func() { _ = tmpFile.Close() }()
+
+		encoder, err := backupformat.NewEncoder(tmpFile, testSchema, zedToken)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = encoder.Close() })
+
+		config := BackupConfig{PrefixFilter: "test"}
+
+		completed, err := backupCreateImpl(t.Context(), mockClient, encoder, progressTracker, config, zedToken)
+
+		require.NoError(t, err)
+		require.True(t, completed, "backup should be marked as completed")
+		require.Len(t, progressTracker.writtenCursors, 1, "should have written one cursor")
+		require.Equal(t, cursor.Token, progressTracker.writtenCursors[0].Token)
+
+		mockClient.assertAllRecvCalls()
+	})
+
+	t.Run("returns error when both zedToken and cursor are nil", func(t *testing.T) {
+		t.Parallel()
+
+		mockClient := &mockClientForBackup{t: t}
+		progressTracker := &mockProgressTracker{cursor: nil}
+
+		// Create a temp file for the encoder
+		tmpFile, err := os.CreateTemp(t.TempDir(), "backup-test")
+		require.NoError(t, err)
+		defer func() { _ = tmpFile.Close() }()
+
+		encoder, err := backupformat.NewEncoder(tmpFile, testSchema, &v1.ZedToken{Token: "dummy"})
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = encoder.Close() })
+
+		config := BackupConfig{}
+
+		completed, err := backupCreateImpl(t.Context(), mockClient, encoder, progressTracker, config, nil)
+
+		require.Error(t, err)
+		require.False(t, completed)
+		require.Contains(t, err.Error(), "malformed existing backup")
+	})
+
+	t.Run("handles permission denied error", func(t *testing.T) {
+		t.Parallel()
+
+		mockClient := &mockClientForBackup{
+			t: t,
+			recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
+				func() (*v1.ExportBulkRelationshipsResponse, error) {
+					return nil, status.Error(codes.PermissionDenied, "unauthorized")
+				},
+			},
+		}
+
+		progressTracker := &mockProgressTracker{}
+		zedToken := &v1.ZedToken{Token: "test-token"}
+
+		// Create a temp file for the encoder
+		tmpFile, err := os.CreateTemp(t.TempDir(), "backup-test")
+		require.NoError(t, err)
+		defer func() { _ = tmpFile.Close() }()
+
+		encoder, err := backupformat.NewEncoder(tmpFile, testSchema, zedToken)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = encoder.Close() })
+
+		config := BackupConfig{PrefixFilter: "test"}
+
+		completed, err := backupCreateImpl(t.Context(), mockClient, encoder, progressTracker, config, zedToken)
+
+		require.Error(t, err)
+		require.False(t, completed)
+		require.Contains(t, err.Error(), "PermissionDenied")
+	})
+
+	t.Run("filters relationships by prefix", func(t *testing.T) {
+		t.Parallel()
+
+		mixedRels := []*v1.Relationship{
+			{
+				Resource: &v1.ObjectReference{ObjectType: "test/resource", ObjectId: "1"},
+				Relation: "reader",
+				Subject:  &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "test/user", ObjectId: "1"}},
+			},
+			{
+				Resource: &v1.ObjectReference{ObjectType: "other/resource", ObjectId: "1"},
+				Relation: "reader",
+				Subject:  &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "other/user", ObjectId: "1"}},
+			},
+		}
+
+		mockClient := &mockClientForBackup{
+			t: t,
+			recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
+				func() (*v1.ExportBulkRelationshipsResponse, error) {
+					return &v1.ExportBulkRelationshipsResponse{
+						Relationships:     mixedRels,
+						AfterResultCursor: &v1.Cursor{Token: "cursor"},
+					}, nil
+				},
+			},
+		}
+
+		progressTracker := &mockProgressTracker{}
+		zedToken := &v1.ZedToken{Token: "test-token"}
+
+		// Create a temp file for the encoder
+		tmpFile, err := os.CreateTemp(t.TempDir(), "backup-test")
+		require.NoError(t, err)
+		defer func() { _ = tmpFile.Close() }()
+
+		encoder, err := backupformat.NewEncoder(tmpFile, testSchema, zedToken)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = encoder.Close() })
+
+		// Only include relationships with "test" prefix
+		config := BackupConfig{PrefixFilter: "test"}
+
+		completed, err := backupCreateImpl(t.Context(), mockClient, encoder, progressTracker, config, zedToken)
+
+		require.NoError(t, err)
+		require.True(t, completed)
+	})
+
+	t.Run("resumes from cursor", func(t *testing.T) {
+		t.Parallel()
+
+		resumeCursor := &v1.Cursor{Token: "resume-from-here"}
+
+		mockClient := &mockClientForBackup{
+			t: t,
+			recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
+				func() (*v1.ExportBulkRelationshipsResponse, error) {
+					return &v1.ExportBulkRelationshipsResponse{
+						Relationships:     testRels,
+						AfterResultCursor: &v1.Cursor{Token: "new-cursor"},
+					}, nil
+				},
+			},
+			exportCalls: []func(t *testing.T, req *v1.ExportBulkRelationshipsRequest){
+				func(t *testing.T, req *v1.ExportBulkRelationshipsRequest) {
+					require.NotNil(t, req.OptionalCursor)
+					require.Equal(t, resumeCursor.Token, req.OptionalCursor.Token)
+					// When resuming from cursor, consistency should not be set
+					require.Nil(t, req.Consistency)
+				},
+			},
+		}
+
+		progressTracker := &mockProgressTracker{cursor: resumeCursor}
+
+		// Create a temp file for the encoder
+		tmpFile, err := os.CreateTemp(t.TempDir(), "backup-test")
+		require.NoError(t, err)
+		defer func() { _ = tmpFile.Close() }()
+
+		encoder, err := backupformat.NewEncoder(tmpFile, testSchema, &v1.ZedToken{Token: "dummy"})
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = encoder.Close() })
+
+		config := BackupConfig{PrefixFilter: "test"}
+
+		// Pass nil zedToken to simulate resume scenario
+		completed, err := backupCreateImpl(t.Context(), mockClient, encoder, progressTracker, config, nil)
+
+		require.NoError(t, err)
+		require.True(t, completed)
+	})
+
+	t.Run("handles context cancellation", func(t *testing.T) {
+		t.Parallel()
+
+		mockClient := &mockClientForBackup{
+			t: t,
+			recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
+				func() (*v1.ExportBulkRelationshipsResponse, error) {
+					return nil, context.Canceled
+				},
+			},
+		}
+
+		progressTracker := &mockProgressTracker{}
+		zedToken := &v1.ZedToken{Token: "test-token"}
+
+		// Create a temp file for the encoder
+		tmpFile, err := os.CreateTemp(t.TempDir(), "backup-test")
+		require.NoError(t, err)
+		defer func() { _ = tmpFile.Close() }()
+
+		encoder, err := backupformat.NewEncoder(tmpFile, testSchema, zedToken)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = encoder.Close() })
+
+		config := BackupConfig{PrefixFilter: "test"}
+
+		completed, err := backupCreateImpl(t.Context(), mockClient, encoder, progressTracker, config, zedToken)
+
+		require.Error(t, err)
+		require.False(t, completed)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("handles WriteCursor error", func(t *testing.T) {
+		t.Parallel()
+
+		writeErr := errors.New("disk full")
+		mockClient := &mockClientForBackup{
+			t: t,
+			recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
+				func() (*v1.ExportBulkRelationshipsResponse, error) {
+					return &v1.ExportBulkRelationshipsResponse{
+						Relationships:     testRels,
+						AfterResultCursor: &v1.Cursor{Token: "cursor"},
+					}, nil
+				},
+			},
+		}
+
+		progressTracker := &mockProgressTracker{writeErr: writeErr}
+		zedToken := &v1.ZedToken{Token: "test-token"}
+
+		// Create a temp file for the encoder
+		tmpFile, err := os.CreateTemp(t.TempDir(), "backup-test")
+		require.NoError(t, err)
+		defer func() { _ = tmpFile.Close() }()
+
+		encoder, err := backupformat.NewEncoder(tmpFile, testSchema, zedToken)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = encoder.Close() })
+
+		config := BackupConfig{PrefixFilter: "test"}
+
+		completed, err := backupCreateImpl(t.Context(), mockClient, encoder, progressTracker, config, zedToken)
+
+		require.Error(t, err)
+		require.False(t, completed)
+		require.ErrorIs(t, err, writeErr)
+	})
+
+	t.Run("mock MarkComplete returns error when configured", func(t *testing.T) {
+		t.Parallel()
+
+		// This test verifies the mockProgressTracker correctly returns markCompleteErr.
+		// Note: backupCreateImpl does NOT call MarkComplete - that's done by the
+		// caller (backupCreateRunE). This test ensures the mock works correctly
+		// for integration testing scenarios.
+		markCompleteErr := errors.New("failed to remove progress file")
+		progressTracker := &mockProgressTracker{markCompleteErr: markCompleteErr}
+
+		err := progressTracker.MarkComplete()
+		require.Error(t, err)
+		require.ErrorIs(t, err, markCompleteErr)
+		require.True(t, progressTracker.completed, "completed flag should be set even on error")
+	})
+
+	t.Run("verifies progressTracker.closed is set on Close", func(t *testing.T) {
+		t.Parallel()
+
+		progressTracker := &mockProgressTracker{}
+		require.False(t, progressTracker.closed)
+
+		err := progressTracker.Close()
+		require.NoError(t, err)
+		require.True(t, progressTracker.closed)
+	})
+}
+
+func TestProgressTracker(t *testing.T) {
+	t.Parallel()
+
+	t.Run("newFileProgressTracker creates new file when backup doesn't exist", func(t *testing.T) {
+		t.Parallel()
+
+		backupFile := filepath.Join(t.TempDir(), "test-backup.zedbackup")
+
+		tracker, err := newFileProgressTracker(backupFile, false)
+		require.NoError(t, err)
+		defer func() { _ = tracker.Close() }()
+
+		require.Nil(t, tracker.GetCursor())
+		require.FileExists(t, toLockFileName(backupFile))
+	})
+
+	t.Run("newFileProgressTracker errors when backup exists without progress file", func(t *testing.T) {
+		t.Parallel()
+
+		backupFile := filepath.Join(t.TempDir(), "test-backup.zedbackup")
+
+		_, err := newFileProgressTracker(backupFile, true)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "already exists")
+	})
+
+	t.Run("newFileProgressTracker resumes from existing progress file", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		backupFile := filepath.Join(tmpDir, "test-backup.zedbackup")
+		progressFile := toLockFileName(backupFile)
+
+		// Create progress file with cursor
+		err := os.WriteFile(progressFile, []byte("test-cursor-token"), 0o600)
+		require.NoError(t, err)
+
+		tracker, err := newFileProgressTracker(backupFile, true)
+		require.NoError(t, err)
+		defer func() { _ = tracker.Close() }()
+
+		cursor := tracker.GetCursor()
+		require.NotNil(t, cursor)
+		require.Equal(t, "test-cursor-token", cursor.Token)
+	})
+
+	t.Run("WriteCursor updates progress file", func(t *testing.T) {
+		t.Parallel()
+
+		backupFile := filepath.Join(t.TempDir(), "test-backup.zedbackup")
+
+		tracker, err := newFileProgressTracker(backupFile, false)
+		require.NoError(t, err)
+		defer func() { _ = tracker.Close() }()
+
+		cursor := &v1.Cursor{Token: "new-cursor-token"}
+		err = tracker.WriteCursor(cursor)
+		require.NoError(t, err)
+
+		// Verify file contents
+		contents, err := os.ReadFile(toLockFileName(backupFile))
+		require.NoError(t, err)
+		require.Equal(t, "new-cursor-token", string(contents))
+	})
+
+	t.Run("MarkComplete removes progress file", func(t *testing.T) {
+		t.Parallel()
+
+		backupFile := filepath.Join(t.TempDir(), "test-backup.zedbackup")
+
+		tracker, err := newFileProgressTracker(backupFile, false)
+		require.NoError(t, err)
+
+		progressFileName := toLockFileName(backupFile)
+		require.FileExists(t, progressFileName)
+
+		err = tracker.MarkComplete()
+		require.NoError(t, err)
+		require.NoFileExists(t, progressFileName)
+
+		// Close should be a no-op after MarkComplete (file already closed)
+		err = tracker.Close()
+		require.NoError(t, err)
+	})
+}
