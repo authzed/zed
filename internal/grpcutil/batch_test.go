@@ -2,6 +2,7 @@ package grpcutil
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -139,4 +140,24 @@ func TestConcurrentBatch(t *testing.T) {
 			require.Equal(tt.wantCalls, int(calls))
 		})
 	}
+}
+
+func TestConcurrentBatchWhenOneBatchFailsAndWorkersIsOne(t *testing.T) {
+	items := generateItems(20)
+	batchSize := 10
+	workers := 1 // effectively no parallelization...
+	var callsToEachFn int64
+	batchFn := func(_ context.Context, no int, _ int, _ int) error {
+		atomic.AddInt64(&callsToEachFn, 1)
+		if no == 0 {
+			return errors.New("one batch failed")
+		}
+		return nil
+	}
+	err := ConcurrentBatch(t.Context(), len(items), batchSize, workers, batchFn)
+
+	require.ErrorContains(t, err, "one batch failed")
+
+	// one call is made, the other one is never queued
+	require.Equal(t, 1, int(callsToEachFn))
 }
