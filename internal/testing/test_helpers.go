@@ -62,6 +62,12 @@ func NewTestServer(ctx context.Context, t *testing.T) server.RunnableServer {
 	return srv
 }
 
+type StringToStringFlag struct {
+	FlagName  string
+	FlagValue map[string]string
+	Changed   bool
+}
+
 type StringFlag struct {
 	FlagName  string
 	FlagValue string
@@ -104,6 +110,9 @@ func CreateTestCobraCommandWithFlagValue(t *testing.T, flagAndValues ...any) *co
 	c := cobra.Command{}
 	for _, flagAndValue := range flagAndValues {
 		switch f := flagAndValue.(type) {
+		case StringToStringFlag:
+			c.Flags().StringToString(f.FlagName, f.FlagValue, "")
+			c.Flag(f.FlagName).Changed = f.Changed
 		case StringFlag:
 			c.Flags().String(f.FlagName, f.FlagValue, "")
 			c.Flag(f.FlagName).Changed = f.Changed

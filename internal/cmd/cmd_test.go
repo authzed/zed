@@ -94,7 +94,7 @@ func TestMultipleInitialiseRootCmd(t *testing.T) {
 
 	// Call InitialiseRootCmd multiple times to simulate what happens
 	// when tests run with -count=10
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		rootCmd := InitialiseRootCmd(zl)
 		require.NotNil(t, rootCmd)
 

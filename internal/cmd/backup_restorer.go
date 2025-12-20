@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -56,10 +57,8 @@ var (
 )
 
 type restorer struct {
-	schema                string
-	decoder               *backupformat.Decoder
+	decoder               backupformat.Decoder
 	client                client.Client
-	prefixFilter          string
 	batchSize             uint
 	batchesPerTransaction uint
 	conflictStrategy      ConflictStrategy
@@ -78,15 +77,13 @@ type restorer struct {
 	requestTimeout   time.Duration
 }
 
-func newRestorer(schema string, decoder *backupformat.Decoder, client client.Client, prefixFilter string, batchSize uint,
+func newRestorer(decoder backupformat.Decoder, client client.Client, batchSize uint,
 	batchesPerTransaction uint, conflictStrategy ConflictStrategy, disableRetryErrors bool,
 	requestTimeout time.Duration,
 ) *restorer {
 	return &restorer{
 		decoder:               decoder,
-		schema:                schema,
 		client:                client,
-		prefixFilter:          prefixFilter,
 		requestTimeout:        requestTimeout,
 		batchSize:             batchSize,
 		batchesPerTransaction: batchesPerTransaction,
@@ -97,6 +94,11 @@ func newRestorer(schema string, decoder *backupformat.Decoder, client client.Cli
 }
 
 func (r *restorer) restoreFromDecoder(ctx context.Context) error {
+	schema, err := r.decoder.Schema()
+	if err != nil {
+		return err
+	}
+
 	relationshipWriteStart := time.Now()
 	defer func() {
 		if err := r.bar.Finish(); err != nil {
@@ -106,7 +108,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 
 	r.bar.Describe("restoring schema from backup")
 	if _, err := r.client.WriteSchema(ctx, &v1.WriteSchemaRequest{
-		Schema: r.schema,
+		Schema: schema,
 	}); err != nil {
 		return fmt.Errorf("unable to write schema: %w", err)
 	}
@@ -125,13 +127,7 @@ func (r *restorer) restoreFromDecoder(ctx context.Context) error {
 			return fmt.Errorf("aborted restore: %w", err)
 		}
 
-		if !hasRelPrefix(rel, r.prefixFilter) {
-			r.filteredOutRels++
-			continue
-		}
-
 		batch = append(batch, rel)
-
 		if uint(len(batch))%r.batchSize == 0 {
 			batchesToBeCommitted = append(batchesToBeCommitted, batch)
 			err := relationshipWriter.Send(&v1.ImportBulkRelationshipsRequest{
@@ -324,7 +320,7 @@ func (r *restorer) writeBatchesWithRetry(ctx context.Context, batches [][]*v1.Re
 
 	var currentRetries, totalRetries, loadedRels uint
 	for _, batch := range batches {
-		updates := lo.Map[*v1.Relationship, *v1.RelationshipUpdate](batch, func(item *v1.Relationship, _ int) *v1.RelationshipUpdate {
+		updates := lo.Map(batch, func(item *v1.Relationship, _ int) *v1.RelationshipUpdate {
 			return &v1.RelationshipUpdate{
 				Relationship: item,
 				Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
@@ -427,10 +423,8 @@ func isGRPCCode(err error, codes ...codes.Code) bool {
 	}
 
 	if s, ok := status.FromError(err); ok {
-		for _, code := range codes {
-			if s.Code() == code {
-				return true
-			}
+		if slices.Contains(codes, s.Code()) {
+			return true
 		}
 	}
 

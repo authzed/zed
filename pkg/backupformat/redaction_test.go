@@ -342,13 +342,12 @@ func TestRedactBackup(t *testing.T) {
 
 	// Write some data.
 	buf := bytes.Buffer{}
-	enc, err := NewEncoder(&buf, exampleSchema, &v1.ZedToken{
-		Token: base64.StdEncoding.EncodeToString(gofakeit.ImageJpeg(10, 10)),
-	})
+	enc := NewOcfEncoder(&buf)
+	err := enc.WriteSchema(exampleSchema, base64.StdEncoding.EncodeToString(gofakeit.ImageJpeg(10, 10)))
 	require.NoError(t, err)
 
 	for _, rel := range exampleRelationships {
-		require.NoError(t, enc.Append(rel))
+		require.NoError(t, enc.Append(rel, ""))
 	}
 	require.NoError(t, enc.Close())
 	require.NotEmpty(t, buf.Bytes())
@@ -382,8 +381,15 @@ func TestRedactBackup(t *testing.T) {
 	redactedDecoder, err := NewDecoder(bytes.NewReader(redactedBuf.Bytes()))
 	require.NoError(t, err)
 
-	require.Equal(t, "definition def0 {}\n\ndefinition def1 {\n\trelation rel3: def0\n}\n\ndefinition def2 {\n\trelation rel4: def0 | def0:*\n\tpermission rel5 = rel4\n}", redactedDecoder.Schema())
-	require.Equal(t, decoder.ZedToken(), redactedDecoder.ZedToken())
+	schema, err := redactedDecoder.Schema()
+	require.NoError(t, err)
+	require.Equal(t, "definition def0 {}\n\ndefinition def1 {\n\trelation rel3: def0\n}\n\ndefinition def2 {\n\trelation rel4: def0 | def0:*\n\tpermission rel5 = rel4\n}", schema)
+
+	zedtoken, err := decoder.ZedToken()
+	require.NoError(t, err)
+	redactedZedtoken, err := redactedDecoder.ZedToken()
+	require.NoError(t, err)
+	require.Equal(t, zedtoken, redactedZedtoken)
 
 	for _, expected := range exampleRelationships {
 		rel, err := redactedDecoder.Next()

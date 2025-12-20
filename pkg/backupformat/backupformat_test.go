@@ -106,13 +106,12 @@ func TestWriteAndRead(t *testing.T) {
 			}
 
 			buf := bytes.Buffer{}
-			enc, err := NewEncoder(&buf, expectedSchema, &v1.ZedToken{
-				Token: expectedZedtoken,
-			})
+			enc := &OcfEncoder{w: &buf}
+			err = enc.WriteSchema(expectedSchema, expectedZedtoken)
 			require.NoError(err)
 
 			for _, rel := range expectedRels {
-				require.NoError(enc.Append(rel))
+				require.NoError(enc.Append(rel, ""))
 			}
 			require.NoError(enc.Close())
 			require.NotEmpty(buf.Bytes())
@@ -120,8 +119,12 @@ func TestWriteAndRead(t *testing.T) {
 			dec, err := NewDecoder(bytes.NewReader(buf.Bytes()))
 			require.NoError(err)
 
-			require.Equal(expectedSchema, dec.Schema())
-			require.Equal(expectedZedtoken, dec.ZedToken().Token)
+			schema, err := dec.Schema()
+			require.NoError(err)
+			require.Equal(expectedSchema, schema)
+			zedtoken, err := dec.ZedToken()
+			require.NoError(err)
+			require.Equal(expectedZedtoken, zedtoken.Token)
 
 			for _, expected := range expectedRels {
 				rel, err := dec.Next()
