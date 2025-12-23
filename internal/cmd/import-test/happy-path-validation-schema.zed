@@ -1,6 +1,12 @@
 definition user {}
 
+caveat mycaveat(day_of_week string) {
+    day_of_week == "friday"
+}
+
 definition resource {
-  relation user: user
-  permission view = user
+    relation writer: user
+    relation reader: user with mycaveat
+    permission write = writer
+    permission view = reader + write
 }

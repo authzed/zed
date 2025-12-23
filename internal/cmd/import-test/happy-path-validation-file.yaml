@@ -1,9 +1,12 @@
 ---
 schemaFile: "./happy-path-validation-schema.zed"
-relationships: >-
-  resource:1#user@user:1
+relationships: |-
+  resource:1#reader@user:1[mycaveat]
+  resource:2#writer@user:1
+  resource:3#writer@user:1
 assertions:
   assertTrue:
-    - "resource:1#user@user:1"
+    - 'resource:1#view@user:1 with {"day_of_week":"friday"}'
   assertFalse:
-    - "resource:1#user@user:2"
+    - 'resource:1#view@user:1 with {"day_of_week":"monday"}'
+    - 'resource:1#view@user:2'

@@ -285,7 +285,7 @@ func schemaWriteCmdImpl(cmd *cobra.Command, args []string, client v1.SchemaServi
 	return nil
 }
 
-// rewriteSchema rewrites the given existing schema to include the specified prefix on all definitions.
+// rewriteSchema rewrites the given existing schema to include the specified prefix on all definitions and caveats.
 func rewriteSchema(existingSchemaText string, definitionPrefix string) (string, error) {
 	if definitionPrefix == "" {
 		return existingSchemaText, nil

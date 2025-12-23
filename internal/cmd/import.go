@@ -54,7 +54,22 @@ func registerImportCmd(rootCmd *cobra.Command) {
 		zed import --schema-definition-prefix=mypermsystem file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
 `,
 		Args: commands.ValidationWrapper(cobra.ExactArgs(1)),
-		RunE: importCmdFunc,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := client.NewClient(cmd)
+			if err != nil {
+				return err
+			}
+			u, err := url.Parse(args[0])
+			if err != nil {
+				return err
+			}
+			prefix, err := determinePrefixForSchema(cmd.Context(), cobrautil.MustGetString(cmd, "schema-definition-prefix"), client, nil)
+			if err != nil {
+				return err
+			}
+			log.Trace().Msgf("using prefix: %s", prefix)
+			return importCmdFunc(cmd, client, client, prefix, u)
+		},
 	}
 
 	rootCmd.AddCommand(importCmd)
@@ -65,16 +80,8 @@ func registerImportCmd(rootCmd *cobra.Command) {
 	importCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before importing")
 }
 
-func importCmdFunc(cmd *cobra.Command, args []string) error {
-	client, err := client.NewClient(cmd)
-	if err != nil {
-		return err
-	}
-	u, err := url.Parse(args[0])
-	if err != nil {
-		return err
-	}
-
+func importCmdFunc(cmd *cobra.Command, schemaClient v1.SchemaServiceClient, relationshipsClient v1.PermissionsServiceClient, prefix string, u *url.URL) error {
+	prefix = strings.TrimRight(prefix, "/")
 	decoder, err := decode.DecoderForURL(u)
 	if err != nil {
 		return err
@@ -84,29 +91,24 @@ func importCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	prefix, err := determinePrefixForSchema(cmd.Context(), cobrautil.MustGetString(cmd, "schema-definition-prefix"), client, nil)
-	if err != nil {
-		return err
-	}
-
 	if cobrautil.MustGetBool(cmd, "schema") {
-		if err := importSchema(cmd.Context(), client, p.Schema.Schema, prefix); err != nil {
-			return err
+		if err := importSchema(cmd.Context(), schemaClient, p.Schema.Schema, prefix); err != nil {
+			return fmt.Errorf("error importing schema: %w", err)
 		}
 	}
 
 	if cobrautil.MustGetBool(cmd, "relationships") {
 		batchSize := cobrautil.MustGetInt(cmd, "batch-size")
 		workers := cobrautil.MustGetInt(cmd, "workers")
-		if err := importRelationships(cmd.Context(), client, p.Relationships.RelationshipsString, prefix, batchSize, workers); err != nil {
-			return err
+		if err := importRelationships(cmd.Context(), relationshipsClient, p.Relationships.RelationshipsString, prefix, batchSize, workers); err != nil {
+			return fmt.Errorf("error importing relationships: %w", err)
 		}
 	}
 
 	return err
 }
 
-func importSchema(ctx context.Context, client client.Client, schema string, definitionPrefix string) error {
+func importSchema(ctx context.Context, client v1.SchemaServiceClient, schema string, definitionPrefix string) error {
 	log.Info().Msg("importing schema")
 
 	// Recompile the schema with the specified prefix.
@@ -126,7 +128,7 @@ func importSchema(ctx context.Context, client client.Client, schema string, defi
 	return nil
 }
 
-func importRelationships(ctx context.Context, client client.Client, relationships string, definitionPrefix string, batchSize int, workers int) error {
+func importRelationships(ctx context.Context, client v1.PermissionsServiceClient, relationships string, definitionPrefix string, batchSize int, workers int) error {
 	relationshipUpdates := make([]*v1.RelationshipUpdate, 0)
 	scanner := bufio.NewScanner(strings.NewReader(relationships))
 	for scanner.Scan() {
@@ -147,6 +149,9 @@ func importRelationships(ctx context.Context, client client.Client, relationship
 		if len(definitionPrefix) > 0 {
 			rel.Resource.ObjectType = fmt.Sprintf("%s/%s", definitionPrefix, rel.Resource.ObjectType)
 			rel.Subject.Object.ObjectType = fmt.Sprintf("%s/%s", definitionPrefix, rel.Subject.Object.ObjectType)
+			if rel.OptionalCaveat != nil {
+				rel.OptionalCaveat.CaveatName = fmt.Sprintf("%s/%s", definitionPrefix, rel.OptionalCaveat.CaveatName)
+			}
 		}
 
 		relationshipUpdates = append(relationshipUpdates, &v1.RelationshipUpdate{
