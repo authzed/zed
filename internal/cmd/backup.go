@@ -193,20 +193,36 @@ func createBackupFile(filename string, returnIfExists bool) (*os.File, bool, err
 // revisionForServerless determines the latest revision to use for the backup
 // because Serverless doesn't return a revision in the ReadSchema response.
 func revisionForServerless(ctx context.Context, spiceClient client.Client, schema *compiler.CompiledSchema) (*v1.ZedToken, error) {
-	stream, err := spiceClient.ReadRelationships(ctx, &v1.ReadRelationshipsRequest{
-		RelationshipFilter: &v1.RelationshipFilter{ResourceType: schema.ObjectDefinitions[0].Name},
-		OptionalLimit:      1,
-	})
-	if err != nil {
-		return nil, err
+	var finalErr error
+	for _, def := range schema.ObjectDefinitions {
+		stream, err := spiceClient.ReadRelationships(ctx, &v1.ReadRelationshipsRequest{
+			RelationshipFilter: &v1.RelationshipFilter{ResourceType: def.Name},
+			OptionalLimit:      1,
+			Consistency: &v1.Consistency{
+				Requirement: &v1.Consistency_FullyConsistent{
+					FullyConsistent: true,
+				},
+			},
+		})
+		if err != nil {
+			finalErr = errors.Join(finalErr, err)
+			continue
+		}
+
+		msg, err := stream.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				finalErr = errors.Join(finalErr, fmt.Errorf("no relationships found for definition %q", def.Name))
+			} else {
+				finalErr = errors.Join(finalErr, err)
+			}
+			continue
+		}
+		log.Trace().Str("revision", msg.GetReadAt().GetToken()).Msg("determined serverless revision")
+		return msg.GetReadAt(), nil
 	}
 
-	msg, err := stream.Recv()
-	if err != nil {
-		return nil, err
-	}
-	log.Trace().Str("revision", msg.ReadAt.Token).Msg("determined serverless revision")
-	return msg.ReadAt, nil
+	return nil, finalErr
 }
 
 // CloseAndJoin attempts to close the provided arguement and joins the error
