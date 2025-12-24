@@ -20,6 +20,7 @@ import (
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/genutil/mapz"
+	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
@@ -699,6 +700,67 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 	require.Equal(t, "bar", encoder.Relationships[1].Resource.ObjectId)
 
 	client.assertAllRecvCalls()
+}
+
+func TestRevisionForServerless(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// create a spicedb server
+	srv := zedtesting.NewTestServer(ctx, t)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- srv.Run(ctx)
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(t, err)
+
+	c, err := zedtesting.ClientFromConn(conn)(nil)
+	require.NoError(t, err)
+
+	// write a schema
+	schemaText := `definition user {}
+definition document {
+   relation view: user 
+}`
+	schema, err := compiler.Compile(
+		compiler.InputSchema{Source: "schema", SchemaString: schemaText},
+		compiler.AllowUnprefixedObjectType(),
+		compiler.SkipValidation(),
+	)
+	require.NoError(t, err)
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: schemaText})
+	require.NoError(t, err)
+
+	// query for serverless revision when there are no relationships in the system should return error
+	res, err := revisionForServerless(ctx, c, schema)
+	require.ErrorContains(t, err, "no relationships found")
+	require.Nil(t, res)
+
+	// write relationships for the *second* object definition
+	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{
+		Updates: []*v1.RelationshipUpdate{
+			{
+				Operation: v1.RelationshipUpdate_OPERATION_CREATE,
+				Relationship: &v1.Relationship{
+					Resource: &v1.ObjectReference{ObjectType: "document", ObjectId: "1"},
+					Relation: "view",
+					Subject: &v1.SubjectReference{
+						Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "maria"},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	// now, we should have a result
+	res, err = revisionForServerless(ctx, c, schema)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	cancel()
+	require.NoError(t, <-errCh)
 }
 
 type mockClientForBackup struct {
