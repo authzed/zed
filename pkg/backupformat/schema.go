@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/hamba/avro/v2"
 )
@@ -14,14 +15,15 @@ func init() {
 }
 
 type RelationshipV1 struct {
-	ObjectType        string `avro:"object_type"`
-	ObjectID          string `avro:"object_id"`
-	Relation          string `avro:"relation"`
-	SubjectObjectType string `avro:"subject_object_type"`
-	SubjectObjectID   string `avro:"subject_object_id"`
-	SubjectRelation   string `avro:"subject_relation"`
-	CaveatName        string `avro:"caveat_name"`
-	CaveatContext     []byte `avro:"caveat_context"`
+	ObjectType        string    `avro:"object_type"`
+	ObjectID          string    `avro:"object_id"`
+	Relation          string    `avro:"relation"`
+	SubjectObjectType string    `avro:"subject_object_type"`
+	SubjectObjectID   string    `avro:"subject_object_id"`
+	SubjectRelation   string    `avro:"subject_relation"`
+	CaveatName        string    `avro:"caveat_name"`
+	CaveatContext     []byte    `avro:"caveat_context"`
+	Expiration        time.Time `avro:"expiration"`
 }
 
 type SchemaV1 struct {
@@ -76,20 +78,28 @@ func recordSchemaFromAvroStruct(name, namespace string, avroStruct any) (*avro.R
 		}
 		fieldGoType := f.Type
 
-		var fieldType avro.Type
-		switch fieldGoType.Kind() {
-		case reflect.String:
-			fieldType = avro.String
-		case reflect.Slice:
-			if fieldGoType.Elem().Kind() != reflect.Uint8 {
-				return nil, errors.New("unable to build schema for slice, only byte slices are supported")
+		var fieldSchema avro.Schema
+		if fieldGoType == reflect.TypeOf(time.Time{}) {
+			// timestamp-millis is a logical type that extends long. see https://github.com/hamba/avro/tree/v2.30.0?tab=readme-ov-file#types-conversions
+			logicalSchema := avro.NewPrimitiveLogicalSchema(avro.TimestampMillis)
+			fieldSchema = avro.NewPrimitiveSchema(avro.Long, logicalSchema)
+		} else {
+			var fieldType avro.Type
+			switch fieldGoType.Kind() {
+			case reflect.String:
+				fieldType = avro.String
+			case reflect.Slice:
+				if fieldGoType.Elem().Kind() != reflect.Uint8 {
+					return nil, errors.New("unable to build schema for slice, only byte slices are supported")
+				}
+				fieldType = avro.Bytes
+			default:
+				return nil, fmt.Errorf("unsupported struct kind: %s", fieldGoType)
 			}
-			fieldType = avro.Bytes
-		default:
-			return nil, fmt.Errorf("unsupported struct kind: %s", fieldGoType)
+			fieldSchema = avro.NewPrimitiveSchema(fieldType, nil)
 		}
 
-		schemaField, err := avro.NewField(fieldName, avro.NewPrimitiveSchema(fieldType, nil))
+		schemaField, err := avro.NewField(fieldName, fieldSchema)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create avro schema field: %w", err)
 		}

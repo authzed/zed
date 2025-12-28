@@ -165,6 +165,10 @@ func (e *OcfEncoder) Append(r *v1.Relationship, _ string) error {
 		toEncode.CaveatContext = contextBytes
 	}
 
+	if r.OptionalExpiresAt != nil && !r.OptionalExpiresAt.AsTime().IsZero() {
+		toEncode.Expiration = r.OptionalExpiresAt.AsTime()
+	}
+
 	encoder, err := e.encoder("")
 	if err != nil {
 		return err
