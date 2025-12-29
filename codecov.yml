@@ -1,0 +1,2 @@
+ignore:
+  - "internal/cmd/mock_*.go"

@@ -17,8 +17,13 @@ type Gen mg.Namespace
 
 // All Run all generators in parallel
 func (g Gen) All() error {
-	mg.Deps(g.Docs)
+	mg.Deps(g.Docs, g.mocks)
 	return nil
+}
+
+// mocks Generate mocks using go generate
+func (g Gen) mocks() error {
+	return sh.RunV("go", "generate", "./...")
 }
 
 // Docs Generate documentation in markdown format
