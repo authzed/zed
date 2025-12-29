@@ -3,11 +3,13 @@ package cmd
 import (
 	"context"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
@@ -126,7 +128,62 @@ caveat test/some_caveat(someCondition int) {
 	}
 }
 
-func TestSchemaCompile(t *testing.T) {
+// testWriter is a simple writer that captures bytes to a buffer
+type testWriter struct {
+	buffer *[]byte
+}
+
+func (tw *testWriter) Write(p []byte) (n int, err error) {
+	*tw.buffer = append(*tw.buffer, p...)
+	return len(p), nil
+}
+
+func TestSchemaCompileOuter(t *testing.T) {
+	t.Parallel()
+
+	f := filepath.Join(t.TempDir(), uuid.NewString())
+
+	testCases := map[string]struct {
+		outFile      string
+		expectStdout bool
+	}{
+		`use_stdout`: {
+			expectStdout: true,
+		},
+		`use_file`: {
+			outFile:      f,
+			expectStdout: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			files := []string{filepath.Join("preview-test", "composable-schema-root.zed")}
+			expected := `definition user {}
+
+definition resource {
+	relation user: user
+	permission view = user
+}
+`
+			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+				zedtesting.StringFlag{FlagName: "out", FlagValue: tc.outFile},
+			)
+			usedStdout, err := schemaCompileOuter(cmd, files)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectStdout, usedStdout)
+			if tc.outFile != "" {
+				tempOutString, err := os.ReadFile(tc.outFile)
+				require.NoError(t, err)
+				require.Equal(t, expected, string(tempOutString))
+			}
+		})
+	}
+}
+
+func TestSchemaCompileInner(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
@@ -139,19 +196,13 @@ definition resource {
 }
 `
 
-	tempOutFile := filepath.Join(t.TempDir(), "out.zed")
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
-		zedtesting.StringFlag{FlagName: "out", FlagValue: tempOutFile})
+	var buf []byte
+	writer := &testWriter{buffer: &buf}
 
-	mockTermCheckerr := &mockTermChecker{returnVal: false}
-	err := schemaCompileCmdFunc(cmd, files, mockTermCheckerr)
+	err := schemaCompileInner(files, writer)
 
 	require.NoError(err)
-	tempOutString, err := os.ReadFile(tempOutFile)
-	require.NoError(err)
-	require.Equal(expected, string(tempOutString))
-	// TODO re-enable after adding a test that uses stdout
-	// require.Equal(int(os.Stdout.Fd()), mockTermCheckerr.capturedFd, "expected stdout to be checked for terminal")
+	require.Equal(expected, string(buf))
 }
 
 func TestSchemaCompileFileNotFound(t *testing.T) {
@@ -160,12 +211,7 @@ func TestSchemaCompileFileNotFound(t *testing.T) {
 
 	files := []string{filepath.Join("preview-test", "nonexistent.zed")}
 
-	tempOutFile := filepath.Join(t.TempDir(), "out.zed")
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
-		zedtesting.StringFlag{FlagName: "out", FlagValue: tempOutFile})
-
-	mockTermCheckerr := &mockTermChecker{returnVal: false}
-	err := schemaCompileCmdFunc(cmd, files, mockTermCheckerr)
+	err := schemaCompileInner(files, io.Discard)
 	require.Error(err)
 	require.ErrorIs(err, fs.ErrNotExist)
 }
@@ -177,12 +223,7 @@ func TestSchemaCompileFailureFromReservedKeyword(t *testing.T) {
 	files := []string{filepath.Join("preview-test", "composable-schema-invalid-root.zed")}
 	var expectedErr compiler.BaseCompilerError
 
-	tempOutFile := filepath.Join(t.TempDir(), "out.zed")
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
-		zedtesting.StringFlag{FlagName: "out", FlagValue: tempOutFile})
-
-	mockTermCheckerr := &mockTermChecker{returnVal: false}
-	err := schemaCompileCmdFunc(cmd, files, mockTermCheckerr)
+	err := schemaCompileInner(files, io.Discard)
 	require.Error(err)
 	require.ErrorAs(err, &expectedErr)
 }
