@@ -58,9 +58,9 @@ zed backup <filename> [flags]
 ### Options
 
 ```
-      --page-limit uint32      defines the number of relationships to be read by requested page during backup
-      --prefix-filter string   include only schema and relationships with a given prefix
-      --rewrite-legacy         potentially modify the schema to exclude legacy/broken syntax
+      --page-limit uint32                    defines the number of relationships to be read by requested page during backup
+      --prefix-filter string                 include only schema definitions and relationships with a given prefix
+      --prefix-replacements stringToString   potentially modify the schema to replace desired prefixes (default [])
 ```
 
 ### Options Inherited From Parent Flags
@@ -103,9 +103,9 @@ zed backup create <filename> [flags]
 ### Options
 
 ```
-      --page-limit uint32      defines the number of relationships to be read by requested page during backup
-      --prefix-filter string   include only schema and relationships with a given prefix
-      --rewrite-legacy         potentially modify the schema to exclude legacy/broken syntax
+      --page-limit uint32                    defines the number of relationships to be read by requested page during backup
+      --prefix-filter string                 include only schema definitions and relationships with a given prefix
+      --prefix-replacements stringToString   potentially modify the schema to replace desired prefixes (default [])
 ```
 
 ### Options Inherited From Parent Flags
@@ -140,7 +140,8 @@ zed backup parse-relationships <filename> [flags]
 ### Options
 
 ```
-      --prefix-filter string   Include only relationships with a given prefix
+      --prefix-filter string                 include only schema definitions and relationships with a given prefix
+      --prefix-replacements stringToString   potentially modify the schema to replace desired prefixes (default [])
 ```
 
 ### Options Inherited From Parent Flags
@@ -204,8 +205,8 @@ zed backup parse-schema <filename> [flags]
 ### Options
 
 ```
-      --prefix-filter string   include only schema and relationships with a given prefix
-      --rewrite-legacy         potentially modify the schema to exclude legacy/broken syntax
+      --prefix-filter string                 include only schema definitions and relationships with a given prefix
+      --prefix-replacements stringToString   potentially modify the schema to replace desired prefixes (default [])
 ```
 
 ### Options Inherited From Parent Flags
@@ -278,13 +279,13 @@ zed backup restore <filename> [flags]
 ### Options
 
 ```
-      --batch-size uint                restore relationship write batch size (default 1000)
-      --batches-per-transaction uint   number of batches per transaction (default 10)
-      --conflict-strategy string       strategy used when a conflicting relationship is found. Possible values: fail, skip, touch (default "fail")
-      --disable-retries                retries when an errors is determined to be retryable (e.g. serialization errors)
-      --prefix-filter string           include only schema and relationships with a given prefix
-      --request-timeout duration       timeout for each request performed during restore (default 30s)
-      --rewrite-legacy                 potentially modify the schema to exclude legacy/broken syntax
+      --batch-size uint                      restore relationship write batch size (default 1000)
+      --batches-per-transaction uint         number of batches per transaction (default 10)
+      --conflict-strategy string             strategy used when a conflicting relationship is found. Possible values: fail, skip, touch (default "fail")
+      --disable-retries                      retries when an errors is determined to be retryable (e.g. serialization errors)
+      --prefix-filter string                 include only schema definitions and relationships with a given prefix
+      --prefix-replacements stringToString   potentially modify the schema to replace desired prefixes (default [])
+      --request-timeout duration             timeout for each request performed during restore (default 30s)
 ```
 
 ### Options Inherited From Parent Flags
@@ -856,7 +857,9 @@ zed preview schema compile <file> [flags]
 
 	Write to stdout:
 		zed preview schema compile root.zed
-	Write to an output file:
+	Write to redirected stdout:
+		zed preview schema compile schema.zed 1> compiled.zed
+	Write to a file:
 		zed preview schema compile root.zed --out compiled.zed
 	
 ```

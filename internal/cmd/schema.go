@@ -83,12 +83,15 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) *cobra.Command {
 		Example: `
 	Write to stdout:
 		zed preview schema compile root.zed
-	Write to an output file:
+	Write to redirected stdout:
+		zed preview schema compile schema.zed 1> compiled.zed
+	Write to a file:
 		zed preview schema compile root.zed --out compiled.zed
 	`,
 		ValidArgsFunction: commands.FileExtensionCompletions("zed"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return schemaCompileCmdFunc(cmd, args, &realTermChecker{})
+			_, err := schemaCompileOuter(cmd, args)
+			return err
 		},
 	}
 
@@ -360,22 +363,38 @@ func determinePrefixForSchema(ctx context.Context, specifiedPrefix string, clien
 	return "", nil
 }
 
-// Compiles an input schema written in the new composable schema syntax
-// and produces it as a fully-realized schema
-func schemaCompileCmdFunc(cmd *cobra.Command, args []string, termChecker termChecker) error {
-	stdOutFd, err := safecast.Convert[int](os.Stdout.Fd())
-	if err != nil {
-		return err
-	}
+func schemaCompileOuter(cmd *cobra.Command, args []string) (bool, error) {
 	outputFilepath := cobrautil.MustGetString(cmd, "out")
-	if outputFilepath == "" && !termChecker.IsTerminal(stdOutFd) {
-		return errors.New("must provide stdout or output file path")
+
+	var outputFile *os.File
+	var toStdout bool
+	switch outputFilepath {
+	case "":
+		toStdout = true
+		outputFile = os.Stdout
+	default:
+		toStdout = false
+		var err error
+		outputFile, err = os.OpenFile(outputFilepath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+		if err != nil {
+			return toStdout, fmt.Errorf("failed to create output file: %w", err)
+		}
+		defer func() {
+			if err := outputFile.Close(); err != nil {
+				log.Warn().Err(err).Msg("failed to close output file")
+			}
+		}()
 	}
 
+	return toStdout, schemaCompileInner(args, outputFile)
+}
+
+// Compiles an input schema written in the new composable schema syntax
+// and produces it as a fully-realized schema
+func schemaCompileInner(args []string, writer io.Writer) error {
 	inputFilepath := args[0]
 	inputSourceFolder := filepath.Dir(inputFilepath)
-	var schemaBytes []byte
-	schemaBytes, err = os.ReadFile(inputFilepath)
+	schemaBytes, err := os.ReadFile(inputFilepath)
 	if err != nil {
 		return fmt.Errorf("failed to read schema file: %w", err)
 	}
@@ -413,14 +432,9 @@ func schemaCompileCmdFunc(cmd *cobra.Command, args []string, termChecker termChe
 	// Add a newline at the end for hygiene's sake
 	terminated := generated + "\n"
 
-	if outputFilepath == "" {
-		// Print to stdout
-		fmt.Print(terminated)
-	} else {
-		err = os.WriteFile(outputFilepath, []byte(terminated), 0o_600)
-		if err != nil {
-			return err
-		}
+	_, err = fmt.Fprint(writer, terminated)
+	if err != nil {
+		return fmt.Errorf("failed to write schema: %w", err)
 	}
 
 	return nil
