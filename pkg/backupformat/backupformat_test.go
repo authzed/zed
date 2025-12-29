@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/base64"
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 )
@@ -53,6 +55,9 @@ func TestWriteAndRead(t *testing.T) {
 	require.NoError(t, err)
 	relWithNestedContext.OptionalCaveat.Context = nestedContext
 
+	relWithExpiration := simpleRel.CloneVT()
+	relWithExpiration.OptionalExpiresAt = timestamppb.New(time.Date(2025, 12, 28, 12, 26, 0, 0, time.UTC))
+
 	testCases := []struct {
 		name                   string
 		schemaSize             int
@@ -65,6 +70,9 @@ func TestWriteAndRead(t *testing.T) {
 			relWithCaveatName,
 			relWithSimpleContext,
 			relWithNestedContext,
+		}},
+		{"expiration", 1, 0, []*v1.Relationship{
+			relWithExpiration,
 		}},
 	}
 
@@ -150,5 +158,10 @@ func requireRelationshipEqual(require *require.Assertions, expected, received *v
 	} else {
 		require.Equal(expected.OptionalCaveat.CaveatName, received.OptionalCaveat.CaveatName)
 		require.Equal(expected.OptionalCaveat.Context.AsMap(), received.OptionalCaveat.Context.AsMap())
+	}
+	if expected.OptionalExpiresAt == nil {
+		require.Nil(received.OptionalExpiresAt)
+	} else {
+		require.Equal(expected.OptionalExpiresAt.AsTime(), received.OptionalExpiresAt.AsTime())
 	}
 }

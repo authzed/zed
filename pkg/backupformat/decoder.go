@@ -9,6 +9,7 @@ import (
 	"github.com/hamba/avro/v2/ocf"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 )
@@ -139,6 +140,10 @@ func (d *OcfDecoder) Next() (*v1.Relationship, error) {
 			},
 			OptionalRelation: flat.SubjectRelation,
 		},
+	}
+
+	if !flat.Expiration.IsZero() {
+		rel.OptionalExpiresAt = timestamppb.New(flat.Expiration)
 	}
 
 	if flat.CaveatName != "" {
