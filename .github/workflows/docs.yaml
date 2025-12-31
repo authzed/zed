@@ -40,7 +40,8 @@ jobs:
         id: "check-changes"
         run: |
           cp -v docs/merged.md docs-repo/$TARGET_DOCS_FILE
-          if [[ -n "$(git status --porcelain ./docs-repo)" ]]; then
+          if [[ -n "$(git -C docs-repo status --porcelain)" ]]; then
+            echo "changes were made"
             echo "docs_changed=true" >> $GITHUB_OUTPUT
           else
             echo "no changes were made"
