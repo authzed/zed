@@ -1,5 +1,7 @@
 package cmd
 
+//go:generate go run go.uber.org/mock/mockgen -destination=mock_schema_client_test.go -package=cmd github.com/authzed/authzed-go/proto/authzed/api/v1 SchemaServiceClient
+
 import (
 	"context"
 	"errors"
@@ -7,10 +9,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -228,6 +232,125 @@ func TestSchemaCompileFailureFromReservedKeyword(t *testing.T) {
 	require.ErrorAs(err, &expectedErr)
 }
 
+func TestSchemaCompileWriteError(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	files := []string{filepath.Join("preview-test", "composable-schema-root.zed")}
+
+	err := schemaCompileInner(files, &failingWriter{err: errors.New("simulated write failure")})
+
+	require.Error(err)
+	require.ErrorContains(err, "failed to write schema")
+	require.ErrorContains(err, "simulated write failure")
+}
+
+func TestSchemaCompileEmptySchema(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	emptySchemaFile := filepath.Join(t.TempDir(), "empty.zed")
+	err := os.WriteFile(emptySchemaFile, []byte(""), 0o600)
+	require.NoError(err)
+
+	files := []string{emptySchemaFile}
+
+	err = schemaCompileInner(files, io.Discard)
+
+	require.Error(err)
+	require.ErrorContains(err, "attempted to compile empty schema")
+}
+
+// failingWriter is a writer that always returns an error
+type failingWriter struct {
+	err error
+}
+
+func (fw *failingWriter) Write(_ []byte) (n int, err error) {
+	return 0, fw.err
+}
+
+func TestSchemaDiffInner(t *testing.T) {
+	t.Parallel()
+
+	beforeSchema := `definition user {}
+
+definition old_resource {
+	relation viewer: user
+}
+
+definition shared_resource {
+	relation viewer: user
+	permission view = viewer
+}
+
+caveat old_caveat(condition int) {
+	condition == 1
+}`
+
+	afterSchema := `definition user {}
+
+definition new_resource {
+	relation editor: user
+}
+
+definition shared_resource {
+	relation viewer: user
+	relation editor: user
+	permission view = viewer
+	permission edit = editor
+}
+
+caveat new_caveat(condition int) {
+	condition == 2
+}`
+
+	var output strings.Builder
+	err := schemaDiffInner(
+		strings.NewReader(beforeSchema),
+		strings.NewReader(afterSchema),
+		"before.zed",
+		"after.zed",
+		&output,
+	)
+
+	require.NoError(t, err)
+
+	result := output.String()
+
+	require.Contains(t, result, "Added definition: new_resource")
+	require.Contains(t, result, "Removed definition: old_resource")
+	require.Contains(t, result, "Changed definition: shared_resource")
+	require.Contains(t, result, "Added caveat: new_caveat")
+	require.Contains(t, result, "Removed caveat: old_caveat")
+}
+
+func TestSchemaCopyInner(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	sourceSchema := `definition user {}`
+	expectedWrittenSchema := `definition user {}`
+
+	srcClient := NewMockSchemaServiceClient(ctrl)
+	destClient := NewMockSchemaServiceClient(ctrl)
+
+	srcClient.EXPECT().
+		ReadSchema(gomock.Any(), gomock.Any()).
+		Return(&v1.ReadSchemaResponse{SchemaText: sourceSchema}, nil).
+		Times(1)
+
+	destClient.EXPECT().
+		WriteSchema(gomock.Any(), &v1.WriteSchemaRequest{Schema: expectedWrittenSchema}).
+		Return(&v1.WriteSchemaResponse{}, nil).
+		Times(1)
+
+	resp, err := schemaCopyInner(context.Background(), srcClient, destClient, "")
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+}
+
 // TODO: refactor the impl function to provide a pipe or buffer directly and delegate the input selection to
 // another function
 //
@@ -323,64 +446,49 @@ definition resource {
 			)
 
 			args, writeErr := tc.schemaMakerFn()
-			mockWriteSchemaClientt := &mockWriteSchemaClient{}
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockClient := NewMockSchemaServiceClient(ctrl)
+
+			// ReadSchema is always called at least once
+			mockClient.EXPECT().
+				ReadSchema(gomock.Any(), gomock.Any()).
+				Return(&v1.ReadSchemaResponse{SchemaText: ""}, nil).
+				MaxTimes(2) // sometimes we read for prefix determination
+
+			// Set up WriteSchema expectations based on test case
+			var receivedSchema string
 			if writeErr != nil {
-				mockWriteSchemaClientt.writeReturnsError = true
+				// For write failure error case, expect WriteSchema to return error
+				mockClient.EXPECT().
+					WriteSchema(gomock.Any(), gomock.Any()).
+					Return(nil, errors.New("error writing schema")).
+					Times(1)
+			} else if tc.expectErr == "" {
+				// Success case - expect WriteSchema to be called and capture schema
+				mockClient.EXPECT().
+					WriteSchema(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, req *v1.WriteSchemaRequest, _ ...grpc.CallOption) (*v1.WriteSchemaResponse, error) {
+						receivedSchema = req.Schema
+						return &v1.WriteSchemaResponse{}, nil
+					}).
+					Times(1)
 			}
 
-			err := schemaWriteCmdImpl(cmd, args, mockWriteSchemaClientt, tc.terminalChecker)
+			err := schemaWriteCmdImpl(cmd, args, mockClient, tc.terminalChecker)
 
 			if tc.expectErr != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.expectErr)
-				return
-			}
-
-			require.NoError(t, err)
-			require.Equal(t, tc.expectSchemaWritten, mockWriteSchemaClientt.receivedSchema)
-			if tc.terminalChecker.captured {
-				require.Equal(t, int(os.Stdin.Fd()), tc.terminalChecker.capturedFd, "expected stdin to be checked for terminal")
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expectSchemaWritten, receivedSchema)
+				if tc.terminalChecker.captured {
+					require.Equal(t, int(os.Stdin.Fd()), tc.terminalChecker.capturedFd, "expected stdin to be checked for terminal")
+				}
 			}
 		})
 	}
-}
-
-type mockWriteSchemaClient struct {
-	existingSchema    string
-	receivedSchema    string
-	writeReturnsError bool
-}
-
-var _ v1.SchemaServiceClient = (*mockWriteSchemaClient)(nil)
-
-func (m *mockWriteSchemaClient) WriteSchema(_ context.Context, in *v1.WriteSchemaRequest, _ ...grpc.CallOption) (*v1.WriteSchemaResponse, error) {
-	if m.writeReturnsError {
-		return nil, errors.New("error writing schema")
-	}
-	m.receivedSchema = in.Schema
-	return &v1.WriteSchemaResponse{}, nil
-}
-
-func (m *mockWriteSchemaClient) ReadSchema(_ context.Context, _ *v1.ReadSchemaRequest, _ ...grpc.CallOption) (*v1.ReadSchemaResponse, error) {
-	return &v1.ReadSchemaResponse{
-		SchemaText: m.existingSchema,
-	}, nil
-}
-
-func (m *mockWriteSchemaClient) ReflectSchema(_ context.Context, _ *v1.ReflectSchemaRequest, _ ...grpc.CallOption) (*v1.ReflectSchemaResponse, error) {
-	panic("not implemented")
-}
-
-func (m *mockWriteSchemaClient) ComputablePermissions(_ context.Context, _ *v1.ComputablePermissionsRequest, _ ...grpc.CallOption) (*v1.ComputablePermissionsResponse, error) {
-	panic("not implemented")
-}
-
-func (m *mockWriteSchemaClient) DependentRelations(_ context.Context, _ *v1.DependentRelationsRequest, _ ...grpc.CallOption) (*v1.DependentRelationsResponse, error) {
-	panic("not implemented")
-}
-
-func (m *mockWriteSchemaClient) DiffSchema(_ context.Context, _ *v1.DiffSchemaRequest, _ ...grpc.CallOption) (*v1.DiffSchemaResponse, error) {
-	panic("not implemented")
 }
 
 type mockTermChecker struct {

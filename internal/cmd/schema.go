@@ -112,18 +112,38 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) *cobra.Command {
 }
 
 func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {
-	beforeBytes, err := os.ReadFile(args[0])
+	beforeReader, err := os.Open(args[0])
 	if err != nil {
-		return fmt.Errorf("failed to read before schema file: %w", err)
+		return fmt.Errorf("failed to open before schema file: %w", err)
 	}
 
-	afterBytes, err := os.ReadFile(args[1])
+	afterReader, err := os.Open(args[1])
 	if err != nil {
-		return fmt.Errorf("failed to read after schema file: %w", err)
+		return fmt.Errorf("failed to open after schema file: %w", err)
+	}
+
+	return schemaDiffInner(
+		beforeReader,
+		afterReader,
+		args[0],
+		args[1],
+		os.Stdout,
+	)
+}
+
+func schemaDiffInner(beforeReader, afterReader io.Reader, beforeSource, afterSource string, writer io.Writer) error {
+	beforeBytes, err := io.ReadAll(beforeReader)
+	if err != nil {
+		return fmt.Errorf("failed to read before schema: %w", err)
+	}
+
+	afterBytes, err := io.ReadAll(afterReader)
+	if err != nil {
+		return fmt.Errorf("failed to read after schema: %w", err)
 	}
 
 	before, err := compiler.Compile(
-		compiler.InputSchema{Source: input.Source(args[0]), SchemaString: string(beforeBytes)},
+		compiler.InputSchema{Source: input.Source(beforeSource), SchemaString: string(beforeBytes)},
 		compiler.AllowUnprefixedObjectType(),
 	)
 	if err != nil {
@@ -131,7 +151,7 @@ func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {
 	}
 
 	after, err := compiler.Compile(
-		compiler.InputSchema{Source: input.Source(args[1]), SchemaString: string(afterBytes)},
+		compiler.InputSchema{Source: input.Source(afterSource), SchemaString: string(afterBytes)},
 		compiler.AllowUnprefixedObjectType(),
 	)
 	if err != nil {
@@ -147,26 +167,26 @@ func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {
 	}
 
 	for _, ns := range schemaDiff.AddedNamespaces {
-		console.Printf("Added definition: %s\n", ns)
+		fmt.Fprintf(writer, "Added definition: %s\n", ns)
 	}
 
 	for _, ns := range schemaDiff.RemovedNamespaces {
-		console.Printf("Removed definition: %s\n", ns)
+		fmt.Fprintf(writer, "Removed definition: %s\n", ns)
 	}
 
 	for nsName, ns := range schemaDiff.ChangedNamespaces {
-		console.Printf("Changed definition: %s\n", nsName)
+		fmt.Fprintf(writer, "Changed definition: %s\n", nsName)
 		for _, delta := range ns.Deltas() {
-			console.Printf("\t %s: %s\n", delta.Type, delta.RelationName)
+			fmt.Fprintf(writer, "\t %s: %s\n", delta.Type, delta.RelationName)
 		}
 	}
 
 	for _, caveat := range schemaDiff.AddedCaveats {
-		console.Printf("Added caveat: %s\n", caveat)
+		fmt.Fprintf(writer, "Added caveat: %s\n", caveat)
 	}
 
 	for _, caveat := range schemaDiff.RemovedCaveats {
-		console.Printf("Removed caveat: %s\n", caveat)
+		fmt.Fprintf(writer, "Removed caveat: %s\n", caveat)
 	}
 
 	return nil
@@ -184,45 +204,56 @@ func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	prefix := cobrautil.MustGetString(cmd, "schema-definition-prefix")
+	outputJSON := cobrautil.MustGetBool(cmd, "json")
+
+	resp, err := schemaCopyInner(cmd.Context(), srcClient, destClient, prefix)
+	if err != nil {
+		return err
+	}
+
+	if outputJSON {
+		prettyProto, err := commands.PrettyProto(resp)
+		if err != nil {
+			return fmt.Errorf("failed to convert schema to JSON: %w", err)
+		}
+
+		console.Println(string(prettyProto))
+	}
+
+	return nil
+}
+
+func schemaCopyInner(ctx context.Context, srcClient, destClient v1.SchemaServiceClient, definitionPrefix string) (*v1.WriteSchemaResponse, error) {
 	readRequest := &v1.ReadSchemaRequest{}
 	log.Trace().Interface("request", readRequest).Msg("requesting schema read")
 
-	readResp, err := srcClient.ReadSchema(cmd.Context(), readRequest)
+	readResp, err := srcClient.ReadSchema(ctx, readRequest)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to read schema")
+		return nil, fmt.Errorf("failed to read schema: %w", err)
 	}
 	log.Trace().Interface("response", readResp).Msg("read schema")
 
-	prefix, err := determinePrefixForSchema(cmd.Context(), cobrautil.MustGetString(cmd, "schema-definition-prefix"), nil, &readResp.SchemaText)
+	prefix, err := determinePrefixForSchema(ctx, definitionPrefix, nil, &readResp.SchemaText)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	schemaText, err := rewriteSchema(readResp.SchemaText, prefix)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	writeRequest := &v1.WriteSchemaRequest{Schema: schemaText}
 	log.Trace().Interface("request", writeRequest).Msg("writing schema")
 
-	resp, err := destClient.WriteSchema(cmd.Context(), writeRequest)
+	resp, err := destClient.WriteSchema(ctx, writeRequest)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to write schema")
+		return nil, fmt.Errorf("failed to write schema: %w", err)
 	}
 	log.Trace().Interface("response", resp).Msg("wrote schema")
 
-	if cobrautil.MustGetBool(cmd, "json") {
-		prettyProto, err := commands.PrettyProto(resp)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to convert schema to JSON")
-		}
-
-		console.Println(string(prettyProto))
-		return nil
-	}
-
-	return nil
+	return resp, nil
 }
 
 func schemaWriteCmdImpl(cmd *cobra.Command, args []string, client v1.SchemaServiceClient, terminalChecker termChecker) error {
