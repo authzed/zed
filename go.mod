@@ -164,7 +164,7 @@ require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dlmiddlecote/sqlstats v1.0.2 // indirect
 	github.com/docker/cli v27.5.1+incompatible // indirect
-	github.com/docker/docker v27.5.1+incompatible // indirect
+	github.com/docker/docker v28.0.0+incompatible // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.7.0 // indirect
 	github.com/ecordell/optgen v0.1.1 // indirect
