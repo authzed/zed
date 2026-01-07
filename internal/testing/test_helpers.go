@@ -74,6 +74,12 @@ type StringFlag struct {
 	Changed   bool
 }
 
+type StringSliceFlag struct {
+	FlagName  string
+	FlagValue []string
+	Changed   bool
+}
+
 type BoolFlag struct {
 	FlagName  string
 	FlagValue bool
@@ -115,6 +121,9 @@ func CreateTestCobraCommandWithFlagValue(t *testing.T, flagAndValues ...any) *co
 			c.Flag(f.FlagName).Changed = f.Changed
 		case StringFlag:
 			c.Flags().String(f.FlagName, f.FlagValue, "")
+			c.Flag(f.FlagName).Changed = f.Changed
+		case StringSliceFlag:
+			c.Flags().StringSlice(f.FlagName, f.FlagValue, "")
 			c.Flag(f.FlagName).Changed = f.Changed
 		case BoolFlag:
 			c.Flags().Bool(f.FlagName, f.FlagValue, "")
