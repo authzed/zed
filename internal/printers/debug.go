@@ -30,64 +30,51 @@ func displayCheckTrace(checkTrace *v1.CheckDebugTrace, tp *TreePrinter, hasError
 	lightgreen := color.C256(35).Sprint
 	caveatColor := color.C256(198).Sprint
 
-	hasPermission := green("✓")
-	resourceColor := white
-	permissionColor := color.FgWhite.Render
+	// Get shared presentation logic
+	pres := GetTracePresentation(checkTrace, hasError)
 
+	// Map presentation to terminal colors
+	hasPermission := green("✓")
+	switch pres.IconClass {
+	case "has-permission":
+		hasPermission = green(pres.Icon)
+	case "no-permission":
+		hasPermission = red(pres.Icon)
+	case "conditional":
+		hasPermission = magenta(pres.Icon)
+	case "cycle":
+		hasPermission = orange(pres.Icon)
+	case "unspecified":
+		hasPermission = yellow(pres.Icon)
+	}
+
+	resourceColor := white
+	if pres.ResourceFaint {
+		resourceColor = faint
+	}
+
+	permissionColor := color.FgWhite.Render
 	switch checkTrace.PermissionType {
 	case v1.CheckDebugTrace_PERMISSION_TYPE_PERMISSION:
 		permissionColor = lightgreen
 	case v1.CheckDebugTrace_PERMISSION_TYPE_RELATION:
 		permissionColor = orange
 	}
-
-	switch checkTrace.Result {
-	case v1.CheckDebugTrace_PERMISSIONSHIP_CONDITIONAL_PERMISSION:
-		switch checkTrace.CaveatEvaluationInfo.Result {
-		case v1.CaveatEvalInfo_RESULT_FALSE:
-			hasPermission = red("⨉")
-			resourceColor = faint
-			permissionColor = faint
-
-		case v1.CaveatEvalInfo_RESULT_MISSING_SOME_CONTEXT:
-			hasPermission = magenta("?")
-			resourceColor = faint
-			permissionColor = faint
-		}
-	case v1.CheckDebugTrace_PERMISSIONSHIP_NO_PERMISSION:
-		hasPermission = red("⨉")
-		resourceColor = faint
+	if pres.PermissionFaint {
 		permissionColor = faint
-	case v1.CheckDebugTrace_PERMISSIONSHIP_UNSPECIFIED:
-		hasPermission = yellow("∵")
 	}
 
 	additional := ""
-	if checkTrace.GetWasCachedResult() {
-		sourceKind := ""
-		source := checkTrace.Source
-		if source != "" {
-			parts := strings.Split(source, ":")
-			if len(parts) > 0 {
-				sourceKind = parts[0]
-			}
-		}
-		switch sourceKind {
-		case "":
-			additional = cyan(" (cached)")
-
-		case "spicedb":
-			additional = cyan(" (cached by spicedb)")
-
-		case "materialize":
-			additional = purple(" (cached by materialize)")
-
+	if pres.CacheBadge != "" {
+		// Map badge to colored terminal output
+		switch {
+		case strings.Contains(pres.CacheBadge, "spicedb"):
+			additional = cyan(fmt.Sprintf(" (%s)", pres.CacheBadge))
+		case strings.Contains(pres.CacheBadge, "materialize"):
+			additional = purple(fmt.Sprintf(" (%s)", pres.CacheBadge))
 		default:
-			additional = cyan(fmt.Sprintf(" (cached by %s)", sourceKind))
+			additional = cyan(fmt.Sprintf(" (%s)", pres.CacheBadge))
 		}
-	} else if hasError && isPartOfCycle(checkTrace, map[string]struct{}{}) {
-		hasPermission = orange("!")
-		resourceColor = white
 	}
 
 	isEndOfCycle := false

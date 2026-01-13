@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
@@ -14,6 +16,7 @@ import (
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/encoding/prototext"
 
@@ -131,6 +134,8 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	checkCmd.Flags().String("revision", "", "optional revision at which to check")
 	_ = checkCmd.Flags().MarkHidden("revision")
 	checkCmd.Flags().Bool("explain", false, "requests debug information from SpiceDB and prints out a trace of the requests")
+	checkCmd.Flags().Bool("html", false, "output explain trace as an interactive HTML file")
+	checkCmd.Flags().String("html-output", "trace.html", "path for HTML output file (used with --html)")
 	checkCmd.Flags().Bool("schema", false, "requests debug information from SpiceDB and prints out the schema used")
 	checkCmd.Flags().Bool("error-on-no-permission", false, "if true, zed will return exit code 1 if subject does not have unconditional permission")
 	checkCmd.Flags().String("caveat-context", "", "the caveat context to send along with the check, in JSON form")
@@ -140,6 +145,8 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	checkBulkCmd.Flags().String("revision", "", "optional revision at which to check")
 	checkBulkCmd.Flags().Bool("json", false, "output as JSON")
 	checkBulkCmd.Flags().Bool("explain", false, "requests debug information from SpiceDB and prints out a trace of the requests")
+	checkBulkCmd.Flags().Bool("html", false, "output explain trace as an interactive HTML file")
+	checkBulkCmd.Flags().String("html-output", "trace.html", "path for HTML output file (used with --html)")
 	checkBulkCmd.Flags().Bool("schema", false, "requests debug information from SpiceDB and prints out the schema used")
 	registerConsistencyFlags(checkBulkCmd.Flags())
 
@@ -223,7 +230,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	log.Trace().Interface("request", request).Send()
 
 	ctx := cmd.Context()
-	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") {
+	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") || cobrautil.MustGetBool(cmd, "html") {
 		log.Info().Msg("debugging requested on check")
 		ctx = requestmeta.AddRequestHeaders(ctx, requestmeta.RequestDebugInformation)
 		request.WithTracing = true
@@ -244,7 +251,10 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		derr := displayDebugInformationIfRequested(cmd, debugInfo, trailerMD, true)
+		renderOpts := printers.RenderOptions{
+			Command: fmt.Sprintf("zed permission check %s %s %s", args[0], args[1], args[2]),
+		}
+		derr := displayDebugInformationIfRequested(cmd, debugInfo, trailerMD, true, renderOpts)
 		if derr != nil {
 			return derr
 		}
@@ -277,7 +287,10 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unknown permission response: %v", resp.Permissionship)
 	}
 
-	err = displayDebugInformationIfRequested(cmd, resp.DebugTrace, trailerMD, false)
+	renderOpts := printers.RenderOptions{
+		Command: fmt.Sprintf("zed permission check %s %s %s", args[0], args[1], args[2]),
+	}
+	err = displayDebugInformationIfRequested(cmd, resp.DebugTrace, trailerMD, false, renderOpts)
 	if err != nil {
 		return err
 	}
@@ -289,6 +302,12 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// bulkTraceWithError pairs a debug trace with its error status for bulk HTML rendering
+type bulkTraceWithError struct {
+	trace    *v1.DebugInformation
+	hasError bool
 }
 
 func checkBulkCmdFunc(cmd *cobra.Command, args []string) error {
@@ -336,7 +355,7 @@ func checkBulkCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") {
+	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") || cobrautil.MustGetBool(cmd, "html") {
 		bulk.WithTracing = true
 	}
 
@@ -355,6 +374,9 @@ func checkBulkCmdFunc(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Collect debug traces for bulk HTML output
+	var bulkTracesWithErrors []bulkTraceWithError
+
 	for _, item := range resp.Pairs {
 		console.Printf("%s:%s#%s@%s:%s => ",
 			item.Request.Resource.ObjectType, item.Request.Resource.ObjectId, item.Request.Permission, item.Request.Subject.Object.ObjectType, item.Request.Subject.Object.ObjectId)
@@ -372,13 +394,54 @@ func checkBulkCmdFunc(cmd *cobra.Command, args []string) error {
 				console.Println("false")
 			}
 
-			err = displayDebugInformationIfRequested(cmd, responseType.Item.DebugTrace, nil, false)
-			if err != nil {
-				return err
+			// For --explain or --schema, display immediately (but skip HTML generation for bulk aggregation)
+			if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") {
+				err = displayDebugInformationIfRequestedWithOptions(cmd, responseType.Item.DebugTrace, nil, false, true, printers.RenderOptions{})
+				if err != nil {
+					return err
+				}
+			}
+
+			// For --html, collect all traces (hasError=false for successful responses)
+			if cobrautil.MustGetBool(cmd, "html") && responseType.Item.DebugTrace != nil {
+				bulkTracesWithErrors = append(bulkTracesWithErrors, bulkTraceWithError{
+					trace:    responseType.Item.DebugTrace,
+					hasError: false, // This is a successful response, not a gRPC error
+				})
 			}
 
 		case *v1.CheckBulkPermissionsPair_Error:
 			console.Println(fmt.Sprintf("error: %s", responseType.Error))
+
+			// For errors, try to extract debug trace from error details (e.g., for cycle detection)
+			if cobrautil.MustGetBool(cmd, "html") && responseType.Error != nil {
+				// Convert google.rpc.Status to standard error to use grpcErrorInfoFrom
+				grpcErr := status.ErrorProto(responseType.Error)
+				var debugInfo *v1.DebugInformation
+
+				if errInfo, ok := grpcErrorInfoFrom(grpcErr); ok {
+					if encodedDebugInfo, ok := errInfo.Metadata["debug_trace_proto_text"]; ok {
+						debugInfo = &v1.DebugInformation{}
+						if uerr := prototext.Unmarshal([]byte(encodedDebugInfo), debugInfo); uerr != nil {
+							log.Debug().Err(uerr).Msg("failed to unmarshal debug trace from bulk error response")
+						} else if debugInfo.Check != nil {
+							// Successfully extracted debug trace from error - include with hasError=true
+							bulkTracesWithErrors = append(bulkTracesWithErrors, bulkTraceWithError{
+								trace:    debugInfo,
+								hasError: true, // This trace came from an error response (cycle, etc.)
+							})
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Generate aggregated HTML output for bulk checks
+	if cobrautil.MustGetBool(cmd, "html") && len(bulkTracesWithErrors) > 0 {
+		err = displayBulkHTMLTracesWithErrors(cmd, bulkTracesWithErrors)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -630,8 +693,50 @@ func prettyLookupPermissionship(objectID string, p v1.LookupPermissionship, info
 	return b.String()
 }
 
-func displayDebugInformationIfRequested(cmd *cobra.Command, debug *v1.DebugInformation, trailerMD metadata.MD, hasError bool) error {
-	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") {
+// writeHTMLOutput writes HTML content to the file specified by --html-output flag
+func writeHTMLOutput(cmd *cobra.Command, htmlContent string, checkCount int) error {
+	htmlPath := cobrautil.MustGetStringExpanded(cmd, "html-output")
+	timestamp := time.Now().Format("20060102-150405") // Call once for consistency
+
+	// Check if the path is a directory (trailing slash or existing directory)
+	// If so, append a default filename
+	if strings.HasSuffix(htmlPath, string(filepath.Separator)) || strings.HasSuffix(htmlPath, "/") {
+		htmlPath = filepath.Join(htmlPath, fmt.Sprintf("trace-%s.html", timestamp))
+	} else if info, err := os.Stat(htmlPath); err == nil && info.IsDir() {
+		htmlPath = filepath.Join(htmlPath, fmt.Sprintf("trace-%s.html", timestamp))
+	} else if flag := cmd.Flags().Lookup("html-output"); flag != nil && !flag.Changed {
+		// When the caller leaves --html-output at its default, append a timestamp to avoid overwriting.
+		dir := filepath.Dir(htmlPath)
+		ext := filepath.Ext(htmlPath)
+		base := strings.TrimSuffix(filepath.Base(htmlPath), ext)
+		htmlPath = filepath.Join(dir, fmt.Sprintf("%s-%s%s", base, timestamp, ext))
+	}
+
+	// Create parent directories if they don't exist.
+	if dir := filepath.Dir(htmlPath); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		}
+	}
+
+	if err := os.WriteFile(htmlPath, []byte(htmlContent), 0o600); err != nil {
+		return fmt.Errorf("failed to write HTML output: %w", err)
+	}
+
+	if checkCount > 1 {
+		console.Printf("HTML traces written to: %s (%d checks)\n", htmlPath, checkCount)
+	} else {
+		console.Printf("HTML trace written to: %s\n", htmlPath)
+	}
+	return nil
+}
+
+func displayDebugInformationIfRequested(cmd *cobra.Command, debug *v1.DebugInformation, trailerMD metadata.MD, hasError bool, renderOpts printers.RenderOptions) error {
+	return displayDebugInformationIfRequestedWithOptions(cmd, debug, trailerMD, hasError, false, renderOpts)
+}
+
+func displayDebugInformationIfRequestedWithOptions(cmd *cobra.Command, debug *v1.DebugInformation, trailerMD metadata.MD, hasError bool, skipHTML bool, renderOpts printers.RenderOptions) error {
+	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") || (cobrautil.MustGetBool(cmd, "html") && !skipHTML) {
 		debugInfo := &v1.DebugInformation{}
 		// DebugInformation comes in trailer < 1.30, and in response payload >= 1.30
 		if debug == nil {
@@ -664,10 +769,42 @@ func displayDebugInformationIfRequested(cmd *cobra.Command, debug *v1.DebugInfor
 			tp.Print()
 		}
 
+		if cobrautil.MustGetBool(cmd, "html") && !skipHTML {
+			htmlOutput := printers.DisplayCheckTraceHTMLWithOptions(debugInfo.Check, hasError, renderOpts)
+			if err := writeHTMLOutput(cmd, htmlOutput, 1); err != nil {
+				return err
+			}
+		}
+
 		if cobrautil.MustGetBool(cmd, "schema") {
 			console.Println()
 			console.Println(debugInfo.SchemaUsed)
 		}
 	}
 	return nil
+}
+
+func displayBulkHTMLTracesWithErrors(cmd *cobra.Command, tracesWithErrors []bulkTraceWithError) error {
+	if len(tracesWithErrors) == 0 {
+		return nil
+	}
+
+	// Extract check traces with error information
+	var checkTracesWithError []printers.CheckTraceWithError
+	for _, item := range tracesWithErrors {
+		if item.trace != nil && item.trace.Check != nil {
+			checkTracesWithError = append(checkTracesWithError, printers.CheckTraceWithError{
+				Trace:    item.trace.Check,
+				HasError: item.hasError,
+			})
+		}
+	}
+
+	if len(checkTracesWithError) == 0 {
+		log.Warn().Msg("No traces found for bulk HTML output")
+		return nil
+	}
+
+	htmlOutput := printers.DisplayBulkCheckTracesWithErrorsHTML(checkTracesWithError)
+	return writeHTMLOutput(cmd, htmlOutput, len(checkTracesWithError))
 }
