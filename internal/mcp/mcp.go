@@ -1129,6 +1129,8 @@ func newSpiceDBServer(ctx context.Context) (server.RunnableServer, error) {
 		server.WithNamespaceCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithClusterDispatchCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithDatastore(ds),
+		// enable expiration support for relationships
+		server.WithEnableRelationshipExpiration(true),
 	}
 
 	return server.NewConfigWithOptionsAndDefaults(configOpts...).Complete(ctx)
