@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"runtime"
+	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -47,6 +48,7 @@ func ConcurrentBatch(ctx context.Context, n int, batchSize int, maxWorkers int, 
 		maxWorkers = runtime.GOMAXPROCS(0)
 	}
 
+	var failed atomic.Bool
 	sem := semaphore.NewWeighted(int64(maxWorkers))
 	g, ctx := errgroup.WithContext(ctx)
 	numBatches := (n + batchSize - 1) / batchSize
@@ -55,12 +57,24 @@ func ConcurrentBatch(ctx context.Context, n int, batchSize int, maxWorkers int, 
 			break
 		}
 
+		// After acquiring the semaphore, check whether a previous batch
+		// has already failed. This handles the race where a failing batch
+		// releases the semaphore before the errgroup cancels the context.
+		if failed.Load() {
+			sem.Release(1)
+			break
+		}
+
 		batchNum := i
 		g.Go(func() error {
 			defer sem.Release(1)
 			start := batchNum * batchSize
 			end := minimum(start+batchSize, n)
-			return each(ctx, batchNum, start, end)
+			err := each(ctx, batchNum, start, end)
+			if err != nil {
+				failed.Store(true)
+			}
+			return err
 		})
 	}
 	return g.Wait()
