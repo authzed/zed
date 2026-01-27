@@ -184,6 +184,9 @@ type PrefixReplacer struct {
 func (pr *PrefixReplacer) replaceName(name string) string {
 	prefix, prefixlessName, prefixExists := strings.Cut(name, "/")
 	if newPrefix, ok := pr.replacements[prefix]; prefixExists && ok {
+		if newPrefix == "" {
+			return prefixlessName
+		}
 		return newPrefix + "/" + prefixlessName
 	}
 	return name
