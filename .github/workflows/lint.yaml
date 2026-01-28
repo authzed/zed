@@ -13,7 +13,7 @@ on: # yamllint disable-line rule:truthy
 jobs:
   go-lint:
     name: "Lint Go"
-    runs-on: "ubuntu-latest"
+    runs-on: "depot-ubuntu-24.04-arm"
     steps:
       - uses: "actions/checkout@v6"
       - uses: "authzed/actions/setup-go@main"
@@ -24,7 +24,7 @@ jobs:
 
   extra-lint:
     name: "Lint YAML & Markdown"
-    runs-on: "ubuntu-latest"
+    runs-on: "depot-ubuntu-24.04-arm"
     steps:
       - uses: "actions/checkout@v6"
       - uses: "authzed/actions/yaml-lint@main"
@@ -34,7 +34,7 @@ jobs:
 
   codeql:
     name: "Analyze with CodeQL"
-    runs-on: "ubuntu-latest"
+    runs-on: "depot-ubuntu-24.04-arm"
     permissions:
       actions: "read"
       contents: "read"
@@ -50,7 +50,7 @@ jobs:
 
   trivy-fs:
     name: "Analyze FS with Trivy"
-    runs-on: "ubuntu-latest"
+    runs-on: "depot-ubuntu-24.04-arm"
     steps:
       - uses: "actions/checkout@v6"
       - uses: "aquasecurity/trivy-action@master"
@@ -66,7 +66,7 @@ jobs:
 
   trivy-image:
     name: "Analyze Release Image with Trivy"
-    runs-on: "ubuntu-latest"
+    runs-on: "depot-ubuntu-24.04-arm"
     steps:
       - uses: "actions/checkout@v6"
       - uses: "authzed/actions/setup-go@main"
@@ -99,7 +99,7 @@ jobs:
 
   conventional-commits:
     name: "Lint Commit Messages"
-    runs-on: "depot-ubuntu-24.04-small"
+    runs-on: "depot-ubuntu-24.04-arm-small"
     if: "github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened' || github.event.action == 'edited')"
     steps:
       - uses: "actions/checkout@v6"

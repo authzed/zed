@@ -15,7 +15,7 @@ on:  # yamllint disable-line rule:truthy
 jobs:
   cla:
     name: "Check Signature"
-    runs-on: "ubuntu-latest"
+    runs-on: "depot-ubuntu-24.04-arm"
     steps:
       - uses: "authzed/actions/cla-check@main"
         with:
