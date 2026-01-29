@@ -278,7 +278,6 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	backupformat.RegisterRewriterFlags(backupParseRelsCmd)
 }
 
-
 func registerBackupRestoreFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint("batch-size", 1_000, "restore relationship write batch size")
 	cmd.Flags().Uint("batches-per-transaction", 10, "number of batches per transaction")
@@ -460,7 +459,6 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	return err
 }
 
-
 // backupCreateImpl performs the core backup logic. It is designed to be testable
 // by accepting dependencies as parameters rather than creating them internally.
 func backupCreateImpl(
@@ -519,7 +517,6 @@ func backupCreateImpl(
 	return true, nil
 }
 
-
 func takeBackup(ctx context.Context, spiceClient client.Client, req *v1.ExportBulkRelationshipsRequest, processResponse func(*v1.ExportBulkRelationshipsResponse) error) error {
 	relationshipStream, err := spiceClient.ExportBulkRelationships(ctx, req)
 	if err != nil {
@@ -571,7 +568,6 @@ func takeBackup(ctx context.Context, spiceClient client.Client, req *v1.ExportBu
 	return nil
 }
 
-
 // writeSchemaForNewBackup reads the schema from SpiceDB and writes it to the encoder.
 // It returns the ZedToken at which the backup must be taken.
 func writeSchemaForNewBackup(ctx context.Context, c client.Client, encoder backupformat.Encoder, config BackupConfig) (*v1.ZedToken, error) {
@@ -606,7 +602,6 @@ func writeSchemaForNewBackup(ctx context.Context, c client.Client, encoder backu
 
 	return zedToken, nil
 }
-
 
 func toLockFileName(backupFileName string) string {
 	return backupFileName + ".lock"
