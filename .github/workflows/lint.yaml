@@ -103,4 +103,4 @@ jobs:
     if: "github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened' || github.event.action == 'edited')"
     steps:
       - uses: "actions/checkout@v6"
-      - uses: "webiny/action-conventional-commits@v1.3.0"
+      - uses: "webiny/action-conventional-commits@v1.3.1"
