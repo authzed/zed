@@ -46,7 +46,7 @@ func TestReadSchema(t *testing.T) {
 
 		// SpiceDB returns an error when no schema is defined, which is expected
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "No schema has been defined")
+		assert.Contains(t, err.Error(), "no schema has been defined")
 		assert.Empty(t, schema)
 	})
 
