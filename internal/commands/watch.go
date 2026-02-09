@@ -33,7 +33,7 @@ func RegisterWatchCmd(rootCmd *cobra.Command) *cobra.Command {
 		Short:      "Watches the stream of relationship updates and schema updates from the server",
 		Args:       ValidationWrapper(cobra.RangeArgs(0, 2)),
 		RunE:       watchCmdFunc,
-		Deprecated: "please use `zed relationships watch` instead",
+		Deprecated: "please use `zed relationship watch` instead",
 	}
 
 	rootCmd.AddCommand(watchCmd)
@@ -119,16 +119,17 @@ func watchCmdFuncImpl(cmd *cobra.Command, watchClient v1.WatchServiceClient, pro
 		default:
 			resp, err := watchStream.Recv()
 			if err != nil {
+				log.Debug().Err(err).Msg("error receiving from Watch stream")
 				ok, err := isRetryable(err)
 				if !ok {
 					return err
 				}
 
-				log.Trace().Err(err).Msg("will retry from the last known revision " + watchRevision)
+				log.Debug().Err(err).Msg("will retry from the last known revision " + watchRevision)
 				req.OptionalStartCursor = &v1.ZedToken{Token: watchRevision}
 				watchStream, err = watchClient.Watch(ctx, req)
 				if err != nil {
-					return err
+					return fmt.Errorf("error retrying the Watch call: %w", err)
 				}
 				continue
 			}
