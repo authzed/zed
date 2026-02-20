@@ -165,12 +165,19 @@ func tokenFromCli(cmd *cobra.Command) (storage.Token, error) {
 		nvc := cobrautil.MustGetBool(cmd, "no-verify-ca")
 		notVerifyCA = &nvc
 	}
+
+	var hostnameOverride string
+	if cmd.Flags().Changed("hostname-override") {
+		hostnameOverride = cobrautil.MustGetString(cmd, "hostname-override")
+	}
+
 	overrideToken := storage.Token{
-		APIToken:   cobrautil.MustGetString(cmd, "token"),
-		Endpoint:   cobrautil.MustGetString(cmd, "endpoint"),
-		Insecure:   notSecure,
-		NoVerifyCA: notVerifyCA,
-		CACert:     certBytes,
+		APIToken:         cobrautil.MustGetString(cmd, "token"),
+		Endpoint:         cobrautil.MustGetString(cmd, "endpoint"),
+		Insecure:         notSecure,
+		NoVerifyCA:       notVerifyCA,
+		CACert:           certBytes,
+		HostnameOverride: hostnameOverride,
 	}
 	return overrideToken, nil
 }
@@ -278,9 +285,8 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 		opts = append(opts, certOpt)
 	}
 
-	hostnameOverride := cobrautil.MustGetString(cmd, "hostname-override")
-	if hostnameOverride != "" {
-		opts = append(opts, grpc.WithAuthority(hostnameOverride))
+	if token.HostnameOverride != "" {
+		opts = append(opts, grpc.WithAuthority(token.HostnameOverride))
 	}
 
 	maxMessageSize := cobrautil.MustGetInt(cmd, "max-message-size")
