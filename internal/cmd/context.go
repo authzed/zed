@@ -145,14 +145,16 @@ func contextSetCmdFunc(cmd *cobra.Command, args []string) error {
 
 	insecure := cobrautil.MustGetBool(cmd, "insecure")
 	noVerifyCA := cobrautil.MustGetBool(cmd, "no-verify-ca")
+	hostnameOverride := cobrautil.MustGetString(cmd, "hostname-override")
 	cfgStore, secretStore := client.DefaultStorage()
 	err = storage.PutToken(storage.Token{
-		Name:       name,
-		Endpoint:   stringz.DefaultEmpty(endpoint, "grpc.authzed.com:443"),
-		APIToken:   apiToken,
-		Insecure:   &insecure,
-		NoVerifyCA: &noVerifyCA,
-		CACert:     certBytes,
+		Name:             name,
+		Endpoint:         stringz.DefaultEmpty(endpoint, "grpc.authzed.com:443"),
+		APIToken:         apiToken,
+		Insecure:         &insecure,
+		NoVerifyCA:       &noVerifyCA,
+		CACert:           certBytes,
+		HostnameOverride: hostnameOverride,
 	}, secretStore)
 	if err != nil {
 		return err

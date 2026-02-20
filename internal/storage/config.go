@@ -63,12 +63,13 @@ func TokenWithOverride(overrideToken Token, referenceToken Token) (Token, error)
 	}
 
 	return Token{
-		Name:       referenceToken.Name,
-		Endpoint:   stringz.DefaultEmpty(overrideToken.Endpoint, referenceToken.Endpoint),
-		APIToken:   stringz.DefaultEmpty(overrideToken.APIToken, referenceToken.APIToken),
-		Insecure:   insecure,
-		NoVerifyCA: noVerifyCA,
-		CACert:     caCert,
+		Name:             referenceToken.Name,
+		Endpoint:         stringz.DefaultEmpty(overrideToken.Endpoint, referenceToken.Endpoint),
+		APIToken:         stringz.DefaultEmpty(overrideToken.APIToken, referenceToken.APIToken),
+		Insecure:         insecure,
+		NoVerifyCA:       noVerifyCA,
+		CACert:           caCert,
+		HostnameOverride: stringz.DefaultEmpty(overrideToken.HostnameOverride, referenceToken.HostnameOverride),
 	}, nil
 }
 
