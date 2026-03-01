@@ -76,7 +76,7 @@ jobs:
         run: |
           echo "partial:
             by: target" >> .goreleaser.docker.yml
-      - uses: "goreleaser/goreleaser-action@v6"
+      - uses: "goreleaser/goreleaser-action@v7"
         id: "goreleaser"
         with:
           distribution: "goreleaser-pro"
