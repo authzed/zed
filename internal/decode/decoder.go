@@ -15,10 +15,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 
-	composable "github.com/authzed/spicedb/pkg/composableschemadsl/compiler"
-	"github.com/authzed/spicedb/pkg/composableschemadsl/generator"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
-	"github.com/authzed/spicedb/pkg/schemadsl/input"
+	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
 	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/authzed/spicedb/pkg/validationfile/blocks"
@@ -200,47 +198,30 @@ func hasYAMLRelationshipsKey(input string) bool {
 	return yamlRelationshipsKeyPattern.MatchString(input)
 }
 
-// compileSchemaFromData attempts to compile using the old DSL and the new composable DSL,
-// but prefers the new DSL.
-// It returns the errors returned by both compilations.
+// TODO: is this still in use?
+// compileSchemaFromData attempts to compile a schema to a form that can be written to SpiceDB.
 func compileSchemaFromData(filename, schemaString string, out any) error {
-	var (
-		standardCompileErr   error
-		composableCompiled   *composable.CompiledSchema
-		composableCompileErr error
-		vfile                validationfile.ValidationFile
-	)
+	var vfile validationfile.ValidationFile
 
 	vfile = *out.(*validationfile.ValidationFile)
+	// TODO: figure out if this is still necessary
 	vfile.Schema = blocks.SchemaWithPosition{
 		SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
 	}
 
-	_, standardCompileErr = compiler.Compile(compiler.InputSchema{
-		Source:       input.Source("schema"),
-		SchemaString: schemaString,
-	}, compiler.AllowUnprefixedObjectType())
-
-	if standardCompileErr == nil {
-		vfile.Schema.Schema = schemaString
-	}
-
 	inputSourceFolder := filepath.Dir(filename)
-	composableCompiled, composableCompileErr = composable.Compile(composable.InputSchema{
+	compiled, err := compiler.Compile(compiler.InputSchema{
 		SchemaString: schemaString,
-	}, composable.AllowUnprefixedObjectType(), composable.SourceFolder(inputSourceFolder))
-
-	// We'll only attempt to generate the composable schema string if we don't already
-	// have one from standard schema compilation
-	if composableCompileErr == nil && vfile.Schema.Schema == "" {
-		compiledSchemaString, _, err := generator.GenerateSchema(composableCompiled.OrderedDefinitions)
-		if err != nil {
-			return fmt.Errorf("could not generate string schema: %w", err)
-		}
-		vfile.Schema.Schema = compiledSchemaString
+	}, compiler.AllowUnprefixedObjectType(), compiler.SourceFolder(inputSourceFolder))
+	if err != nil {
+		return err
 	}
 
-	err := errors.Join(standardCompileErr, composableCompileErr)
+	compiledSchemaString, _, err := generator.GenerateSchema(compiled.OrderedDefinitions)
+	if err != nil {
+		return fmt.Errorf("could not generate string schema: %w", err)
+	}
+	vfile.Schema.Schema = compiledSchemaString
 
 	*out.(*validationfile.ValidationFile) = vfile
 	return err

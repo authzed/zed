@@ -1,3 +1,5 @@
+use import
+
 import "./composable-schema-user.zed"
 
 definition resource {

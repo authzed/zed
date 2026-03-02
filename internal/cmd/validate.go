@@ -14,11 +14,9 @@ import (
 	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 
-	composable "github.com/authzed/spicedb/pkg/composableschemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/development"
 	core "github.com/authzed/spicedb/pkg/proto/core/v1"
 	devinterface "github.com/authzed/spicedb/pkg/proto/developer/v1"
-	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
 	"github.com/authzed/spicedb/pkg/validationfile"
 
@@ -93,11 +91,8 @@ func registerValidateCmd(cmd *cobra.Command) {
 
 	validateCmd.Flags().Bool("force-color", false, "force color code output even in non-tty environments")
 	validateCmd.Flags().Bool("fail-on-warn", false, "treat warnings as errors during validation")
-	validateCmd.Flags().String("schema-type", "", "force validation according to specific schema syntax (\"\", \"composable\", \"standard\")")
 	cmd.AddCommand(validateCmd)
 }
-
-var validSchemaTypes = []string{"", "standard", "composable"}
 
 func validatePreRunE(cmd *cobra.Command, _ []string) error {
 	// Override lipgloss's autodetection of whether it's in a terminal environment
@@ -106,17 +101,6 @@ func validatePreRunE(cmd *cobra.Command, _ []string) error {
 	setForceColor := cobrautil.MustGetBool(cmd, "force-color")
 	if setForceColor {
 		lipgloss.SetColorProfile(termenv.ANSI256)
-	}
-
-	schemaType := cobrautil.MustGetString(cmd, "schema-type")
-	schemaTypeValid := false
-	for _, validType := range validSchemaTypes {
-		if schemaType == validType {
-			schemaTypeValid = true
-		}
-	}
-	if !schemaTypeValid {
-		return fmt.Errorf("schema-type must be one of \"\", \"standard\", \"composable\". received: %s", schemaType)
 	}
 
 	return nil
@@ -130,7 +114,6 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		successfullyValidatedFiles = 0
 		shouldExit                 = false
 		toPrint                    = &strings.Builder{}
-		schemaType                 = cobrautil.MustGetString(cmd, "schema-type")
 		failOnWarn                 = cobrautil.MustGetBool(cmd, "fail-on-warn")
 	)
 
@@ -153,43 +136,14 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		var parsed validationfile.ValidationFile
 		// the decoder is also where compilation happens.
 		validateContents, isOnlySchema, err := decoder(&parsed)
-		standardErrors, composableErrs, otherErrs := classifyErrors(err)
 
-		switch schemaType {
-		case "standard":
-			if standardErrors != nil {
-				var errWithSource spiceerrors.WithSourceError
-				if errors.As(standardErrors, &errWithSource) {
-					outputErrorWithSource(toPrint, validateContents, errWithSource)
-					shouldExit = true
-				}
-				return "", shouldExit, standardErrors
+		if err != nil {
+			var errWithSource spiceerrors.WithSourceError
+			if errors.As(err, &errWithSource) {
+				outputErrorWithSource(toPrint, validateContents, errWithSource)
+				shouldExit = true
 			}
-		case "composable":
-			if composableErrs != nil {
-				var errWithSource spiceerrors.WithSourceError
-				if errors.As(composableErrs, &errWithSource) {
-					outputErrorWithSource(toPrint, validateContents, errWithSource)
-					shouldExit = true
-				}
-				return "", shouldExit, composableErrs
-			}
-		default:
-			// By default, validate will attempt to validate a schema first according to composable schema rules,
-			// then standard schema rules,
-			// and if both fail it will show the errors from composable schema.
-			if composableErrs != nil && standardErrors != nil {
-				var errWithSource spiceerrors.WithSourceError
-				if errors.As(composableErrs, &errWithSource) {
-					outputErrorWithSource(toPrint, validateContents, errWithSource)
-					shouldExit = true
-				}
-				return "", shouldExit, composableErrs
-			}
-		}
-
-		if otherErrs != nil {
-			return "", false, otherErrs
+			return "", shouldExit, err
 		}
 
 		tuples := make([]*core.RelationTuple, 0)
@@ -213,6 +167,8 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			// Calculate the schema offset, used for outputting errors and warnings
 			// and having them point to the right place regardless of zed vs yaml
 			schemaOffset := parsed.Schema.SourcePosition.LineNumber
+			fmt.Println("offset before reset")
+			fmt.Println(schemaOffset)
 			if isOnlySchema {
 				schemaOffset = 0
 			}
@@ -403,29 +359,4 @@ func renderLine(sb *strings.Builder, lines []string, index int, highlight string
 			highlightedSourceStyle().Render("^"),
 			highlightedSourceStyle().Render(strings.Repeat("~", highlightLength)))
 	}
-}
-
-// classifyErrors returns errors from the composable DSL, the standard DSL, and any other parsing errors.
-func classifyErrors(err error) (error, error, error) {
-	if err == nil {
-		return nil, nil, nil
-	}
-	var standardErr compiler.BaseCompilerError
-	var composableErr composable.BaseCompilerError
-	var retStandard, retComposable, allOthers error
-
-	ok := errors.As(err, &standardErr)
-	if ok {
-		retStandard = standardErr
-	}
-	ok = errors.As(err, &composableErr)
-	if ok {
-		retComposable = composableErr
-	}
-
-	if retStandard == nil && retComposable == nil {
-		allOthers = err
-	}
-
-	return retStandard, retComposable, allOthers
 }
