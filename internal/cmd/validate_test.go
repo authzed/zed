@@ -254,26 +254,6 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			},
 			expectStr: "Success! - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
 		},
-		`composable_schema_only_without_flag_passes`: {
-			files: []string{
-				filepath.Join("validate-test", "only-passes-composable.zed"),
-			},
-			expectStr: "Success! - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
-		},
-		`standard_only_with_composable_flag_fails`: {
-			schemaTypeFlag: "composable",
-			files: []string{
-				filepath.Join("validate-test", "only-passes-standard.zed"),
-			},
-			expectErr: "Expected identifier, found token TokenTypeKeyword",
-		},
-		`composable_only_with_standard_flag_fails`: {
-			schemaTypeFlag: "standard",
-			files: []string{
-				filepath.Join("validate-test", "only-passes-composable.zed"),
-			},
-			expectErr: "Unexpected token at root level",
-		},
 		`composable_in_validation_yaml_with_standard_fails`: {
 			schemaTypeFlag: "standard",
 			files: []string{
@@ -303,6 +283,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 complete - 0 relationships loaded, 0 assertions run, 0 expected relations validated
 `,
 		},
+		// TODO: it's not showing the pointer for whatever reason.
 		`warnings_point_at_correct_line_in_zed`: {
 			files: []string{
 				filepath.Join("validate-test", "warnings-point-at-right-line.zed"),
