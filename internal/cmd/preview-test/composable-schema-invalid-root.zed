@@ -3,6 +3,7 @@ use import
 import "./composable-schema-user.zed"
 
 definition resource {
-  relation and: user
-  permission viewer = and
+  // definition is a keyword, so we expect it to fail here.
+  relation definition: user
+  permission viewer = definition
 }

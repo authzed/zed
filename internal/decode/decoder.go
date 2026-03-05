@@ -1,82 +1,62 @@
 package decode
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 
-	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
-	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
 	"github.com/authzed/spicedb/pkg/validationfile"
 	"github.com/authzed/spicedb/pkg/validationfile/blocks"
 )
 
-var playgroundPattern = regexp.MustCompile("^.*/s/.*/schema|relationships|assertions|expected.*$")
-
-// yamlKeyPatterns match YAML top-level keys that indicate a validation file format.
-// These patterns look for the key at the start of a line (column 0), followed by a colon.
-// This avoids false positives like "relation schema: parent" in a schema file being
-// mistaken for the "schema:" YAML key.
-var (
-	yamlSchemaKeyPattern        = regexp.MustCompile(`(?m)^schema\s*:`)
-	yamlSchemaFileKeyPattern    = regexp.MustCompile(`(?m)^schemaFile\s*:`)
-	yamlRelationshipsKeyPattern = regexp.MustCompile(`(?m)^relationships\s*:`)
+const (
+	FileTypeUnknown = iota
+	FileTypeYaml
+	FileTypeZed
 )
 
-// SchemaRelationships holds the schema (as a string) and a list of
-// relationships (as a string) in the format from the devtools download API.
-type SchemaRelationships struct {
-	Schema        string `yaml:"schema"`
-	Relationships string `yaml:"relationships"`
-}
+var playgroundPattern = regexp.MustCompile("^.*/s/.*/schema|relationships|assertions|expected.*$")
 
 // Func will decode into the supplied object.
-type Func func(out any) ([]byte, bool, error)
+type Func func(out any) ([]byte, error)
 
-// DecoderForURL returns the appropriate decoder for a given URL.
-// Some URLs have special handling to dereference to the actual file.
-func DecoderForURL(u *url.URL) (d Func, err error) {
+// FetchURL interprets the URL and fetches using the appropriate transport.
+func FetchURL(u *url.URL) (contents []byte, err error) {
 	switch s := u.Scheme; s {
 	case "", "file":
-		d = fileDecoder(u)
+		return fetchFile(u)
 	case "http", "https":
-		d = httpDecoder(u)
+		return fetchHTTP(u)
 	default:
-		err = fmt.Errorf("%s scheme not supported", s)
-	}
-	return d, err
-}
-
-func fileDecoder(u *url.URL) Func {
-	return func(out any) ([]byte, bool, error) {
-		fs := os.DirFS(".")
-		file, err := fs.Open(u.Path)
-		if err != nil {
-			return nil, false, err
-		}
-		data, err := io.ReadAll(file)
-		if err != nil {
-			return nil, false, err
-		}
-		isOnlySchema, err := unmarshalAsYAMLOrSchemaWithFile(data, out, u.Path)
-		return data, isOnlySchema, err
+		return nil, fmt.Errorf("%s scheme not supported", s)
 	}
 }
 
-func httpDecoder(u *url.URL) Func {
+func fetchFile(u *url.URL) ([]byte, error) {
+	fs := os.DirFS(".")
+	file, err := fs.Open(u.Path)
+	if err != nil {
+		return nil, err
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	return data, err
+}
+
+func fetchHTTP(u *url.URL) ([]byte, error) {
 	rewriteURL(u)
-	return directHTTPDecoder(u)
+	return fetchHTTPDirectly(u)
 }
 
 func rewriteURL(u *url.URL) {
@@ -99,130 +79,52 @@ func rewriteURL(u *url.URL) {
 	}
 }
 
-func directHTTPDecoder(u *url.URL) Func {
-	return func(out any) ([]byte, bool, error) {
-		log.Debug().Stringer("url", u).Send()
-		r, err := http.Get(u.String())
-		if err != nil {
-			return nil, false, err
-		}
-		defer r.Body.Close()
-		data, err := io.ReadAll(r.Body)
-		if err != nil {
-			return nil, false, err
-		}
-
-		isOnlySchema, err := unmarshalAsYAMLOrSchema("", data, out)
-		return data, isOnlySchema, err
+func fetchHTTPDirectly(u *url.URL) ([]byte, error) {
+	log.Debug().Stringer("url", u).Send()
+	r, err := http.Get(u.String())
+	if err != nil {
+		return nil, err
 	}
-}
-
-// Uses the files passed in the args and looks for the specified schemaFile to parse the YAML.
-func unmarshalAsYAMLOrSchemaWithFile(data []byte, out any, filename string) (bool, error) {
-	inputString := string(data)
-	if hasYAMLSchemaFileKey(inputString) && !hasYAMLSchemaKey(inputString) {
-		if err := yaml.Unmarshal(data, out); err != nil {
-			return false, err
-		}
-		validationFile, ok := out.(*validationfile.ValidationFile)
-		if !ok {
-			return false, errors.New("could not cast unmarshalled file to validationfile")
-		}
-
-		// Need to join the original filepath with the requested filepath
-		// to construct the path to the referenced schema file.
-		// NOTE: This does not allow for yaml files to transitively reference
-		// each other's schemaFile fields.
-		// TODO: enable this behavior
-		schemaPath := filepath.Join(filepath.Dir(filename), validationFile.SchemaFile)
-
-		if !filepath.IsLocal(schemaPath) {
-			// We want to prevent access of files that are outside of the folder
-			// where the command was originally invoked. This should do that.
-			return false, fmt.Errorf("schema filepath %s must be local to where the command was invoked", schemaPath)
-		}
-
-		fs := os.DirFS(".")
-		file, err := fs.Open(schemaPath)
-		if err != nil {
-			return false, err
-		}
-		data, err = io.ReadAll(file)
-		if err != nil {
-			return false, err
-		}
-	}
-	return unmarshalAsYAMLOrSchema(filename, data, out)
-}
-
-func unmarshalAsYAMLOrSchema(filename string, data []byte, out any) (bool, error) {
-	inputString := string(data)
-
-	// Check for indications of a schema-only file by looking for YAML top-level keys.
-	// We use regex patterns to match keys at the start of a line to avoid false positives
-	// like "relation schema: parent" in a schema file being mistaken for the "schema:" YAML key.
-	if !hasYAMLSchemaKey(inputString) && !hasYAMLRelationshipsKey(inputString) {
-		if err := compileSchemaFromData(filename, inputString, out); err != nil {
-			return false, err
-		}
-		return true, nil
+	defer r.Body.Close()
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
 	}
 
-	if !hasYAMLSchemaKey(inputString) && !hasYAMLSchemaFileKey(inputString) {
-		// If there is no schema and no schemaFile and it doesn't compile then it must be yaml with missing fields
-		if err := compileSchemaFromData(filename, inputString, out); err != nil {
-			return false, errors.New("either schema or schemaFile must be present")
-		}
-		return true, nil
+	return data, err
+}
+
+func UnmarshalValidationFile(contents []byte) (validationfile.ValidationFile, error) {
+	// Try first to unmarshal as yaml. If it can't be unmarshalled, we assume it's a schema.
+	// TODO: make sure this doesn't attempt to unmarshal relation schema: user
+	vFile, err := UnmarshalYAMLValidationFile(contents)
+	if err == nil {
+		return vFile, nil
 	}
-	// Try to unparse as YAML for the validation file format.
-	if err := yaml.Unmarshal(data, out); err != nil {
-		return false, err
-	}
 
-	return false, nil
+	// yaml unmarshalling was unsuccessful, so we construct a vfile that assumes the schema
+	// is the bytes and return it.
+	return UnmarshalSchemaValidationFile(contents), nil
 }
 
-// hasYAMLSchemaKey returns true if the input contains a "schema:" YAML key at the start of a line.
-func hasYAMLSchemaKey(input string) bool {
-	return yamlSchemaKeyPattern.MatchString(input)
+// TODO: use os.OpenRoot to avoid needing to check whether the file is local
+// or DirFS(). Not sure which.
+func UnmarshalYAMLValidationFile(yamlBytes []byte) (validationfile.ValidationFile, error) {
+	var vFile validationfile.ValidationFile
+	// Try to unmarshal as YAML for the validation file format.
+	err := yaml.Unmarshal(yamlBytes, &vFile)
+	return vFile, err
 }
 
-// hasYAMLSchemaFileKey returns true if the input contains a "schemaFile:" YAML key at the start of a line.
-func hasYAMLSchemaFileKey(input string) bool {
-	return yamlSchemaFileKeyPattern.MatchString(input)
-}
+// TODO: does this actually do anything?
+// I think the idea is that we'd just pass it to the validation logic.
+func UnmarshalSchemaValidationFile(schemaBytes []byte) validationfile.ValidationFile {
+	var vFile validationfile.ValidationFile
 
-// hasYAMLRelationshipsKey returns true if the input contains a "relationships:" YAML key at the start of a line.
-func hasYAMLRelationshipsKey(input string) bool {
-	return yamlRelationshipsKeyPattern.MatchString(input)
-}
-
-// TODO: is this still in use?
-// compileSchemaFromData attempts to compile a schema to a form that can be written to SpiceDB.
-func compileSchemaFromData(filename, schemaString string, out any) error {
-	var vfile validationfile.ValidationFile
-
-	vfile = *out.(*validationfile.ValidationFile)
-	// TODO: figure out if this is still necessary
-	vfile.Schema = blocks.SchemaWithPosition{
+	vFile.Schema = blocks.SchemaWithPosition{
 		SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
+		Schema:         string(schemaBytes),
 	}
 
-	inputSourceFolder := filepath.Dir(filename)
-	compiled, err := compiler.Compile(compiler.InputSchema{
-		SchemaString: schemaString,
-	}, compiler.AllowUnprefixedObjectType(), compiler.SourceFolder(inputSourceFolder))
-	if err != nil {
-		return err
-	}
-
-	compiledSchemaString, _, err := generator.GenerateSchema(compiled.OrderedDefinitions)
-	if err != nil {
-		return fmt.Errorf("could not generate string schema: %w", err)
-	}
-	vfile.Schema.Schema = compiledSchemaString
-
-	*out.(*validationfile.ValidationFile) = vfile
-	return err
+	return vFile
 }
