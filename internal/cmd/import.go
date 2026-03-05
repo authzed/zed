@@ -13,7 +13,6 @@ import (
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
-	"github.com/authzed/spicedb/pkg/validationfile"
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/commands"
@@ -82,14 +81,11 @@ func registerImportCmd(rootCmd *cobra.Command) {
 
 func importCmdFunc(cmd *cobra.Command, schemaClient v1.SchemaServiceClient, relationshipsClient v1.PermissionsServiceClient, prefix string, u *url.URL) error {
 	prefix = strings.TrimRight(prefix, "/")
-	decoder, err := decode.DecoderForURL(u)
+	contents, err := decode.FetchURL(u)
 	if err != nil {
 		return err
 	}
-	var p validationfile.ValidationFile
-	if _, _, err := decoder(&p); err != nil {
-		return err
-	}
+	p, err := decode.UnmarshalYAMLValidationFile(contents)
 
 	if cobrautil.MustGetBool(cmd, "schema") {
 		if err := importSchema(cmd.Context(), schemaClient, p.Schema.Schema, prefix); err != nil {
