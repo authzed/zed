@@ -15,7 +15,7 @@ require (
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
 	github.com/authzed/authzed-go v1.7.0
 	github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b
-	github.com/authzed/spicedb v1.49.1-0.20260205205028-286d6e84c0dd
+	github.com/authzed/spicedb v1.49.1
 	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/ccoveille/go-safecast/v2 v2.0.0
 	github.com/cenkalti/backoff/v4 v4.3.0
