@@ -791,8 +791,8 @@ func (smcp *spiceDBMCPServer) checkPermissionHandler(ctx context.Context, reques
 	console.Printf("check_permission: Permission check result: %s\n", response.Permissionship.String())
 
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("Permission: %s\n", response.Permissionship.String()))
-	result.WriteString(fmt.Sprintf("Checked at revision: %s\n", response.CheckedAt.Token))
+	fmt.Fprintf(&result, "Permission: %s\n", response.Permissionship.String())
+	fmt.Fprintf(&result, "Checked at revision: %s\n", response.CheckedAt.Token)
 
 	if response.DebugTrace != nil {
 		result.WriteString("\nDebug Trace:\n")
