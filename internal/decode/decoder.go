@@ -62,7 +62,8 @@ func DecoderForURL(u *url.URL) (d Func, err error) {
 
 func fileDecoder(u *url.URL) Func {
 	return func(out any) ([]byte, bool, error) {
-		file, err := os.Open(u.Path)
+		fs := os.DirFS(".")
+		file, err := fs.Open(u.Path)
 		if err != nil {
 			return nil, false, err
 		}
@@ -143,7 +144,8 @@ func unmarshalAsYAMLOrSchemaWithFile(data []byte, out any, filename string) (boo
 			return false, fmt.Errorf("schema filepath %s must be local to where the command was invoked", schemaPath)
 		}
 
-		file, err := os.Open(schemaPath)
+		fs := os.DirFS(".")
+		file, err := fs.Open(schemaPath)
 		if err != nil {
 			return false, err
 		}

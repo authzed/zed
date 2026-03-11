@@ -73,7 +73,6 @@ func TestDeterminePrefixForSchema(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			found, err := determinePrefixForSchema(t.Context(), test.specifiedPrefix, nil, &test.existingSchema)
 			require.NoError(t, err)
@@ -123,7 +122,6 @@ caveat test/some_caveat(someCondition int) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			found, err := rewriteSchema(test.existingSchema, test.definitionPrefix)
 			require.NoError(t, err)
@@ -484,7 +482,7 @@ definition resource {
 				require.NoError(t, err)
 				require.Equal(t, tc.expectSchemaWritten, receivedSchema)
 				if tc.terminalChecker.captured {
-					require.Equal(t, int(os.Stdin.Fd()), tc.terminalChecker.capturedFd, "expected stdin to be checked for terminal")
+					require.Equal(t, int(os.Stdin.Fd()), tc.terminalChecker.capturedFd, "expected stdin to be checked for terminal") //nolint:gosec  // not worried about overflows here
 				}
 			}
 		})

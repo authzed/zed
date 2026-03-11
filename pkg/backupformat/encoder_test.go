@@ -24,19 +24,19 @@ func TestNewEncoder(t *testing.T) {
 		{
 			name:        "valid encoder creation",
 			schema:      "definition user {}",
-			token:       &v1.ZedToken{Token: "dGVzdF90b2tlbl8xMjM="},
+			token:       &v1.ZedToken{Token: "dGVzdF90b2tlbl8xMjM="}, //nolint:gosec  // no this is not a secret
 			expectError: false,
 		},
 		{
 			name:        "empty schema",
 			schema:      "",
-			token:       &v1.ZedToken{Token: "dGVzdF90b2tlbl8xMjM="},
+			token:       &v1.ZedToken{Token: "dGVzdF90b2tlbl8xMjM="}, //nolint:gosec  // no this is not a secret
 			expectError: false,
 		},
 		{
 			name:        "complex schema",
 			schema:      "definition user {}\ndefinition document { relation viewer: user }",
-			token:       &v1.ZedToken{Token: "Y29tcGxleF90b2tlbl8xMjM="},
+			token:       &v1.ZedToken{Token: "Y29tcGxleF90b2tlbl8xMjM="}, //nolint:gosec  // no this is not a secret
 			expectError: false,
 		},
 		{
