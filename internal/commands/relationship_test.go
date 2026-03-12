@@ -21,7 +21,7 @@ import (
 	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
-	zedtesting "github.com/authzed/zed/internal/testing"
+	"github.com/authzed/zed/internal/zedtesting"
 )
 
 const testSchema = `definition test/resource {
@@ -217,7 +217,6 @@ func TestWriteRelationshipsArgs(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = f.Close()
-		_ = os.Remove(f.Name())
 	})
 
 	isTerm := false
@@ -266,7 +265,6 @@ func TestWriteRelationshipCmdFuncFromTTY(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = tty.Close()
-		_ = os.Remove(tty.Name())
 	})
 
 	originalClient := client.NewClient
@@ -430,7 +428,7 @@ func TestWriteRelationshipCmdFuncFromFailsWithCaveatArg(t *testing.T) {
 		_ = fi.Close()
 	}()
 	t.Cleanup(func() {
-		_ = os.Remove(fi.Name())
+		_ = os.Remove(fi.Name()) //nolint:gosec // this is a test
 	})
 
 	originalClient := client.NewClient
@@ -547,7 +545,6 @@ func fileFromStrings(t *testing.T, strings []string) *os.File {
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = fi.Close()
-		_ = os.Remove(fi.Name())
 	})
 
 	for _, data := range strings {
@@ -556,7 +553,7 @@ func fileFromStrings(t *testing.T, strings []string) *os.File {
 	}
 	require.NoError(t, fi.Sync())
 
-	file, err := os.Open(fi.Name())
+	file, err := os.Open(fi.Name()) //nolint:gosec // this is a test
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		file.Close()

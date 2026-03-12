@@ -25,7 +25,7 @@ func mapRelationshipTuplesToCLIOutput(t *testing.T, input []string) []string {
 func readLines(t *testing.T, fileName string) []string {
 	t.Helper()
 
-	f, err := os.Open(fileName)
+	f, err := os.Open(fileName) //nolint:gosec // this is a test helper
 	require.NoError(t, err)
 	defer func() {
 		_ = f.Close()
@@ -50,7 +50,6 @@ func createTestBackup(t *testing.T, cmd *cobra.Command, schema string, relations
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = f.Close()
-		_ = os.Remove(f.Name())
 	})
 
 	avroWriter := backupformat.NewOcfEncoder(f)

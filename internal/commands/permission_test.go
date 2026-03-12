@@ -20,7 +20,7 @@ import (
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/console"
-	zedtesting "github.com/authzed/zed/internal/testing"
+	"github.com/authzed/zed/internal/zedtesting"
 )
 
 func init() {

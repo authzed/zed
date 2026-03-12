@@ -190,5 +190,5 @@ func atomicWriteFile(filename string, data []byte, perm os.FileMode) (err error)
 	if err := f.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpName, filename)
+	return os.Rename(tmpName, filename) //nolint:gosec // tmpName is from os.CreateTemp in the same directory as filename
 }
