@@ -81,11 +81,14 @@ func registerImportCmd(rootCmd *cobra.Command) {
 
 func importCmdFunc(cmd *cobra.Command, schemaClient v1.SchemaServiceClient, relationshipsClient v1.PermissionsServiceClient, prefix string, u *url.URL) error {
 	prefix = strings.TrimRight(prefix, "/")
-	contents, err := decode.FetchURL(u)
+	d, err := decode.DecoderFromURL(u)
 	if err != nil {
 		return err
 	}
-	p, err := decode.UnmarshalYAMLValidationFile(contents)
+	p, err := d.UnmarshalYAMLValidationFile()
+	if err != nil {
+		return err
+	}
 
 	if cobrautil.MustGetBool(cmd, "schema") {
 		if err := importSchema(cmd.Context(), schemaClient, p.Schema.Schema, prefix); err != nil {
