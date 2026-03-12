@@ -20,7 +20,7 @@ import (
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/composableschemadsl/compiler"
 
-	zedtesting "github.com/authzed/zed/internal/testing"
+	"github.com/authzed/zed/internal/zedtesting"
 )
 
 func TestDeterminePrefixForSchema(t *testing.T) {

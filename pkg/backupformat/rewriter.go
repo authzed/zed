@@ -285,11 +285,11 @@ func validateAndCompileDefs(defs []compiler.SchemaDefinition) (string, error) {
 
 	for _, rawDef := range compiledSchema.ObjectDefinitions {
 		ts := schemapkg.NewTypeSystem(schemapkg.ResolverForCompiledSchema(compiledSchema))
-		def, err := schemapkg.NewDefinition(ts, rawDef)
+		def, err := schemapkg.NewDefinition(rawDef)
 		if err != nil {
 			return "", fmt.Errorf("failed to create schema definition: %w", err)
 		}
-		if _, err := def.Validate(context.Background()); err != nil {
+		if _, err := ts.Validate(context.Background(), def); err != nil {
 			return "", fmt.Errorf("failed to validate schema definition: %w", err)
 		}
 	}

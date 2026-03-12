@@ -17,7 +17,7 @@ import (
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 
 	"github.com/authzed/zed/internal/client"
-	zedtesting "github.com/authzed/zed/internal/testing"
+	"github.com/authzed/zed/internal/zedtesting"
 )
 
 func TestGetClientVersion(t *testing.T) {

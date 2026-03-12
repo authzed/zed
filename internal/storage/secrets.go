@@ -17,7 +17,7 @@ import (
 type Token struct {
 	Name       string
 	Endpoint   string
-	APIToken   string
+	APIToken   string //nolint:gosec // not a hardcoded credential, this is a user-provided API token field
 	Insecure   *bool
 	NoVerifyCA *bool
 	CACert     []byte

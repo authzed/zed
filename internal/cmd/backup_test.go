@@ -25,7 +25,7 @@ import (
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/storage"
-	zedtesting "github.com/authzed/zed/internal/testing"
+	"github.com/authzed/zed/internal/zedtesting"
 	"github.com/authzed/zed/pkg/backupformat"
 )
 
@@ -186,7 +186,6 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				_ = f.Close()
-				_ = os.Remove(f.Name())
 			})
 
 			err = backupParseRelsCmdFunc(cmd, f, []string{backupName})
@@ -206,7 +205,6 @@ func TestBackupParseRevisionCmdFunc(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = f.Close()
-		_ = os.Remove(f.Name())
 	})
 
 	err = backupParseRevisionCmdFunc(cmd, f, []string{backupName})
@@ -266,7 +264,6 @@ func TestBackupParseSchemaCmdFunc(t *testing.T) {
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				_ = f.Close()
-				_ = os.Remove(f.Name())
 			})
 
 			err = backupParseSchemaCmdFunc(cmd, f, []string{backupName})
@@ -343,7 +340,6 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			_ = f.Close()
-			_ = os.Remove(f.Name())
 		})
 
 		err = backupCreateCmdFunc(cmd, []string{tempFile})

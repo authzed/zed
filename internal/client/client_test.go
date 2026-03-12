@@ -19,7 +19,7 @@ import (
 
 	"github.com/authzed/zed/internal/client"
 	"github.com/authzed/zed/internal/storage"
-	zedtesting "github.com/authzed/zed/internal/testing"
+	"github.com/authzed/zed/internal/zedtesting"
 )
 
 func TestGetTokenWithCLIOverride(t *testing.T) {
@@ -28,7 +28,6 @@ func TestGetTokenWithCLIOverride(t *testing.T) {
 	require.NoError(err)
 	t.Cleanup(func() {
 		_ = testCert.Close()
-		_ = os.Remove(testCert.Name())
 	})
 	_, err = testCert.Write([]byte("hi"))
 	require.NoError(err)
