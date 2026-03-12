@@ -6,15 +6,7 @@ import (
 	"runtime"
 
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 )
-
-func minimum(a int, b int) int {
-	if a <= b {
-		return a
-	}
-	return b
-}
 
 // EachFunc is a callback function that is called for each batch. no is the
 // batch number, start is the starting index of this batch in the slice, and
@@ -47,19 +39,17 @@ func ConcurrentBatch(ctx context.Context, n int, batchSize int, maxWorkers int, 
 		maxWorkers = runtime.GOMAXPROCS(0)
 	}
 
-	sem := semaphore.NewWeighted(int64(maxWorkers))
 	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(maxWorkers)
 	numBatches := (n + batchSize - 1) / batchSize
 	for i := 0; i < numBatches; i++ {
-		if err := sem.Acquire(ctx, 1); err != nil {
-			break
-		}
-
 		batchNum := i
 		g.Go(func() error {
-			defer sem.Release(1)
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			start := batchNum * batchSize
-			end := minimum(start+batchSize, n)
+			end := min(start+batchSize, n)
 			return each(ctx, batchNum, start, end)
 		})
 	}
