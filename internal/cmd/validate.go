@@ -123,7 +123,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 
 	if fileTypeArg != "" {
 		switch fileTypeArg {
-		case "yaml":
+		case "yaml", "yml", "zaml":
 			fileType = decode.FileTypeYaml
 		case "zed":
 			fileType = decode.FileTypeZed
@@ -147,19 +147,22 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			return "", true, err
 		}
 
-		contents, err := decode.FetchURL(u)
+		d, err := decode.DecoderFromURL(u)
 		if err != nil {
 			return "", true, err
 		}
+		contents := d.Contents
 
-		var parsed validationfile.ValidationFile
+		var parsed *validationfile.ValidationFile
 		switch fileType {
 		case decode.FileTypeYaml:
-			parsed, err = decode.UnmarshalYAMLValidationFile(contents)
+			parsed, err = d.UnmarshalYAMLValidationFile()
 		case decode.FileTypeZed:
-			parsed = decode.UnmarshalSchemaValidationFile(contents)
+			parsed = d.UnmarshalSchemaValidationFile()
 		case decode.FileTypeUnknown:
-			parsed, err = decode.UnmarshalValidationFile(contents)
+			parsed, err = d.UnmarshalAsYAMLOrSchema()
+		default:
+			return "", true, fmt.Errorf("invalid file type %q", fileType)
 		}
 		// This block handles the error regardless of which case statement is hit
 		if err != nil {
@@ -177,11 +180,11 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			// stick it in the schema field.
 			fileDir := filepath.Dir(filename)
 			schemaFileName := filepath.Join(fileDir, parsed.SchemaFile)
-			contents, err := fs.ReadFile(filesystem, schemaFileName)
+			contentsOfSchema, err := fs.ReadFile(filesystem, schemaFileName)
 			if err != nil {
 				return "", false, fmt.Errorf("could not read schemaFile %s at path %s", parsed.SchemaFile, schemaFileName)
 			}
-			parsed.Schema.Schema = string(contents)
+			parsed.Schema.Schema = string(contentsOfSchema)
 		}
 
 		// This logic will use the zero value of the struct, so we don't need
@@ -199,7 +202,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
 			Schema:        parsed.Schema.Schema,
 			Relationships: tuples,
-		}, development.WithSourceFS(os.DirFS(".")))
+		}, development.WithSourceFS(filesystem))
 		if err != nil {
 			return "", false, err
 		}
