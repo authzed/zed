@@ -47,42 +47,13 @@ func normalizeNewlines(s string) string {
 func TestValidatePreRun(t *testing.T) {
 	t.Parallel()
 
-	testCases := map[string]struct {
-		schemaTypeFlag string
-		expectErr      bool
-	}{
-		`invalid`: {
-			schemaTypeFlag: "invalid",
-			expectErr:      true,
-		},
-		`composable`: {
-			schemaTypeFlag: "composable",
-			expectErr:      false,
-		},
-		`standard`: {
-			schemaTypeFlag: "standard",
-			expectErr:      false,
-		},
-	}
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
+		zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
+	)
 
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
-			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
-				zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
-				zedtesting.StringFlag{FlagName: "schema-type", FlagValue: tc.schemaTypeFlag},
-				zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
-			)
-
-			err := validatePreRunE(cmd, []string{})
-			if tc.expectErr {
-				require.ErrorContains(t, err, "schema-type must be one of \"\", \"standard\", \"composable\"")
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
+	err := validatePreRunE(cmd, []string{})
+	require.NoError(t, err)
 }
 
 func TestValidate(t *testing.T) {
@@ -143,12 +114,6 @@ total files: 2, successfully validated files: 2
 				filepath.Join("validate-test", "invalid-schema.zed"),
 			},
 			expectErr: "Unexpected token at root level",
-		},
-		`standard_only_without_flag_passes`: {
-			files: []string{
-				filepath.Join("validate-test", "only-passes-standard.zed"),
-			},
-			expectStr: "Success! - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
 		},
 		`without_schema_fails`: {
 			files: []string{
@@ -254,33 +219,6 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			},
 			expectStr: "Success! - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
 		},
-		`composable_schema_only_without_flag_passes`: {
-			files: []string{
-				filepath.Join("validate-test", "only-passes-composable.zed"),
-			},
-			expectStr: "Success! - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
-		},
-		`standard_only_with_composable_flag_fails`: {
-			schemaTypeFlag: "composable",
-			files: []string{
-				filepath.Join("validate-test", "only-passes-standard.zed"),
-			},
-			expectErr: "Expected identifier, found token TokenTypeKeyword",
-		},
-		`composable_only_with_standard_flag_fails`: {
-			schemaTypeFlag: "standard",
-			files: []string{
-				filepath.Join("validate-test", "only-passes-composable.zed"),
-			},
-			expectErr: "Unexpected token at root level",
-		},
-		`composable_in_validation_yaml_with_standard_fails`: {
-			schemaTypeFlag: "standard",
-			files: []string{
-				filepath.Join("validate-test", "external-and-composable.yaml"),
-			},
-			expectErr: "Unexpected token at root level",
-		},
 		`composable_in_validation_yaml_with_composable_passes`: {
 			schemaTypeFlag: "composable",
 			files: []string{
@@ -289,20 +227,12 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			expectStr: "Success! - 1 relationships loaded, 2 assertions run, 0 expected relations validated\n",
 		},
 		`warnings_in_composable_fail`: {
-			schemaTypeFlag: "composable",
 			files: []string{
 				filepath.Join("validate-test", "composable-schema-warning-root.zed"),
 			},
-			expectStr: `warning: Permission "edit" references itself, which will cause an error to be raised due to infinite recursion (permission-references-itself)
- 1 | partial edit_partial {
- 2 >     permission edit = edit
-   >                       ^~~~
- 3 | }
- 4 | 
-
-complete - 0 relationships loaded, 0 assertions run, 0 expected relations validated
-`,
+			expectStr: "warning: Permission \"edit\" references itself, which will cause an error to be raised due to infinite recursion (permission-references-itself)\n  1 | use partial\n  2 | \n  3 | partial edit_partial {\n  4 >     permission edit = edit\n    >                       ^~~~\n  5 | }\n  6 | \n\ncomplete - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
 		},
+		// TODO: it's not showing the pointer for whatever reason.
 		`warnings_point_at_correct_line_in_zed`: {
 			files: []string{
 				filepath.Join("validate-test", "warnings-point-at-right-line.zed"),
@@ -327,6 +257,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
 				zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 				zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
+				zedtesting.StringFlag{FlagName: "type", FlagValue: ""},
 			)
 
 			res, shouldError, err := validateCmdFunc(cmd, tc.files)
@@ -337,7 +268,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				require.Error(err)
 				require.Contains(err.Error(), tc.expectErr)
 			}
-			require.Equal(tc.expectNonZeroStatusCode, shouldError)
+			require.Equal(tc.expectNonZeroStatusCode, shouldError, "non-zero status code value didn't match expectation")
 		})
 	}
 }
@@ -353,6 +284,7 @@ func TestFailOnWarn(t *testing.T) {
 		zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
 		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100}, zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 		zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
+		zedtesting.StringFlag{FlagName: "type", FlagValue: ""},
 	)
 
 	_, shouldError, _ := validateCmdFunc(cmd, []string{filepath.Join("validate-test", "schema-with-warnings.zed")})
@@ -365,6 +297,7 @@ func TestFailOnWarn(t *testing.T) {
 		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
 		zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 		zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: true},
+		zedtesting.StringFlag{FlagName: "type", FlagValue: ""},
 	)
 
 	_, shouldError, _ = validateCmdFunc(cmd, []string{filepath.Join("validate-test", "schema-with-warnings.zed")})

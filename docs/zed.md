@@ -1431,9 +1431,9 @@ zed validate <validation_file_or_schema_file> [flags]
 ### Options
 
 ```
-      --fail-on-warn         treat warnings as errors during validation
-      --force-color          force color code output even in non-tty environments
-      --schema-type string   force validation according to specific schema syntax ("", "composable", "standard")
+      --fail-on-warn   treat warnings as errors during validation
+      --force-color    force color code output even in non-tty environments
+      --type string    the type of the validated file. valid options are "zed" and "yaml"
 ```
 
 ### Options Inherited From Parent Flags
