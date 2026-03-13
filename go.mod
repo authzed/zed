@@ -1,6 +1,6 @@
 module github.com/authzed/zed
 
-go 1.25.7
+go 1.25.8
 
 // 0.14.0 was published as 1.14.0 by mistake
 retract v1.14.0
