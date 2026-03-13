@@ -6,3 +6,11 @@ docs/merged.md
 go.work
 go.work.sum
 coverage.txt
+coverage.out
+
+# HTML trace files
+demo-*.html
+trace.html
+
+# Compiled binary (root level only)
+/zed
