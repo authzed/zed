@@ -60,11 +60,10 @@ func TestValidate(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		schemaTypeFlag          string
 		files                   []string
 		expectErr               string
 		expectStr               string
-		expectNonZeroStatusCode bool
+		expectNonZeroStatusCode bool // when there is an error with the validation process OR an error in the schema
 	}{
 		`standard_passes`: {
 			files: []string{
@@ -95,7 +94,10 @@ total files: 2, successfully validated files: 2
 				filepath.Join("validate-test", "standard-validation.yaml"),
 				filepath.Join("validate-test", "invalid-schema.zed"),
 			},
-			expectErr: "Unexpected token at root level",
+			expectStr: filepath.Join("validate-test", "standard-validation.yaml") + `
+Success! - 1 relationships loaded, 2 assertions run, 0 expected relations validated
+` + filepath.Join("validate-test", "invalid-schema.zed") + "\nerror: parse error in `something`, line 1, column 1: Unexpected token at root level: TokenTypeIdentifier                             \n 1 > something something {}\n   > ^~~~~~~~~\n 2 | \n\n\n",
+			expectNonZeroStatusCode: true,
 		},
 		`schema_only_passes`: {
 			files: []string{
@@ -113,7 +115,8 @@ total files: 2, successfully validated files: 2
 			files: []string{
 				filepath.Join("validate-test", "invalid-schema.zed"),
 			},
-			expectErr: "Unexpected token at root level",
+			expectStr:               "error: parse error in `something`, line 1, column 1: Unexpected token at root level: TokenTypeIdentifier                             \n 1 > something something {}\n   > ^~~~~~~~~\n 2 | \n\n\n",
+			expectNonZeroStatusCode: true,
 		},
 		`without_schema_fails`: {
 			files: []string{
@@ -173,13 +176,15 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			files: []string{
 				"http://%zz",
 			},
-			expectErr: "invalid URL escape",
+			expectErr:               "invalid URL escape",
+			expectNonZeroStatusCode: true,
 		},
 		`url_does_not_exist_fails`: {
 			files: []string{
 				"https://unknown-url",
 			},
-			expectErr: "Get \"https://unknown-url\": dial tcp: lookup unknown-url",
+			expectErr:               "Get \"https://unknown-url\": dial tcp: lookup unknown-url",
+			expectNonZeroStatusCode: true,
 		},
 		`missing_relation_fails`: {
 			files: []string{
@@ -220,7 +225,6 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			expectStr: "Success! - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
 		},
 		`composable_in_validation_yaml_with_composable_passes`: {
-			schemaTypeFlag: "composable",
 			files: []string{
 				filepath.Join("validate-test", "external-and-composable.yaml"),
 			},
@@ -232,7 +236,6 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			},
 			expectStr: "warning: Permission \"edit\" references itself, which will cause an error to be raised due to infinite recursion (permission-references-itself)\n  1 | use partial\n  2 | \n  3 | partial edit_partial {\n  4 >     permission edit = edit\n    >                       ^~~~\n  5 | }\n  6 | \n\ncomplete - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
 		},
-		// TODO: it's not showing the pointer for whatever reason.
 		`warnings_point_at_correct_line_in_zed`: {
 			files: []string{
 				filepath.Join("validate-test", "warnings-point-at-right-line.zed"),
@@ -245,6 +248,41 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			},
 			expectStr: "warning: Permission \"delete_resource\" references parent type \"resource\" in its name; it is recommended to drop the suffix (relation-name-references-parent)\n 23 |     /** can_admin allows a user to administer the resource */\n 24 |     permission can_admin = admin\n 25 | \n 26 >     /** delete_resource allows a user to delete the resource. */\n    >         ^~~~~~~~~~~~~~~\n 27 |     permission delete_resource = can_admin\n 28 |   }\n\ncomplete - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
 		},
+		`missing_import_file_fails`: {
+			files: []string{
+				filepath.Join("validate-test", "nonexistant-import.zed"),
+			},
+			expectNonZeroStatusCode: true,
+			expectStr:               "error: parse error in `nonexistant-import.zed`, line 7, column 1: failed to read import \"doesnotexist.zed\": open doesnotexist.zed: no such file or\ndirectory                                                                       \n 4 | \n 5 | definition resource {}\n 6 | \n 7 > import \"doesnotexist.zed\"\n 8 | \n\n\n",
+		},
+		`error_in_imported_file_fails_with_correct_file_and_line_pointer`: {
+			files: []string{
+				filepath.Join("validate-test", "nested-composable-schema.zed"),
+			},
+			expectNonZeroStatusCode: true,
+			expectStr:               "error: parse error in `nonexistant-import.zed`, line 7, column 1: failed to read import \"doesnotexist.zed\": open doesnotexist.zed: no such file or\ndirectory                                                                       \n 4 | \n 5 | definition resource {}\n 6 | \n 7 > import \"doesnotexist.zed\"\n 8 | \n\n\n",
+		},
+		`error_in_imported_file_fails_with_correct_file_and_line_pointer_2`: {
+			files: []string{
+				filepath.Join("validate-test", "composable-schema-imports-file-with-error.zed"),
+			},
+			expectNonZeroStatusCode: true,
+			expectStr:               "error: parse error in `unknownrel`, line 5, column 23: relation/permission `unknownrel` not found under definition `group`             \n  2 | definition user {}\n  3 | \n  4 | definition group {\n  5 >     permission view = unknownrel\n    >                       ^~~~~~~~~~\n  6 | }\n  7 | \n\n\n",
+		},
+		`yaml_with_composable_schemaFile_with_import_error`: {
+			files: []string{
+				filepath.Join("validate-test", "external-composable-with-error.yaml"),
+			},
+			expectNonZeroStatusCode: true,
+			expectStr:               "error: parse error in `unknownrel`, line 5, column 23: relation/permission `unknownrel` not found under definition `group`             \n 3 | definition group {\n 4 |     relation member: user\n 5 |     permission view = unknownrel\n 6 > }\n 7 | \n\n\n",
+		},
+		`yaml_with_schemaFile_escape_attempt_fails`: {
+			files: []string{
+				filepath.Join("validate-test", "external-schema-escape.yaml"),
+			},
+			expectNonZeroStatusCode: true,
+			expectErr:               `schema filepath "../some-schema.zed" must be local to where the command was invoked`,
+		},
 	}
 
 	for name, tc := range testCases {
@@ -253,11 +291,9 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 
 			require := require.New(t)
 			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
-				zedtesting.StringFlag{FlagName: "schema-type", FlagValue: tc.schemaTypeFlag},
 				zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
 				zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 				zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
-				zedtesting.StringFlag{FlagName: "type", FlagValue: ""},
 			)
 
 			res, shouldError, err := validateCmdFunc(cmd, tc.files)
@@ -280,11 +316,9 @@ func TestFailOnWarn(t *testing.T) {
 
 	// Run once with fail-on-warn set to false
 	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
-		zedtesting.StringFlag{FlagName: "schema-type", FlagValue: ""},
 		zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
 		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100}, zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 		zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
-		zedtesting.StringFlag{FlagName: "type", FlagValue: ""},
 	)
 
 	_, shouldError, _ := validateCmdFunc(cmd, []string{filepath.Join("validate-test", "schema-with-warnings.zed")})
@@ -292,12 +326,10 @@ func TestFailOnWarn(t *testing.T) {
 
 	// Run again with fail-on-warn set to true
 	cmd = zedtesting.CreateTestCobraCommandWithFlagValue(t,
-		zedtesting.StringFlag{FlagName: "schema-type", FlagValue: ""},
 		zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
 		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
 		zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 		zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: true},
-		zedtesting.StringFlag{FlagName: "type", FlagValue: ""},
 	)
 
 	_, shouldError, _ = validateCmdFunc(cmd, []string{filepath.Join("validate-test", "schema-with-warnings.zed")})

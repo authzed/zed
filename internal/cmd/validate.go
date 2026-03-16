@@ -49,8 +49,8 @@ var (
 
 func registerValidateCmd(cmd *cobra.Command) {
 	validateCmd := &cobra.Command{
-		Use:   "validate <validation_file_or_schema_file>",
-		Short: "Validates the given validation file (.yaml, .zaml) or schema file (.zed)",
+		Use:   "validate <validation_files_or_schema_files>",
+		Short: "Validates the given validation files (.yaml, .zaml) or schema files (.zed)",
 		Example: `
 	From a local file (with prefix):
 		zed validate file:///Users/zed/Downloads/authzed-x7izWU8_2Gw3.yaml
@@ -65,10 +65,7 @@ func registerValidateCmd(cmd *cobra.Command) {
 		zed validate https://play.authzed.com/s/iksdFvCtvnkR/schema
 
 	From pastebin:
-		zed validate https://pastebin.com/8qU45rVK
-
-	From a devtools instance:
-		zed validate https://localhost:8443/download`,
+		zed validate https://pastebin.com/8qU45rVK`,
 		Args:              commands.ValidationWrapper(cobra.MinimumNArgs(1)),
 		ValidArgsFunction: commands.FileExtensionCompletions("zed", "yaml", "yml", "zaml"),
 		PreRunE:           validatePreRunE,
@@ -92,7 +89,6 @@ func registerValidateCmd(cmd *cobra.Command) {
 
 	validateCmd.Flags().Bool("force-color", false, "force color code output even in non-tty environments")
 	validateCmd.Flags().Bool("fail-on-warn", false, "treat warnings as errors during validation")
-	validateCmd.Flags().String("type", "", "the type of the validated file. valid options are \"zed\" and \"yaml\"")
 	cmd.AddCommand(validateCmd)
 }
 
@@ -117,24 +113,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		shouldExit                 = false
 		toPrint                    = &strings.Builder{}
 		failOnWarn                 = cobrautil.MustGetBool(cmd, "fail-on-warn")
-		fileTypeArg                = cobrautil.MustGetString(cmd, "type")
-		fileType                   = decode.FileTypeUnknown
 	)
-
-	if fileTypeArg != "" {
-		switch fileTypeArg {
-		case "yaml", "yml", "zaml":
-			fileType = decode.FileTypeYaml
-		case "zed":
-			fileType = decode.FileTypeZed
-		default:
-			return "", true, fmt.Errorf("invalid value \"%s\" for --type. valid options are \"zed\" and \"yaml\"", fileTypeArg)
-		}
-	}
-
-	// Get a handle on a filesystem rooted where the command was invoked. This
-	// ensures that we don't traverse outside of where the command was invoked.
-	filesystem := os.DirFS(".")
 
 	for _, filename := range filenames {
 		// If we're running over multiple files, print the filename for context/debugging purposes
@@ -151,40 +130,40 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		if err != nil {
 			return "", true, err
 		}
-		contents := d.Contents
+		validateContents := d.Contents
+
+		// Root the filesystem at the directory containing the schema file, so
+		// that relative imports resolve correctly.
+		fileDir := filepath.Dir(filename)
+		if fileDir == "" {
+			fileDir = "."
+		}
+		filesystem := os.DirFS(fileDir)
+
+		// Parse the zed or YAML file
+		fileType := ".zed"
+		ext := filepath.Ext(filename)
+		if ext != "" {
+			fileType = ext
+		}
 
 		var parsed *validationfile.ValidationFile
 		switch fileType {
-		case decode.FileTypeYaml:
+		case ".yaml", ".yml":
 			parsed, err = d.UnmarshalYAMLValidationFile()
-		case decode.FileTypeZed:
+		case ".zed":
 			parsed = d.UnmarshalSchemaValidationFile()
-		case decode.FileTypeUnknown:
-			parsed, err = d.UnmarshalAsYAMLOrSchema()
 		default:
-			return "", true, fmt.Errorf("invalid file type %q", fileType)
+			parsed, err = d.UnmarshalAsYAMLOrSchema()
 		}
 		// This block handles the error regardless of which case statement is hit
 		if err != nil {
-			// TODO: what should this string be?
 			return "", true, err
 		}
 
 		// Ensure that either schema or schemaFile is present
-		if parsed.Schema.Schema == "" {
-			if parsed.SchemaFile == "" {
-				return "", false, errors.New("either schema or schemaFile must be present")
-			}
-
-			// If schema is not defined and schemaFile is, we go and grab the schemaFile and
-			// stick it in the schema field.
-			fileDir := filepath.Dir(filename)
-			schemaFileName := filepath.Join(fileDir, parsed.SchemaFile)
-			contentsOfSchema, err := fs.ReadFile(filesystem, schemaFileName)
-			if err != nil {
-				return "", false, fmt.Errorf("could not read schemaFile %s at path %s", parsed.SchemaFile, schemaFileName)
-			}
-			parsed.Schema.Schema = string(contentsOfSchema)
+		if parsed.Schema.Schema == "" && parsed.SchemaFile == "" {
+			return "", false, errors.New("either schema or schemaFile must be present")
 		}
 
 		// This logic will use the zero value of the struct, so we don't need
@@ -202,17 +181,18 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
 			Schema:        parsed.Schema.Schema,
 			Relationships: tuples,
-		}, development.WithSourceFS(filesystem))
+		}, development.WithSourceFS(filesystem), development.WithRootFileName(filepath.Base(filename)))
 		if err != nil {
 			return "", false, err
 		}
 		if devErrs != nil {
-			// Calculate the schema offset, used for outputting errors and warnings
-			// and having them point to the right place regardless of zed vs yaml
-			schemaOffset := parsed.Schema.SourcePosition.LineNumber
+			schemaOffset := 0
+			if fileType != ".zed" {
+				schemaOffset = parsed.Schema.SourcePosition.LineNumber
+			}
 
 			// Output errors
-			outputDeveloperErrorsWithLineOffset(toPrint, contents, devErrs.InputErrors, schemaOffset)
+			outputDeveloperErrorsWithLineOffset(toPrint, validateContents, devErrs.InputErrors, schemaOffset, filesystem)
 			return toPrint.String(), true, nil
 		}
 		// Run assertions
@@ -221,7 +201,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			return "", false, aerr
 		}
 		if adevErrs != nil {
-			outputDeveloperErrors(toPrint, contents, adevErrs)
+			outputDeveloperErrors(toPrint, validateContents, adevErrs, filesystem)
 			return toPrint.String(), true, nil
 		}
 		successfullyValidatedFiles++
@@ -232,7 +212,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			return "", false, rerr
 		}
 		if erDevErrs != nil {
-			outputDeveloperErrors(toPrint, contents, erDevErrs)
+			outputDeveloperErrors(toPrint, validateContents, erDevErrs, filesystem)
 			return toPrint.String(), true, nil
 		}
 		// Print out any warnings for file
@@ -244,7 +224,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		if len(warnings) > 0 {
 			for _, warning := range warnings {
 				fmt.Fprintf(toPrint, "%s%s\n", warningPrefix(), warning.Message)
-				outputForLine(toPrint, contents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
+				outputForLine(toPrint, validateContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
 				toPrint.WriteString("\n")
 			}
 
@@ -293,14 +273,20 @@ func outputForLine(sb *strings.Builder, validateContents []byte, oneIndexedLineN
 	}
 }
 
-func outputDeveloperErrors(sb *strings.Builder, validateContents []byte, devErrors []*devinterface.DeveloperError) {
-	outputDeveloperErrorsWithLineOffset(sb, validateContents, devErrors, 0)
+func outputDeveloperErrors(sb *strings.Builder, validateContents []byte, devErrors []*devinterface.DeveloperError, sourceFS fs.FS) {
+	outputDeveloperErrorsWithLineOffset(sb, validateContents, devErrors, 0, sourceFS)
 }
 
-func outputDeveloperErrorsWithLineOffset(sb *strings.Builder, validateContents []byte, devErrors []*devinterface.DeveloperError, lineOffset int) {
-	lines := strings.Split(string(validateContents), "\n")
-
+func outputDeveloperErrorsWithLineOffset(sb *strings.Builder, validateContents []byte, devErrors []*devinterface.DeveloperError, lineOffset int, sourceFS fs.FS) {
 	for _, devErr := range devErrors {
+		// If the error has a Path, read the contents from that file instead.
+		if len(devErr.Path) > 0 {
+			fileContents, err := fs.ReadFile(sourceFS, devErr.Path[0])
+			if err == nil {
+				validateContents = fileContents
+			}
+		}
+		lines := strings.Split(string(validateContents), "\n")
 		outputDeveloperError(sb, devErr, lines, lineOffset)
 	}
 }

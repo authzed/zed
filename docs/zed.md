@@ -43,7 +43,7 @@ zed permission check --explain document:firstdoc writer user:emilia
 - [zed relationship](#reference-zed-relationship)	 - Query and mutate the relationships in a permissions system
 - [zed schema](#reference-zed-schema)	 - Manage schema for a permissions system
 - [zed use](#reference-zed-use)	 - Alias for `zed context use`
-- [zed validate](#reference-zed-validate)	 - Validates the given validation file (.yaml, .zaml) or schema file (.zed)
+- [zed validate](#reference-zed-validate)	 - Validates the given validation files (.yaml, .zaml) or schema files (.zed)
 - [zed version](#reference-zed-version)	 - Display zed and SpiceDB version information
 
 
@@ -1399,10 +1399,10 @@ zed use <context>
 
 ## Reference: `zed validate`
 
-Validates the given validation file (.yaml, .zaml) or schema file (.zed)
+Validates the given validation files (.yaml, .zaml) or schema files (.zed)
 
 ```
-zed validate <validation_file_or_schema_file> [flags]
+zed validate <validation_files_or_schema_files> [flags]
 ```
 
 ### Examples
@@ -1423,9 +1423,6 @@ zed validate <validation_file_or_schema_file> [flags]
 
 	From pastebin:
 		zed validate https://pastebin.com/8qU45rVK
-
-	From a devtools instance:
-		zed validate https://localhost:8443/download
 ```
 
 ### Options
@@ -1433,7 +1430,6 @@ zed validate <validation_file_or_schema_file> [flags]
 ```
       --fail-on-warn   treat warnings as errors during validation
       --force-color    force color code output even in non-tty environments
-      --type string    the type of the validated file. valid options are "zed" and "yaml"
 ```
 
 ### Options Inherited From Parent Flags

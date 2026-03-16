@@ -1,0 +1,10 @@
+// this is a userrr
+definition user {}
+
+definition group {
+    permission view = unknownrel
+}
+
+caveat is_raining(day string) {
+    day == "sat" || day == "sun"
+}

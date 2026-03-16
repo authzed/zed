@@ -41,7 +41,7 @@ func TestCommandOutput(t *testing.T) {
 			command:               []string{"zed", "validate"},
 			expectFlagErrorCalled: true,
 			flagErrorContains:     "requires at least 1 arg(s), only received 0",
-			expectUsageContains:   "zed validate <validation_file_or_schema_file> [flags]",
+			expectUsageContains:   "zed validate <validation_files_or_schema_files> [flags]",
 		},
 		{
 			name:                  "prints correct usage",

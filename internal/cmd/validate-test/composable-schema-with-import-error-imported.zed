@@ -1,0 +1,6 @@
+definition user {}
+
+definition group {
+    relation member: user
+    permission view = unknownrel
+}

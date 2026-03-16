@@ -1,0 +1,7 @@
+---
+schemaFile: "./composable-schema-with-import-error-root.zed"
+relationships: >-
+  resource:1#viewer@user:1
+assertions:
+  assertTrue:
+    - "resource:1#viewer@user:1"

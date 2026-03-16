@@ -65,7 +65,7 @@ func DecoderFromURL(u *url.URL) (*Decoder, error) {
 
 func decoderFromFile(u *url.URL) (*Decoder, error) {
 	filePath := u.Path
-	data, err := os.ReadFile(filePath)
+	data, err := os.ReadFile(filePath) //nolint:gosec // not an issue
 	if err != nil {
 		return nil, err
 	}
