@@ -155,6 +155,11 @@ func (fss *fakeServer) Watch(*v1.WatchRequest, grpc.ServerStreamingServer[v1.Wat
 	return status.Errorf(codes.Unavailable, "")
 }
 
+func (fss *fakeServer) ReadRelationships(*v1.ReadRelationshipsRequest, grpc.ServerStreamingServer[v1.ReadRelationshipsResponse]) error {
+	fss.testFunc()
+	return status.Errorf(codes.Unavailable, "")
+}
+
 func TestRetries(t *testing.T) {
 	ctx := t.Context()
 	var callCount uint
@@ -250,6 +255,16 @@ func TestDoesNotRetry(t *testing.T) {
 		watchReq, err := c.Watch(ctx, &v1.WatchRequest{})
 		require.NoError(t, err)
 		resp, err := watchReq.Recv()
+		require.Nil(t, resp)
+		grpcutil.RequireStatus(t, codes.Unavailable, err)
+		require.Equal(t, uint(1), callCount)
+	})
+
+	t.Run("read_relationships", func(t *testing.T) {
+		callCount = 0
+		stream, err := c.ReadRelationships(ctx, &v1.ReadRelationshipsRequest{})
+		require.NoError(t, err)
+		resp, err := stream.Recv()
 		require.Nil(t, resp)
 		grpcutil.RequireStatus(t, codes.Unavailable, err)
 		require.Equal(t, uint(1), callCount)
