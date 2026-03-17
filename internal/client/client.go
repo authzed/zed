@@ -44,6 +44,7 @@ const (
 	defaultRetryJitterFraction     = 0.5
 	importBulkRoute                = "/authzed.api.v1.PermissionsService/ImportBulkRelationships"
 	exportBulkRoute                = "/authzed.api.v1.PermissionsService/ExportBulkRelationships"
+	readRelationshipsRoute         = "/authzed.api.v1.PermissionsService/ReadRelationships"
 	watchRoute                     = "/authzed.api.v1.WatchService/Watch"
 )
 
@@ -236,7 +237,9 @@ func DialOptsFromFlags(cmd *cobra.Command, token storage.Token) ([]grpc.DialOpti
 		// retrying the bulk import in backup/restore logic is handled manually.
 		// retrying bulk export is also handled manually, because the default behavior is
 		// to start at the beginning of the stream, which produces duplicate values.
-		selector.StreamClientInterceptor(retry.StreamClientInterceptor(retryOpts...), selector.MatchFunc(isNoneOf(importBulkRoute, exportBulkRoute, watchRoute))),
+		// read relationships is also excluded, because replaying that stream silently
+		// duplicates results for callers that persist or print the stream incrementally.
+		selector.StreamClientInterceptor(retry.StreamClientInterceptor(retryOpts...), selector.MatchFunc(isNoneOf(importBulkRoute, exportBulkRoute, readRelationshipsRoute, watchRoute))),
 	}
 
 	if !cobrautil.MustGetBool(cmd, "skip-version-check") {

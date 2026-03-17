@@ -698,6 +698,151 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 	client.assertAllRecvCalls()
 }
 
+func TestTakeBackupResumesServerlessBackupAtSavedDefinition(t *testing.T) {
+	schema := `definition doc {
+	relation view: user
+}
+
+definition photo {
+	relation view: user
+}
+
+definition user {}`
+	revision := &v1.ZedToken{Token: "serverless-revision"}
+	docRel := tuple.MustParseV1Rel("doc:first#view@user:tom")
+	photoRel1 := tuple.MustParseV1Rel("photo:first#view@user:tom")
+	photoRel2 := tuple.MustParseV1Rel("photo:second#view@user:tom")
+
+	firstRun := &mockClientForServerlessBackup{
+		t: t,
+		readSchemaCalls: []func() (*v1.ReadSchemaResponse, error){
+			func() (*v1.ReadSchemaResponse, error) {
+				return &v1.ReadSchemaResponse{SchemaText: schema}, nil
+			},
+		},
+		readRelationshipCalls: []func(t *testing.T, req *v1.ReadRelationshipsRequest) (grpc.ServerStreamingClient[v1.ReadRelationshipsResponse], error){
+			func(t *testing.T, req *v1.ReadRelationshipsRequest) (grpc.ServerStreamingClient[v1.ReadRelationshipsResponse], error) {
+				require.Equal(t, "doc", req.RelationshipFilter.ResourceType)
+				require.Equal(t, uint32(1), req.OptionalLimit)
+				require.NotNil(t, req.Consistency)
+				return &mockReadRelationshipsStream{
+					recvCalls: []func() (*v1.ReadRelationshipsResponse, error){
+						func() (*v1.ReadRelationshipsResponse, error) {
+							return &v1.ReadRelationshipsResponse{
+								ReadAt:            revision,
+								Relationship:      docRel,
+								AfterResultCursor: &v1.Cursor{Token: "doc-revision-cursor"},
+							}, nil
+						},
+					},
+				}, nil
+			},
+			func(t *testing.T, req *v1.ReadRelationshipsRequest) (grpc.ServerStreamingClient[v1.ReadRelationshipsResponse], error) {
+				require.Equal(t, "doc", req.RelationshipFilter.ResourceType)
+				require.Nil(t, req.OptionalCursor)
+				require.NotNil(t, req.Consistency)
+				return &mockReadRelationshipsStream{
+					recvCalls: []func() (*v1.ReadRelationshipsResponse, error){
+						func() (*v1.ReadRelationshipsResponse, error) {
+							return &v1.ReadRelationshipsResponse{
+								ReadAt:            revision,
+								Relationship:      docRel,
+								AfterResultCursor: &v1.Cursor{Token: "doc-cursor"},
+							}, nil
+						},
+					},
+				}, nil
+			},
+			func(t *testing.T, req *v1.ReadRelationshipsRequest) (grpc.ServerStreamingClient[v1.ReadRelationshipsResponse], error) {
+				require.Equal(t, "photo", req.RelationshipFilter.ResourceType)
+				require.Nil(t, req.OptionalCursor)
+				require.NotNil(t, req.Consistency)
+				return &mockReadRelationshipsStream{
+					recvCalls: []func() (*v1.ReadRelationshipsResponse, error){
+						func() (*v1.ReadRelationshipsResponse, error) {
+							return &v1.ReadRelationshipsResponse{
+								ReadAt:            revision,
+								Relationship:      photoRel1,
+								AfterResultCursor: &v1.Cursor{Token: "photo-cursor-1"},
+							}, nil
+						},
+						func() (*v1.ReadRelationshipsResponse, error) {
+							return nil, status.Error(codes.Internal, "interrupted backup")
+						},
+					},
+				}, nil
+			},
+		},
+	}
+
+	backupFileName := filepath.Join(t.TempDir(), "serverless.zedbackup")
+	err := takeBackup(t.Context(), firstRun, nil, backupFileName, &backupformat.NoopRewriter{}, 0)
+	require.ErrorContains(t, err, "interrupted backup")
+	require.FileExists(t, backupFileName+".lock")
+
+	secondRun := &mockClientForServerlessBackup{
+		t: t,
+		readSchemaCalls: []func() (*v1.ReadSchemaResponse, error){
+			func() (*v1.ReadSchemaResponse, error) {
+				return &v1.ReadSchemaResponse{SchemaText: schema}, nil
+			},
+		},
+		readRelationshipCalls: []func(t *testing.T, req *v1.ReadRelationshipsRequest) (grpc.ServerStreamingClient[v1.ReadRelationshipsResponse], error){
+			func(t *testing.T, req *v1.ReadRelationshipsRequest) (grpc.ServerStreamingClient[v1.ReadRelationshipsResponse], error) {
+				require.Equal(t, "doc", req.RelationshipFilter.ResourceType)
+				require.Equal(t, uint32(1), req.OptionalLimit)
+				require.NotNil(t, req.Consistency)
+				return &mockReadRelationshipsStream{
+					recvCalls: []func() (*v1.ReadRelationshipsResponse, error){
+						func() (*v1.ReadRelationshipsResponse, error) {
+							return &v1.ReadRelationshipsResponse{
+								ReadAt:            revision,
+								Relationship:      docRel,
+								AfterResultCursor: &v1.Cursor{Token: "doc-revision-cursor"},
+							}, nil
+						},
+					},
+				}, nil
+			},
+			func(t *testing.T, req *v1.ReadRelationshipsRequest) (grpc.ServerStreamingClient[v1.ReadRelationshipsResponse], error) {
+				require.Equal(t, "photo", req.RelationshipFilter.ResourceType)
+				require.NotNil(t, req.OptionalCursor)
+				require.Equal(t, "photo-cursor-1", req.OptionalCursor.Token)
+				require.Nil(t, req.Consistency)
+				return &mockReadRelationshipsStream{
+					recvCalls: []func() (*v1.ReadRelationshipsResponse, error){
+						func() (*v1.ReadRelationshipsResponse, error) {
+							return &v1.ReadRelationshipsResponse{
+								ReadAt:            revision,
+								Relationship:      photoRel2,
+								AfterResultCursor: &v1.Cursor{Token: "photo-cursor-2"},
+							}, nil
+						},
+					},
+				}, nil
+			},
+			func(t *testing.T, req *v1.ReadRelationshipsRequest) (grpc.ServerStreamingClient[v1.ReadRelationshipsResponse], error) {
+				require.Equal(t, "user", req.RelationshipFilter.ResourceType)
+				require.Nil(t, req.OptionalCursor)
+				require.NotNil(t, req.Consistency)
+				return &mockReadRelationshipsStream{}, nil
+			},
+		},
+	}
+
+	err = takeBackup(t.Context(), secondRun, nil, backupFileName, &backupformat.NoopRewriter{}, 0)
+	require.NoError(t, err)
+	require.NoFileExists(t, backupFileName+".lock")
+
+	validateBackup(t, backupFileName, schema, revision, []string{
+		"doc:first#view@user:tom",
+		"photo:first#view@user:tom",
+		"photo:second#view@user:tom",
+	})
+	firstRun.assertAllReadRelationshipCalls()
+	secondRun.assertAllReadRelationshipCalls()
+}
+
 func TestRevisionForServerless(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -816,4 +961,55 @@ func (m *mockClientForBackup) ExportBulkRelationships(_ context.Context, req *v1
 // assertAllRecvCalls asserts that the number of invocations is as expected
 func (m *mockClientForBackup) assertAllRecvCalls() {
 	require.Equal(m.t, len(m.recvCalls), m.recvCallIndex, "the number of provided recvCalls should match the number of invocations")
+}
+
+type mockClientForServerlessBackup struct {
+	client.Client
+	t                     *testing.T
+	readSchemaCalls       []func() (*v1.ReadSchemaResponse, error)
+	readSchemaCallsIndex  int
+	readRelationshipCalls []func(t *testing.T, req *v1.ReadRelationshipsRequest) (grpc.ServerStreamingClient[v1.ReadRelationshipsResponse], error)
+	readCallsIndex        int
+}
+
+func (m *mockClientForServerlessBackup) ReadSchema(_ context.Context, _ *v1.ReadSchemaRequest, _ ...grpc.CallOption) (*v1.ReadSchemaResponse, error) {
+	if m.readSchemaCallsIndex == len(m.readSchemaCalls) {
+		m.t.FailNow()
+		return nil, nil
+	}
+
+	readSchemaCall := m.readSchemaCalls[m.readSchemaCallsIndex]
+	m.readSchemaCallsIndex++
+	return readSchemaCall()
+}
+
+func (m *mockClientForServerlessBackup) ReadRelationships(_ context.Context, req *v1.ReadRelationshipsRequest, _ ...grpc.CallOption) (grpc.ServerStreamingClient[v1.ReadRelationshipsResponse], error) {
+	if m.readCallsIndex == len(m.readRelationshipCalls) {
+		m.t.FailNow()
+		return nil, nil
+	}
+
+	readRelationshipsCall := m.readRelationshipCalls[m.readCallsIndex]
+	m.readCallsIndex++
+	return readRelationshipsCall(m.t, req)
+}
+
+func (m *mockClientForServerlessBackup) assertAllReadRelationshipCalls() {
+	require.Equal(m.t, len(m.readRelationshipCalls), m.readCallsIndex, "the number of provided read relationship calls should match the number of invocations")
+}
+
+type mockReadRelationshipsStream struct {
+	grpc.ServerStreamingClient[v1.ReadRelationshipsResponse]
+	recvCalls     []func() (*v1.ReadRelationshipsResponse, error)
+	recvCallIndex int
+}
+
+func (m *mockReadRelationshipsStream) Recv() (*v1.ReadRelationshipsResponse, error) {
+	if m.recvCallIndex == len(m.recvCalls) {
+		return nil, io.EOF
+	}
+
+	recvCall := m.recvCalls[m.recvCallIndex]
+	m.recvCallIndex++
+	return recvCall()
 }
