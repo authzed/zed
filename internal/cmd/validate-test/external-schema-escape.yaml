@@ -1,0 +1,7 @@
+---
+schemaFile: "../some-schema.zed"
+relationships: >-
+  resource:1#user@user:1
+assertions:
+  assertTrue:
+    - "resource:1#user@user:1"

@@ -1,0 +1,3 @@
+use import
+
+import "./nonexistant-import.zed" // this file exists but it imports a file that doesn't exist

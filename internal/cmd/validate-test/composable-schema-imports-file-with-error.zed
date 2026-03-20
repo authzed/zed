@@ -1,0 +1,7 @@
+use import
+
+import "composable-schema-imported-with-error.zed"
+
+definition resource {
+	relation view: user with is_raining
+}

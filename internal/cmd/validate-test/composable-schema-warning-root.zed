@@ -1,3 +1,5 @@
+use partial
+
 partial edit_partial {
     permission edit = edit
 }

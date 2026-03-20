@@ -18,7 +18,7 @@ import (
 	"google.golang.org/grpc"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/spicedb/pkg/composableschemadsl/compiler"
+	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 
 	"github.com/authzed/zed/internal/zedtesting"
 )

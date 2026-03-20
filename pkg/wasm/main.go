@@ -171,7 +171,7 @@ func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringPara
 	reader := devCtx.DataLayer.SnapshotReader(headRev)
 	relationships := []*core.RelationTuple{}
 
-	schemaReader, err := reader.ReadSchema()
+	schemaReader, err := reader.ReadSchema(ctx)
 	if err != nil {
 		return zedCommandResult{Error: err.Error()}
 	}
