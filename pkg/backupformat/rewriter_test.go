@@ -160,7 +160,7 @@ func TestNoopRewriter(t *testing.T) {
 	t.Run("schema passthrough", func(t *testing.T) {
 		rw := &NoopRewriter{}
 		schema := "definition test/user {}"
-		result, err := rw.RewriteSchema(schema)
+		result, err := rw.RewriteSchema(t.Context(), schema)
 		require.NoError(t, err)
 		require.Equal(t, schema, result)
 	})
@@ -181,7 +181,7 @@ func TestLegacyRewriter(t *testing.T) {
 	t.Run("rewrites missing allowed types", func(t *testing.T) {
 		rw := &LegacyRewriter{}
 		schema := "definition user { relation foo /* missing allowed types */}"
-		result, err := rw.RewriteSchema(schema)
+		result, err := rw.RewriteSchema(t.Context(), schema)
 		require.NoError(t, err)
 		require.Contains(t, result, "/* deleted missing allowed type error */")
 		require.NotContains(t, result, "/* missing allowed types */")
@@ -190,7 +190,7 @@ func TestLegacyRewriter(t *testing.T) {
 	t.Run("rewrites short relation names", func(t *testing.T) {
 		rw := &LegacyRewriter{}
 		schema := "definition user {relation ab: user}"
-		result, err := rw.RewriteSchema(schema)
+		result, err := rw.RewriteSchema(t.Context(), schema)
 		require.NoError(t, err)
 		require.Contains(t, result, "/* deleted short relation name */")
 		require.NotContains(t, result, "relation ab")
@@ -202,7 +202,7 @@ func TestLegacyRewriter(t *testing.T) {
 			relation ab: user
 			relation foo /* missing allowed types */
 		}`
-		result, err := rw.RewriteSchema(schema)
+		result, err := rw.RewriteSchema(t.Context(), schema)
 		require.NoError(t, err)
 		require.Contains(t, result, "/* deleted short relation name */")
 		require.Contains(t, result, "/* deleted missing allowed type error */")
@@ -211,7 +211,7 @@ func TestLegacyRewriter(t *testing.T) {
 	t.Run("passthrough for valid schema", func(t *testing.T) {
 		rw := &LegacyRewriter{}
 		schema := "definition test/user { relation viewer: test/user }"
-		result, err := rw.RewriteSchema(schema)
+		result, err := rw.RewriteSchema(t.Context(), schema)
 		require.NoError(t, err)
 		require.Equal(t, schema, result)
 	})
@@ -269,7 +269,7 @@ func TestPrefixFiltererSchema(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			rw := &PrefixFilterer{Prefix: tt.prefix}
-			result, err := rw.RewriteSchema(tt.inputSchema)
+			result, err := rw.RewriteSchema(t.Context(), tt.inputSchema)
 			if tt.expectError != "" {
 				require.ErrorContains(t, err, tt.expectError)
 			} else {
@@ -327,7 +327,7 @@ func TestPrefixReplacerSchema(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			rw := &PrefixReplacer{replacements: tt.replacements}
-			result, err := rw.RewriteSchema(tt.inputSchema)
+			result, err := rw.RewriteSchema(t.Context(), tt.inputSchema)
 			if tt.expectError != "" {
 				require.ErrorContains(t, err, tt.expectError)
 			} else {
@@ -349,7 +349,7 @@ func TestChainRewriter(t *testing.T) {
 		}
 
 		schema := "definition test/user {}\n\ndefinition other/resource {}"
-		result, err := chain.RewriteSchema(schema)
+		result, err := chain.RewriteSchema(t.Context(), schema)
 		require.NoError(t, err)
 		require.Contains(t, result, "prod/user")
 		require.NotContains(t, result, "test/user")
@@ -407,7 +407,7 @@ func TestChainRewriter(t *testing.T) {
 		}
 
 		schema := "definition test/user {}"
-		_, err := chain.RewriteSchema(schema)
+		_, err := chain.RewriteSchema(t.Context(), schema)
 		require.ErrorContains(t, err, "filtered all definitions")
 	})
 
@@ -415,7 +415,7 @@ func TestChainRewriter(t *testing.T) {
 		chain := &ChainRewriter{rewriters: []Rewriter{}}
 
 		schema := "definition test/user {}"
-		result, err := chain.RewriteSchema(schema)
+		result, err := chain.RewriteSchema(t.Context(), schema)
 		require.NoError(t, err)
 		require.Equal(t, schema, result)
 

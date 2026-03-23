@@ -528,7 +528,7 @@ func backupParseSchemaCmdFunc(cmd *cobra.Command, out io.Writer, args []string) 
 	defer CloseAndJoin(&err, closer)
 	defer CloseAndJoin(&err, decoder)
 
-	schema, err := decoder.Schema()
+	schema, err := decoder.Schema(cmd.Context())
 	if err != nil {
 		return err
 	}
@@ -569,7 +569,7 @@ func backupRedactCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	defer CloseAndJoin(&err, writer)
 
-	redactor, err := backupformat.NewRedactor(decoder, writer, backupformat.RedactionOptions{
+	redactor, err := backupformat.NewRedactor(cmd.Context(), decoder, writer, backupformat.RedactionOptions{
 		RedactDefinitions: cobrautil.MustGetBool(cmd, "redact-definitions"),
 		RedactRelations:   cobrautil.MustGetBool(cmd, "redact-relations"),
 		RedactObjectIDs:   cobrautil.MustGetBool(cmd, "redact-object-ids"),

@@ -127,7 +127,7 @@ func TestWriteAndRead(t *testing.T) {
 			dec, err := NewDecoder(bytes.NewReader(buf.Bytes()))
 			require.NoError(err)
 
-			schema, err := dec.Schema()
+			schema, err := dec.Schema(t.Context())
 			require.NoError(err)
 			require.Equal(expectedSchema, schema)
 			zedtoken, err := dec.ZedToken()

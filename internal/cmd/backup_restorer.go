@@ -94,7 +94,7 @@ func newRestorer(decoder backupformat.Decoder, client client.Client, batchSize u
 }
 
 func (r *restorer) restoreFromDecoder(ctx context.Context) error {
-	schema, err := r.decoder.Schema()
+	schema, err := r.decoder.Schema(ctx)
 	if err != nil {
 		return err
 	}

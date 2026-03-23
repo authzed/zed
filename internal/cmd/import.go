@@ -112,7 +112,7 @@ func importSchema(ctx context.Context, client v1.SchemaServiceClient, schema str
 	log.Info().Msg("importing schema")
 
 	// Recompile the schema with the specified prefix.
-	schemaText, err := rewriteSchema(schema, definitionPrefix)
+	schemaText, err := rewriteSchema(ctx, schema, definitionPrefix)
 	if err != nil {
 		return err
 	}

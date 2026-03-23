@@ -47,7 +47,7 @@ func RewriterFromFlags(cmd *cobra.Command) Rewriter {
 // Rewriter is used to transform a backup while encoding or decoding.
 type Rewriter interface {
 	// RewriteSchema transforms a schema.
-	RewriteSchema(schema string) (string, error)
+	RewriteSchema(ctx context.Context, schema string) (string, error)
 
 	// RewriteRelationship transforms a relationship or returns nil to signal
 	// its removal.
@@ -65,7 +65,10 @@ var (
 // NoopRewriter is a rewriter that returns the schema and relationships unchanged.
 type NoopRewriter struct{}
 
-func (n *NoopRewriter) RewriteSchema(schema string) (string, error) { return schema, nil }
+func (n *NoopRewriter) RewriteSchema(_ context.Context, schema string) (string, error) {
+	return schema, nil
+}
+
 func (n *NoopRewriter) RewriteRelationship(r *v1.Relationship) (*v1.Relationship, error) {
 	return r.CloneVT(), nil
 }
@@ -76,10 +79,10 @@ type ChainRewriter struct {
 	rewriters []Rewriter
 }
 
-func (cr *ChainRewriter) RewriteSchema(schema string) (string, error) {
+func (cr *ChainRewriter) RewriteSchema(ctx context.Context, schema string) (string, error) {
 	var err error
 	for _, rw := range cr.rewriters {
-		schema, err = rw.RewriteSchema(schema)
+		schema, err = rw.RewriteSchema(ctx, schema)
 		if err != nil {
 			return "", err
 		}
@@ -120,7 +123,7 @@ var (
 )
 
 // TODO: what are these changes and why are they necessary?
-func (lr *LegacyRewriter) RewriteSchema(schema string) (string, error) {
+func (lr *LegacyRewriter) RewriteSchema(_ context.Context, schema string) (string, error) {
 	schema = string(missingAllowedTypes.ReplaceAll([]byte(schema), []byte("\n/* deleted missing allowed type error */")))
 	schema = string(shortRelations.ReplaceAll([]byte(schema), []byte("\n/* deleted short relation name */")))
 	return schema, nil
@@ -138,7 +141,7 @@ func (sf *PrefixFilterer) MarshalZerologObject(e *zerolog.Event) {
 	e.Str("prefix", sf.Prefix).Uint64("skippedRels", sf.skipped).Uint64("keptRels", sf.kept)
 }
 
-func (sf *PrefixFilterer) RewriteSchema(schema string) (string, error) {
+func (sf *PrefixFilterer) RewriteSchema(ctx context.Context, schema string) (string, error) {
 	if schema == "" || sf.Prefix == "" {
 		return schema, nil
 	}
@@ -161,7 +164,7 @@ func (sf *PrefixFilterer) RewriteSchema(schema string) (string, error) {
 		}
 	}
 
-	return validateAndCompileDefs(defs)
+	return validateAndCompileDefs(ctx, defs)
 }
 
 func (sf *PrefixFilterer) RewriteRelationship(r *v1.Relationship) (*v1.Relationship, error) {
@@ -192,7 +195,7 @@ func (pr *PrefixReplacer) replaceName(name string) string {
 	return name
 }
 
-func (pr *PrefixReplacer) RewriteSchema(schema string) (string, error) {
+func (pr *PrefixReplacer) RewriteSchema(ctx context.Context, schema string) (string, error) {
 	if schema == "" {
 		return schema, nil
 	}
@@ -234,7 +237,7 @@ func (pr *PrefixReplacer) RewriteSchema(schema string) (string, error) {
 		defs = append(defs, newDef)
 	}
 
-	return validateAndCompileDefs(defs)
+	return validateAndCompileDefs(ctx, defs)
 }
 
 func (pr *PrefixReplacer) RewriteRelationship(r *v1.Relationship) (*v1.Relationship, error) {
@@ -265,12 +268,12 @@ func compileSchema(schema string) (*compiler.CompiledSchema, error) {
 	)
 }
 
-func validateAndCompileDefs(defs []compiler.SchemaDefinition) (string, error) {
+func validateAndCompileDefs(ctx context.Context, defs []compiler.SchemaDefinition) (string, error) {
 	if len(defs) == 0 {
 		return "", errors.New("filtered all definitions from schema")
 	}
 
-	schema, _, err := generator.GenerateSchema(defs)
+	schema, _, err := generator.GenerateSchema(ctx, defs)
 	if err != nil {
 		return "", fmt.Errorf("error generating processed schema: %w", err)
 	}
