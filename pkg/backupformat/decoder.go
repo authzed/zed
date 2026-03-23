@@ -1,6 +1,7 @@
 package backupformat
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -60,7 +61,7 @@ func NewDecoder(r io.Reader) (*OcfDecoder, error) {
 }
 
 type Decoder interface {
-	Schema() (string, error)
+	Schema(ctx context.Context) (string, error)
 	ZedToken() (*v1.ZedToken, error)
 	Next() (*v1.Relationship, error)
 }
@@ -75,12 +76,12 @@ type RewriteDecoder struct {
 	Decoder
 }
 
-func (d *RewriteDecoder) Schema() (string, error) {
-	schema, err := d.Decoder.Schema()
+func (d *RewriteDecoder) Schema(ctx context.Context) (string, error) {
+	schema, err := d.Decoder.Schema(ctx)
 	if err != nil {
 		return "", err
 	}
-	return d.RewriteSchema(schema)
+	return d.RewriteSchema(ctx, schema)
 }
 
 func (d *RewriteDecoder) Next() (*v1.Relationship, error) {
@@ -111,9 +112,9 @@ type OcfDecoder struct {
 	zedToken *v1.ZedToken
 }
 
-func (d *OcfDecoder) Schema() (string, error)         { return d.schema, nil }
-func (d *OcfDecoder) ZedToken() (*v1.ZedToken, error) { return d.zedToken, nil }
-func (d *OcfDecoder) Close() error                    { return nil }
+func (d *OcfDecoder) Schema(_ context.Context) (string, error) { return d.schema, nil }
+func (d *OcfDecoder) ZedToken() (*v1.ZedToken, error)          { return d.zedToken, nil }
+func (d *OcfDecoder) Close() error                             { return nil }
 
 func (d *OcfDecoder) Next() (*v1.Relationship, error) {
 	if !d.dec.HasNext() {

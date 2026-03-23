@@ -1,6 +1,7 @@
 package backupformat
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -71,13 +72,13 @@ func (rm RedactionMap) Invert() RedactionMap {
 }
 
 // NewRedactor creates a new redactor that will redact the data as it is written.
-func NewRedactor(dec Decoder, w io.Writer, opts RedactionOptions) (*Redactor, error) {
-	schema, err := dec.Schema()
+func NewRedactor(ctx context.Context, dec Decoder, w io.Writer, opts RedactionOptions) (*Redactor, error) {
+	schema, err := dec.Schema(ctx)
 	if err != nil {
 		return nil, err
 	}
 	// Rewrite the schema to redact as requested.
-	redactedSchema, redactionMap, err := redactSchema(schema, opts)
+	redactedSchema, redactionMap, err := redactSchema(ctx, schema, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +147,7 @@ func (r *Redactor) Close() error {
 	return nil
 }
 
-func redactSchema(schema string, opts RedactionOptions) (string, RedactionMap, error) {
+func redactSchema(ctx context.Context, schema string, opts RedactionOptions) (string, RedactionMap, error) {
 	// Parse the schema.
 	compiled, err := compiler.Compile(compiler.InputSchema{
 		Source:       input.Source("schema"),
@@ -250,7 +251,7 @@ func redactSchema(schema string, opts RedactionOptions) (string, RedactionMap, e
 	}
 
 	// Generate the schema string.
-	generated, _, err := generator.GenerateSchema(compiled.OrderedDefinitions)
+	generated, _, err := generator.GenerateSchema(ctx, compiled.OrderedDefinitions)
 	return generated, redactionMap, err
 }
 

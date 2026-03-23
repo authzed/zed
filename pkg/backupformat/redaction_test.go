@@ -251,7 +251,7 @@ func TestRedactSchema(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			out, redactionMap, err := redactSchema(tc.in, tc.opts)
+			out, redactionMap, err := redactSchema(t.Context(), tc.in, tc.opts)
 			require.NoError(t, err)
 			require.Equal(t, tc.out, out)
 			require.Equal(t, tc.redactionMap, redactionMap)
@@ -358,7 +358,7 @@ func TestRedactBackup(t *testing.T) {
 	decoder, err := NewDecoder(bytes.NewReader(buf.Bytes()))
 	require.NoError(t, err)
 
-	r, err := NewRedactor(decoder, &redactedBuf, RedactionOptions{
+	r, err := NewRedactor(t.Context(), decoder, &redactedBuf, RedactionOptions{
 		RedactDefinitions: true,
 		RedactRelations:   true,
 		RedactObjectIDs:   true,
@@ -381,7 +381,7 @@ func TestRedactBackup(t *testing.T) {
 	redactedDecoder, err := NewDecoder(bytes.NewReader(redactedBuf.Bytes()))
 	require.NoError(t, err)
 
-	schema, err := redactedDecoder.Schema()
+	schema, err := redactedDecoder.Schema(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, "definition def0 {}\n\ndefinition def1 {\n\trelation rel3: def0\n}\n\ndefinition def2 {\n\trelation rel4: def0 | def0:*\n\tpermission rel5 = rel4\n}", schema)
 
