@@ -205,7 +205,7 @@ func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringPara
 		schemaDefinitions = append(schemaDefinitions, schemaDef)
 	}
 
-	schemaText, _, err := generator.GenerateSchema(schemaDefinitions)
+	schemaText, _, err := generator.GenerateSchema(ctx, schemaDefinitions)
 	if err != nil {
 		return zedCommandResult{Error: err.Error()}
 	}

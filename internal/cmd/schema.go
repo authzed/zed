@@ -237,7 +237,7 @@ func schemaCopyInner(ctx context.Context, srcClient, destClient v1.SchemaService
 		return nil, err
 	}
 
-	schemaText, err := rewriteSchema(readResp.SchemaText, prefix)
+	schemaText, err := rewriteSchema(ctx, readResp.SchemaText, prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +291,7 @@ func schemaWriteCmdImpl(cmd *cobra.Command, args []string, client v1.SchemaServi
 		return err
 	}
 
-	schemaText, err := rewriteSchema(string(schemaBytes), prefix)
+	schemaText, err := rewriteSchema(cmd.Context(), string(schemaBytes), prefix)
 	if err != nil {
 		return err
 	}
@@ -318,7 +318,7 @@ func schemaWriteCmdImpl(cmd *cobra.Command, args []string, client v1.SchemaServi
 }
 
 // rewriteSchema rewrites the given existing schema to include the specified prefix on all definitions and caveats.
-func rewriteSchema(existingSchemaText string, definitionPrefix string) (string, error) {
+func rewriteSchema(ctx context.Context, existingSchemaText string, definitionPrefix string) (string, error) {
 	if definitionPrefix == "" {
 		return existingSchemaText, nil
 	}
@@ -332,7 +332,7 @@ func rewriteSchema(existingSchemaText string, definitionPrefix string) (string, 
 		return "", err
 	}
 
-	generated, _, err := generator.GenerateSchema(compiled.OrderedDefinitions)
+	generated, _, err := generator.GenerateSchema(ctx, compiled.OrderedDefinitions)
 	return generated, err
 }
 
@@ -415,12 +415,12 @@ func schemaCompileOuter(cmd *cobra.Command, args []string) (bool, error) {
 		}()
 	}
 
-	return toStdout, schemaCompileInner(args, outputFile)
+	return toStdout, schemaCompileInner(cmd.Context(), args, outputFile)
 }
 
 // Compiles an input schema written in the new composable schema syntax
 // and produces it as a fully-realized schema
-func schemaCompileInner(args []string, writer io.Writer) error {
+func schemaCompileInner(ctx context.Context, args []string, writer io.Writer) error {
 	inputFilepath := args[0]
 	inputSourceFolder := filepath.Dir(inputFilepath)
 	schemaBytes, err := os.ReadFile(inputFilepath)
@@ -443,7 +443,7 @@ func schemaCompileInner(args []string, writer io.Writer) error {
 	}
 
 	// Generate the schema, which compiles over import and partial syntax
-	generated, _, err := generator.GenerateSchema(compiled.OrderedDefinitions)
+	generated, _, err := generator.GenerateSchema(ctx, compiled.OrderedDefinitions)
 	if err != nil {
 		return fmt.Errorf("could not generate resulting schema: %w", err)
 	}

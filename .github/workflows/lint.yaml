@@ -95,7 +95,8 @@ jobs:
           fi
           echo "IMAGE_VERSION=$IMAGE_VERSION" >> $GITHUB_ENV
       - name: "run trivy on release image"
-        run: "docker run -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --format table --exit-code 1 --ignore-unfixed --vuln-type os,library --no-progress --severity CRITICAL,HIGH,MEDIUM authzed/zed:v${{ env.IMAGE_VERSION }}-amd64 --db-repository public.ecr.aws/aquasecurity/trivy-db --java-db-repository public.ecr.aws/aquasecurity/trivy-java-db"
+        # TODO: unpin trivy
+        run: "docker run -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.69.3 image --format table --exit-code 1 --ignore-unfixed --vuln-type os,library --no-progress --severity CRITICAL,HIGH,MEDIUM authzed/zed:v${{ env.IMAGE_VERSION }}-amd64 --db-repository public.ecr.aws/aquasecurity/trivy-db --java-db-repository public.ecr.aws/aquasecurity/trivy-java-db"
 
   conventional-commits:
     name: "Lint Commit Messages"

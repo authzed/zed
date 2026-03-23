@@ -129,7 +129,7 @@ func TestFilterSchemaDefs(t *testing.T) {
 			tt := tt
 			t.Parallel()
 
-			outputSchema, err := (&backupformat.PrefixFilterer{Prefix: tt.inputPrefix}).RewriteSchema(tt.inputSchema)
+			outputSchema, err := (&backupformat.PrefixFilterer{Prefix: tt.inputPrefix}).RewriteSchema(t.Context(), tt.inputSchema)
 			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
 			} else {
@@ -496,7 +496,7 @@ func validateBackupWithFunc(t testing.TB, backupFileName, schema string, token *
 		_ = closer.Close()
 	})
 
-	decodedSchema, err := d.Schema()
+	decodedSchema, err := d.Schema(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, schema, decodedSchema)
 
