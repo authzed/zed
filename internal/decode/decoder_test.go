@@ -94,6 +94,8 @@ func TestUnmarshalYAMLValidationFile(t *testing.T) {
 
 	// Write real files to a temp directory so DecoderFromURL -> decoderFromFile is exercised.
 	dir := t.TempDir()
+	// Change the directory to that directory so that expectations of locality are satisfied
+	t.Chdir(dir)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "schema.zed"), []byte(schemaContent), 0o600))
 
 	tests := []struct {
@@ -126,7 +128,7 @@ relationships: |-
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := filepath.Join(dir, tt.name+".yaml")
+			f := tt.name + ".yaml"
 			require.NoError(t, os.WriteFile(f, []byte(tt.yamlContent), 0o600))
 			u, err := url.Parse(f)
 			require.NoError(t, err)
@@ -141,7 +143,6 @@ relationships: |-
 			}
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedSchema, vFile.Schema.Schema)
-			require.Empty(t, vFile.SchemaFile)
 			require.Equal(t, tt.expectedRels, vFile.Relationships.RelationshipsString)
 		})
 	}
@@ -259,7 +260,6 @@ func TestRewriteURL(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			rewriteURL(&tt.in)
 			require.Equal(t, tt.out, tt.in)

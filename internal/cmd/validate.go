@@ -89,6 +89,7 @@ func registerValidateCmd(cmd *cobra.Command) {
 
 	validateCmd.Flags().Bool("force-color", false, "force color code output even in non-tty environments")
 	validateCmd.Flags().Bool("fail-on-warn", false, "treat warnings as errors during validation")
+	validateCmd.Flags().String("type", "", "the type of the validated file. valid options are \"zed\" and \"yaml\"")
 	cmd.AddCommand(validateCmd)
 }
 
@@ -113,9 +114,32 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		shouldExit                 = false
 		toPrint                    = &strings.Builder{}
 		failOnWarn                 = cobrautil.MustGetBool(cmd, "fail-on-warn")
+		fileTypeArg                = cobrautil.MustGetString(cmd, "type")
+		fileType                   = decode.FileTypeUnknown
 	)
 
 	for _, filename := range filenames {
+		// Make a guess as to the filetype based on file extension
+		ext := filepath.Ext(filename)
+		switch ext {
+		case ".zed":
+			fileType = decode.FileTypeZed
+		case ".yml", ".yaml":
+			fileType = decode.FileTypeYaml
+		}
+
+		// Use the filetype arg if present
+		if fileTypeArg != "" {
+			switch fileTypeArg {
+			case "yaml":
+				fileType = decode.FileTypeYaml
+			case "zed":
+				fileType = decode.FileTypeZed
+			default:
+				return "", true, fmt.Errorf("invalid value \"%s\" for --type. valid options are \"zed\" and \"yaml\"", fileTypeArg)
+			}
+		}
+
 		// If we're running over multiple files, print the filename for context/debugging purposes
 		if totalFiles > 1 {
 			toPrint.WriteString(filename + "\n")
@@ -140,18 +164,11 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		}
 		filesystem := os.DirFS(fileDir)
 
-		// Parse the zed or YAML file
-		fileType := ".zed"
-		ext := filepath.Ext(filename)
-		if ext != "" {
-			fileType = ext
-		}
-
 		var parsed *validationfile.ValidationFile
 		switch fileType {
-		case ".yaml", ".yml":
+		case decode.FileTypeYaml:
 			parsed, err = d.UnmarshalYAMLValidationFile()
-		case ".zed":
+		case decode.FileTypeZed:
 			parsed = d.UnmarshalSchemaValidationFile()
 		default:
 			parsed, err = d.UnmarshalAsYAMLOrSchema()
@@ -186,10 +203,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			return "", false, err
 		}
 		if devErrs != nil {
-			schemaOffset := 0
-			if fileType != ".zed" {
-				schemaOffset = parsed.Schema.SourcePosition.LineNumber
-			}
+			schemaOffset := parsed.Schema.SourcePosition.LineNumber
 
 			// Output errors
 			outputDeveloperErrorsWithLineOffset(toPrint, validateContents, devErrs.InputErrors, schemaOffset, filesystem)

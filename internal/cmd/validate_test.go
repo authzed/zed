@@ -50,6 +50,7 @@ func TestValidatePreRun(t *testing.T) {
 	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
 		zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
 		zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
+		zedtesting.StringFlag{FlagName: "type", FlagValue: ""},
 	)
 
 	err := validatePreRunE(cmd, []string{})
@@ -294,6 +295,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
 				zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 				zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
+				zedtesting.StringFlag{FlagName: "type", FlagValue: ""},
 			)
 
 			res, shouldError, err := validateCmdFunc(cmd, tc.files)
@@ -319,6 +321,7 @@ func TestFailOnWarn(t *testing.T) {
 		zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
 		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100}, zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 		zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
+		zedtesting.StringFlag{FlagName: "type", FlagValue: ""},
 	)
 
 	_, shouldError, _ := validateCmdFunc(cmd, []string{filepath.Join("validate-test", "schema-with-warnings.zed")})
@@ -330,6 +333,7 @@ func TestFailOnWarn(t *testing.T) {
 		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
 		zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 		zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: true},
+		zedtesting.StringFlag{FlagName: "type", FlagValue: ""},
 	)
 
 	_, shouldError, _ = validateCmdFunc(cmd, []string{filepath.Join("validate-test", "schema-with-warnings.zed")})

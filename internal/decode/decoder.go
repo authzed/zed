@@ -64,11 +64,19 @@ func DecoderFromURL(u *url.URL) (*Decoder, error) {
 }
 
 func decoderFromFile(u *url.URL) (*Decoder, error) {
-	filePath := u.Path
-	data, err := os.ReadFile(filePath) //nolint:gosec // not an issue
+	filePath := filepath.Clean(u.Path)
+
+	invocationFS := os.DirFS(".")
+	file, err := invocationFS.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
 	dir := filepath.Dir(filePath)
 	return &Decoder{
 		Contents: data,
@@ -176,7 +184,6 @@ func (d *Decoder) UnmarshalYAMLValidationFile() (*validationfile.ValidationFile,
 		if err != nil {
 			return nil, err
 		}
-		validationFile.SchemaFile = ""
 		validationFile.Schema = blocks.SchemaWithPosition{
 			SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
 			Schema:         string(schemaBytes),
@@ -190,7 +197,9 @@ func (d *Decoder) UnmarshalYAMLValidationFile() (*validationfile.ValidationFile,
 func (d *Decoder) UnmarshalSchemaValidationFile() *validationfile.ValidationFile {
 	return &validationfile.ValidationFile{
 		Schema: blocks.SchemaWithPosition{
-			SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
+			// If the file is just a schema file, we set the LineNumber offset to 0
+			// for the purposes of displaying errors.
+			SourcePosition: spiceerrors.SourcePosition{LineNumber: 0, ColumnPosition: 1},
 			Schema:         string(d.Contents),
 		},
 	}
