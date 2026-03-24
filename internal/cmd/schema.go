@@ -18,8 +18,6 @@ import (
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/caveats/types"
-	newcompiler "github.com/authzed/spicedb/pkg/composableschemadsl/compiler"
-	newinput "github.com/authzed/spicedb/pkg/composableschemadsl/input"
 	"github.com/authzed/spicedb/pkg/diff"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
@@ -435,27 +433,17 @@ func schemaCompileInner(ctx context.Context, args []string, writer io.Writer) er
 		return errors.New("attempted to compile empty schema")
 	}
 
-	compiled, err := newcompiler.Compile(newcompiler.InputSchema{
-		Source:       newinput.Source(inputFilepath),
+	compiled, err := compiler.Compile(compiler.InputSchema{
+		Source:       input.Source(inputFilepath),
 		SchemaString: string(schemaBytes),
-	}, newcompiler.AllowUnprefixedObjectType(),
-		newcompiler.SourceFolder(inputSourceFolder))
+	}, compiler.AllowUnprefixedObjectType(),
+		compiler.SourceFolder(inputSourceFolder))
 	if err != nil {
 		return err
 	}
 
-	// Attempt to cast one kind of OrderedDefinition to another
-	oldDefinitions := make([]compiler.SchemaDefinition, 0, len(compiled.OrderedDefinitions))
-	for _, definition := range compiled.OrderedDefinitions {
-		oldDefinition, ok := definition.(compiler.SchemaDefinition)
-		if !ok {
-			return fmt.Errorf("could not convert definition to old schemadefinition: %v", oldDefinition)
-		}
-		oldDefinitions = append(oldDefinitions, oldDefinition)
-	}
-
-	// This is where we functionally assert that the two systems are compatible
-	generated, _, err := generator.GenerateSchema(ctx, oldDefinitions)
+	// Generate the schema, which compiles over import and partial syntax
+	generated, _, err := generator.GenerateSchema(ctx, compiled.OrderedDefinitions)
 	if err != nil {
 		return fmt.Errorf("could not generate resulting schema: %w", err)
 	}
