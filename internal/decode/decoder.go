@@ -66,8 +66,7 @@ func DecoderFromURL(u *url.URL) (*Decoder, error) {
 func decoderFromFile(u *url.URL) (*Decoder, error) {
 	filePath := filepath.Clean(u.Path)
 
-	invocationFS := os.DirFS(".")
-	file, err := invocationFS.Open(filePath)
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}

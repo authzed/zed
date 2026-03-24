@@ -128,7 +128,7 @@ relationships: |-
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := tt.name + ".yaml"
+			f := filepath.Join(dir, tt.name+".yaml")
 			require.NoError(t, os.WriteFile(f, []byte(tt.yamlContent), 0o600))
 			u, err := url.Parse(f)
 			require.NoError(t, err)

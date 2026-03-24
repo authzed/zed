@@ -89,7 +89,7 @@ func registerValidateCmd(cmd *cobra.Command) {
 
 	validateCmd.Flags().Bool("force-color", false, "force color code output even in non-tty environments")
 	validateCmd.Flags().Bool("fail-on-warn", false, "treat warnings as errors during validation")
-	validateCmd.Flags().String("type", "", "the type of the validated file. valid options are \"zed\" and \"yaml\"")
+	validateCmd.Flags().String("type", "", "the type of the validated file. use this when zed cannot auto-detect the format of the file properly. valid options are \"zed\" and \"yaml\"")
 	cmd.AddCommand(validateCmd)
 }
 
