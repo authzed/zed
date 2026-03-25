@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -33,37 +32,54 @@ var (
 	playgroundPattern = regexp.MustCompile("^.*/s/.*/schema|relationships|assertions|expected.*$")
 )
 
+type FileType int
+
 const (
-	FileTypeUnknown = iota
+	FileTypeUnknown FileType = iota
 	FileTypeYaml
 	FileTypeZed
 )
 
-// Decoder holds fetched file contents along with a filesystem for resolving
-// relative paths (e.g. schemaFile references). For remote URLs the filesystem
-// is nil because relative file references are not supported.
-type Decoder struct {
-	Contents []byte
-	// FS is rooted at the directory of the fetched file. It is non-nil only
-	// for local (file://) URLs.
-	FS fs.FS
-}
+type SourceType int
 
-// DecoderFromURL interprets the URL, fetches the content, and returns a
-// Decoder. For local files the Decoder's FS is rooted at the file's directory
-// so that relative schemaFile paths can be resolved.
-func DecoderFromURL(u *url.URL) (*Decoder, error) {
+const (
+	SourceTypeUnknown SourceType = iota
+	SourceTypeFile
+	SourceTypeHTTP
+)
+
+func SourceTypeFromURL(u *url.URL) (SourceType, error) {
 	switch s := u.Scheme; s {
 	case "", "file":
-		return decoderFromFile(u)
+		return SourceTypeFile, nil
 	case "http", "https":
-		return decoderFromHTTP(u)
+		return SourceTypeHTTP, nil
 	default:
-		return nil, fmt.Errorf("%s scheme not supported", s)
+		return SourceTypeUnknown, fmt.Errorf("%s scheme not supported", s)
 	}
 }
 
-func decoderFromFile(u *url.URL) (*Decoder, error) {
+// FetchFromURL interprets the URL, fetches the content, and returns
+// the bytes.
+func FetchFromURL(u *url.URL) ([]byte, error) {
+	sourceType, err := SourceTypeFromURL(u)
+	if err != nil {
+		return nil, err
+	}
+
+	switch sourceType {
+	case SourceTypeFile:
+		return FetchFromFile(u)
+	case SourceTypeHTTP:
+		return FetchFromHTTP(u)
+	default:
+		// NOTE: this should not be hit, because `SourceTypeFromURL`
+		// should cover this case.
+		return nil, errors.New("unknown source type")
+	}
+}
+
+func FetchFromFile(u *url.URL) ([]byte, error) {
 	filePath := filepath.Clean(u.Path)
 
 	file, err := os.Open(filePath)
@@ -71,28 +87,12 @@ func decoderFromFile(u *url.URL) (*Decoder, error) {
 		return nil, err
 	}
 
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-
-	dir := filepath.Dir(filePath)
-	return &Decoder{
-		Contents: data,
-		FS:       os.DirFS(dir),
-	}, nil
+	return io.ReadAll(file)
 }
 
-func decoderFromHTTP(u *url.URL) (*Decoder, error) {
+func FetchFromHTTP(u *url.URL) ([]byte, error) {
 	rewriteURL(u)
-	data, err := fetchHTTPDirectly(u)
-	if err != nil {
-		return nil, err
-	}
-	return &Decoder{
-		Contents: data,
-		FS:       nil,
-	}, nil
+	return fetchHTTPDirectly(u)
 }
 
 func rewriteURL(u *url.URL) {
@@ -134,8 +134,8 @@ var ErrInvalidYamlTryZed = errors.New("invalid yaml")
 
 // UnmarshalAsYAMLOrSchema tries to unmarshal as YAML first, falling back to
 // treating the contents as a raw schema.
-func (d *Decoder) UnmarshalAsYAMLOrSchema() (*validationfile.ValidationFile, error) {
-	vFile, err := d.UnmarshalYAMLValidationFile()
+func UnmarshalAsYAMLOrSchema(contents []byte) (*validationfile.ValidationFile, error) {
+	vFile, err := UnmarshalYAMLValidationFile(contents)
 	if err == nil {
 		return vFile, nil
 	}
@@ -143,13 +143,13 @@ func (d *Decoder) UnmarshalAsYAMLOrSchema() (*validationfile.ValidationFile, err
 		return nil, err
 	}
 
-	return d.UnmarshalSchemaValidationFile(), nil
+	return UnmarshalSchemaValidationFile(contents), nil
 }
 
-// UnmarshalYAMLValidationFile unmarshals YAML validation file contents. If the
-// YAML contains a schemaFile reference, the Decoder's FS is used to resolve it.
-func (d *Decoder) UnmarshalYAMLValidationFile() (*validationfile.ValidationFile, error) {
-	inputString := string(d.Contents)
+// UnmarshalYAMLValidationFile unmarshals YAML validation file contents into a ValidationFile
+// struct.
+func UnmarshalYAMLValidationFile(contents []byte) (*validationfile.ValidationFile, error) {
+	inputString := string(contents)
 
 	// Only attempt YAML unmarshaling if the input looks like a YAML validation file.
 	if !hasYAMLSchemaKey(inputString) && !hasYAMLSchemaFileKey(inputString) && !yamlRelationshipsKeyPattern.MatchString(inputString) {
@@ -157,49 +157,106 @@ func (d *Decoder) UnmarshalYAMLValidationFile() (*validationfile.ValidationFile,
 	}
 
 	var validationFile validationfile.ValidationFile
-	err := yaml.Unmarshal(d.Contents, &validationFile)
+	err := yaml.Unmarshal(contents, &validationFile)
 	if err != nil {
 		return nil, err
 	}
 
-	// If schemaFile is specified, resolve it using the Decoder's filesystem.
-	if validationFile.SchemaFile != "" {
-		// Clean the path for use with fs.FS (which doesn't accept ./ prefix).
-		schemaPath := filepath.Clean(validationFile.SchemaFile)
+	return &validationFile, nil
+}
 
-		if !filepath.IsLocal(schemaPath) {
-			return nil, fmt.Errorf("schema filepath %q must be local to where the command was invoked", schemaPath)
-		}
+// ValidationFileFromFilename takes a filename and a desired/expected FileType and
+// returns the contents fetched from the filename and the associated validationFile.
+func ValidationFileFromFilename(filename string, fileType FileType) (vfile *validationfile.ValidationFile, contents []byte, err error) {
+	u, err := url.Parse(filename)
+	if err != nil {
+		return nil, nil, err
+	}
 
-		if d.FS == nil {
-			return nil, fmt.Errorf("cannot resolve schemaFile %q: no local filesystem context (remote URL?)", schemaPath)
-		}
+	sourceType, err := SourceTypeFromURL(u)
+	if err != nil {
+		return nil, nil, err
+	}
 
-		file, err := d.FS.Open(schemaPath)
+	contents, err = FetchFromURL(u)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var parsed *validationfile.ValidationFile
+	switch fileType {
+	case FileTypeYaml:
+		parsed, err = UnmarshalYAMLValidationFile(contents)
+	case FileTypeZed:
+		parsed = UnmarshalSchemaValidationFile(contents)
+	default:
+		parsed, err = UnmarshalAsYAMLOrSchema(contents)
+	}
+	// This block handles the error regardless of which case statement is hit
+	if err != nil {
+		return nil, nil, err
+	}
+
+	schemaPresent := parsed.Schema.Schema != ""
+	schemaFilePresent := parsed.SchemaFile != ""
+
+	// Ensure that either schema or schemaFile is present
+	if !schemaPresent && !schemaFilePresent {
+		return nil, nil, errors.New("either schema or schemaFile must be present")
+	}
+
+	if schemaPresent && schemaFilePresent {
+		return nil, nil, errors.New("schema and schemaFile keys are both defined; please choose one")
+	}
+
+	// We will refuse to read in a `schemaFile` key when the file is fetched from a remote resource
+	// We don't do this for HTTP-fetched ValidationFiles because we don't want them
+	// referencing files in the local filesystem.
+	if sourceType == SourceTypeHTTP && schemaFilePresent {
+		return nil, nil, errors.New("cannot use schemaFile key when fetched from a remote resource")
+	}
+
+	// Attach the SchemaFile if we're dealing with a local file
+	if sourceType == SourceTypeFile {
+		err = ResolveSchemaFileIfPresent(filename, parsed)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+	}
+
+	return parsed, contents, nil
+}
+
+// ResolveSchemaFileIfPresent takes a ValidationFile and if the SchemaFile key is present,
+// uses it to populate the `Schema` key.
+func ResolveSchemaFileIfPresent(filename string, validationFile *validationfile.ValidationFile) error {
+	if validationFile.SchemaFile != "" {
+		schemaPath := filepath.Clean(filepath.Join(filepath.Dir(filename), validationFile.SchemaFile))
+
+		file, err := os.Open(schemaPath)
+		if err != nil {
+			return err
 		}
 		schemaBytes, err := io.ReadAll(file)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		validationFile.Schema = blocks.SchemaWithPosition{
 			SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
 			Schema:         string(schemaBytes),
 		}
 	}
-
-	return &validationFile, nil
+	return nil
 }
 
 // UnmarshalSchemaValidationFile wraps raw schema bytes into a ValidationFile.
-func (d *Decoder) UnmarshalSchemaValidationFile() *validationfile.ValidationFile {
+func UnmarshalSchemaValidationFile(contents []byte) *validationfile.ValidationFile {
 	return &validationfile.ValidationFile{
 		Schema: blocks.SchemaWithPosition{
 			// If the file is just a schema file, we set the LineNumber offset to 0
 			// for the purposes of displaying errors.
 			SourcePosition: spiceerrors.SourcePosition{LineNumber: 0, ColumnPosition: 1},
-			Schema:         string(d.Contents),
+			Schema:         string(contents),
 		},
 	}
 }

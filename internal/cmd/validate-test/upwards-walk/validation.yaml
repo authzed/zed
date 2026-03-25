@@ -1,5 +1,5 @@
 ---
-schemaFile: "../some-schema.zed"
+schemaFile: "../external-schema.zed"
 relationships: >-
   resource:1#user@user:1
 assertions:

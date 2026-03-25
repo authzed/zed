@@ -1,0 +1,3 @@
+definition domain {
+  relation read: user
+}

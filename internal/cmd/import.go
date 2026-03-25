@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/jzelinskie/cobrautil/v2"
@@ -58,16 +57,12 @@ func registerImportCmd(rootCmd *cobra.Command) {
 			if err != nil {
 				return err
 			}
-			u, err := url.Parse(args[0])
-			if err != nil {
-				return err
-			}
 			prefix, err := determinePrefixForSchema(cmd.Context(), cobrautil.MustGetString(cmd, "schema-definition-prefix"), client, nil)
 			if err != nil {
 				return err
 			}
 			log.Trace().Msgf("using prefix: %s", prefix)
-			return importCmdFunc(cmd, client, client, prefix, u)
+			return importCmdFunc(cmd, client, client, prefix, args[0])
 		},
 	}
 
@@ -79,13 +74,9 @@ func registerImportCmd(rootCmd *cobra.Command) {
 	importCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before importing")
 }
 
-func importCmdFunc(cmd *cobra.Command, schemaClient v1.SchemaServiceClient, relationshipsClient v1.PermissionsServiceClient, prefix string, u *url.URL) error {
+func importCmdFunc(cmd *cobra.Command, schemaClient v1.SchemaServiceClient, relationshipsClient v1.PermissionsServiceClient, prefix, filename string) error {
 	prefix = strings.TrimRight(prefix, "/")
-	d, err := decode.DecoderFromURL(u)
-	if err != nil {
-		return err
-	}
-	p, err := d.UnmarshalYAMLValidationFile()
+	p, _, err := decode.ValidationFileFromFilename(filename, decode.FileTypeYaml)
 	if err != nil {
 		return err
 	}

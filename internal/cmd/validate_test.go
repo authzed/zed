@@ -123,7 +123,8 @@ Success! - 1 relationships loaded, 2 assertions run, 0 expected relations valida
 			files: []string{
 				filepath.Join("validate-test", "missing-schema.yaml"),
 			},
-			expectErr: "either schema or schemaFile must be present",
+			expectNonZeroStatusCode: true,
+			expectErr:               "either schema or schemaFile must be present",
 		},
 		`warnings_fail`: {
 			files: []string{
@@ -277,12 +278,17 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			expectNonZeroStatusCode: true,
 			expectStr:               "error: parse error in `unknownrel`, line 5, column 23: relation/permission `unknownrel` not found under definition `group`             \n 3 | definition group {\n 4 |     relation member: user\n 5 |     permission view = unknownrel\n 6 > }\n 7 | \n\n\n",
 		},
-		`yaml_with_schemaFile_escape_attempt_fails`: {
+		`yaml_with_schemaFile_can_traverse_up`: {
 			files: []string{
-				filepath.Join("validate-test", "external-schema-escape.yaml"),
+				filepath.Join("validate-test", "upwards-walk", "validation.yaml"),
 			},
-			expectNonZeroStatusCode: true,
-			expectErr:               `schema filepath "../some-schema.zed" must be local to where the command was invoked`,
+			expectStr: "Success! - 1 relationships loaded, 1 assertions run, 0 expected relations validated\n",
+		},
+		`yaml_with_schemaFile_can_traverse_sibling_directories`: {
+			files: []string{
+				filepath.Join("validate-test", "sibling-folders", "tests", "validation.yaml"),
+			},
+			expectStr: "Success! - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
 		},
 	}
 

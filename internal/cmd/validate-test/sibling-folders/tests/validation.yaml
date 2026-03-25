@@ -1,0 +1,5 @@
+---
+# This test is mostly asserting that path walking and
+# schema validation work correctly, so we don't have any
+# relations or assertions.
+schemaFile: "../schema/root.zed"
