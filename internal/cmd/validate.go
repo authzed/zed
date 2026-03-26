@@ -146,6 +146,19 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		if err != nil {
 			return "", true, err
 		}
+		if fileType == decode.FileTypeZed {
+			contents, readErr := os.ReadFile(filename)
+			if readErr == nil && decode.LooksLikeYAMLValidationFile(string(contents)) {
+				fmt.Fprintf(toPrint, "%sfile %q has a .zed extension but appears to be a YAML validation file.\n"+
+					"  Rename the file to use a .yaml extension, or use --type yaml to override:\n"+
+					"    zed validate %s --type yaml\n\n",
+					errorPrefix(), filename, filename,
+				)
+				shouldExit = true
+				continue
+			}
+		}
+
 		filesystem := os.DirFS(parsed.RootSchemaDir)
 
 		// This logic will use the zero value of the struct, so we don't need
