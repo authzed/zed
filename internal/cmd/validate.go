@@ -169,6 +169,15 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		case decode.FileTypeYaml:
 			parsed, err = d.UnmarshalYAMLValidationFile()
 		case decode.FileTypeZed:
+			if decode.LooksLikeYAMLValidationFile(string(d.Contents)) {
+				fmt.Fprintf(toPrint, "%sfile %q has a .zed extension but appears to be a YAML validation file.\n"+
+					"  Rename the file to use a .yaml extension, or use --type yaml to override:\n"+
+					"    zed validate %s --type yaml\n\n",
+					errorPrefix(), filename, filename,
+				)
+				shouldExit = true
+				continue
+			}
 			parsed = d.UnmarshalSchemaValidationFile()
 		default:
 			parsed, err = d.UnmarshalAsYAMLOrSchema()

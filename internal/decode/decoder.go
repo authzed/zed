@@ -152,7 +152,7 @@ func (d *Decoder) UnmarshalYAMLValidationFile() (*validationfile.ValidationFile,
 	inputString := string(d.Contents)
 
 	// Only attempt YAML unmarshaling if the input looks like a YAML validation file.
-	if !hasYAMLSchemaKey(inputString) && !hasYAMLSchemaFileKey(inputString) && !yamlRelationshipsKeyPattern.MatchString(inputString) {
+	if !LooksLikeYAMLValidationFile(inputString) {
 		return nil, fmt.Errorf("%w: input does not appear to be a YAML validation file", ErrInvalidYamlTryZed)
 	}
 
@@ -212,4 +212,11 @@ func hasYAMLSchemaKey(input string) bool {
 // hasYAMLSchemaFileKey returns true if the input contains a "schemaFile:" YAML key at the start of a line.
 func hasYAMLSchemaFileKey(input string) bool {
 	return yamlSchemaFileKeyPattern.MatchString(input)
+}
+
+// LooksLikeYAMLValidationFile returns true if the input appears to be a YAML
+// validation file based on the presence of top-level YAML keys (schema:,
+// schemaFile:, or relationships:).
+func LooksLikeYAMLValidationFile(input string) bool {
+	return hasYAMLSchemaKey(input) || hasYAMLSchemaFileKey(input) || yamlRelationshipsKeyPattern.MatchString(input)
 }
