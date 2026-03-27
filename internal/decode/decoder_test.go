@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+
+	"github.com/authzed/spicedb/pkg/spiceerrors"
 )
 
 const (
@@ -376,12 +378,26 @@ func TestValidationFileFromURL(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "schema.zed"), []byte(schemaContent), 0o600))
 
 	tests := []struct {
-		name            string
-		yamlContent     string
-		expectedSchema  string
-		expectedRels    string
-		expectedErrText string
+		name                   string
+		yamlContent            string
+		expectedSchema         string
+		expectedDisplayContent string
+		expectedSchemaFileName string
+		expectedDir            string
+		expectedSchemaOffset   spiceerrors.SourcePosition
+		expectedRels           string
+		expectedErrText        string
 	}{
+		{
+			name:                   "myfile",
+			yamlContent:            yamlContent,
+			expectedSchema:         `definition user {}`,
+			expectedDisplayContent: yamlContent,
+			expectedSchemaFileName: "myfile.yaml",
+			expectedDir:            filepath.Join(dir, "."),
+			expectedSchemaOffset:   spiceerrors.SourcePosition{LineNumber: 2, ColumnPosition: 9},
+			expectedRels:           "resource:1#reader@user:1",
+		},
 		{
 			name: "resolves_local_schemaFile",
 			yamlContent: `---
@@ -389,8 +405,12 @@ schemaFile: "./schema.zed"
 relationships: |-
   resource:1#reader@user:1
 `,
-			expectedSchema: schemaContent,
-			expectedRels:   "resource:1#reader@user:1",
+			expectedSchema:         schemaContent,
+			expectedDisplayContent: schemaContent,
+			expectedSchemaFileName: "schema.zed",
+			expectedDir:            filepath.Join(dir, "."),
+			expectedSchemaOffset:   spiceerrors.SourcePosition{LineNumber: 0, ColumnPosition: 1},
+			expectedRels:           "resource:1#reader@user:1",
 		},
 		{
 			name: "allows_schemaFile_pointing_to_above_directory",
@@ -401,8 +421,12 @@ schemaFile: "../%s/schema.zed"
 relationships: |-
   resource:1#reader@user:1
 `, dirName),
-			expectedSchema: schemaContent,
-			expectedRels:   "resource:1#reader@user:1",
+			expectedSchema:         schemaContent,
+			expectedDisplayContent: schemaContent,
+			expectedSchemaFileName: "schema.zed",
+			expectedDir:            filepath.Join(dir, "../"+dirName),
+			expectedSchemaOffset:   spiceerrors.SourcePosition{LineNumber: 0, ColumnPosition: 1},
+			expectedRels:           "resource:1#reader@user:1",
 		},
 		{
 			name: "neither schema nor schemafile present",
@@ -433,14 +457,18 @@ relationships: |-
 			f := filepath.Join(dir, tt.name+".yaml")
 			require.NoError(t, os.WriteFile(f, []byte(tt.yamlContent), 0o600))
 
-			vFile, _, err := ValidationFileFromFilename(f, FileTypeYaml)
+			vFile, err := ValidationFileFromFilename(f, FileTypeYaml)
 
 			if tt.expectedErrText != "" {
 				require.ErrorContains(t, err, tt.expectedErrText)
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, tt.expectedSchema, vFile.Schema.Schema)
+			require.Equal(t, tt.expectedSchema, vFile.Schema)
+			require.Equal(t, tt.expectedDisplayContent, string(vFile.DisplayContents))
+			require.Equal(t, tt.expectedSchemaFileName, vFile.SchemaFileName)
+			require.Equal(t, tt.expectedDir, vFile.RootSchemaDir)
+			require.Equal(t, tt.expectedSchemaOffset, vFile.SchemaOffset)
 			require.Equal(t, tt.expectedRels, vFile.Relationships.RelationshipsString)
 		})
 	}
@@ -454,7 +482,7 @@ func TestValidationFileFromURLWithHTTP(t *testing.T) {
 	serverURL := SetupTestServer(t)
 
 	t.Run("schema file does not get populated", func(t *testing.T) {
-		_, _, err := ValidationFileFromFilename(serverURL+"/valid-with-schemaFile.zed", FileTypeYaml)
+		_, err := ValidationFileFromFilename(serverURL+"/valid-with-schemaFile.zed", FileTypeYaml)
 		require.ErrorContains(t, err, "cannot use schemaFile key")
 	})
 }

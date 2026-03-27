@@ -142,10 +142,11 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			toPrint.WriteString(filename + "\n")
 		}
 
-		parsed, contents, err := decode.ValidationFileFromFilename(filename, fileType)
+		parsed, err := decode.ValidationFileFromFilename(filename, fileType)
 		if err != nil {
 			return "", true, err
 		}
+		filesystem := os.DirFS(parsed.RootSchemaDir)
 
 		// This logic will use the zero value of the struct, so we don't need
 		// to do it conditionally.
@@ -157,37 +158,20 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			tuples = append(tuples, rel.ToCoreTuple())
 		}
 
-		// Root the filesystem at the directory containing the schema file, so
-		// that relative schema imports resolve correctly.
-		fileDir := filepath.Dir(filename)
-		if fileDir == "" {
-			fileDir = "."
-		}
-		if parsed.SchemaFile != "" {
-			// If the schemaFile is nonempty, we want to make sure that the import
-			// filesystem is rooted in the dir of that schemafile.
-			// TODO: it seems like there ought to be a better way to handle this.
-			fileDir = filepath.Join(fileDir, filepath.Dir(parsed.SchemaFile))
-		}
-		filesystem := os.DirFS(fileDir)
-
 		// Create the development context for each run
 		ctx := cmd.Context()
 		devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
-			Schema:        parsed.Schema.Schema,
+			Schema:        parsed.Schema,
 			Relationships: tuples,
-		}, development.WithSourceFS(filesystem), development.WithRootFileName(filepath.Base(filename)))
+		}, development.WithSourceFS(filesystem), development.WithRootFileName(parsed.SchemaFileName))
 		if err != nil {
 			return "", false, err
 		}
 		if devErrs != nil {
-			schemaOffset := parsed.Schema.SourcePosition.LineNumber
-			if parsed.SchemaFile != "" {
-				contents = []byte(parsed.Schema.Schema)
-			}
+			schemaOffset := parsed.SchemaOffset.LineNumber
 
 			// Output errors
-			outputDeveloperErrorsWithLineOffset(toPrint, contents, devErrs.InputErrors, schemaOffset, filesystem)
+			outputDeveloperErrorsWithLineOffset(toPrint, parsed.DisplayContents, devErrs.InputErrors, schemaOffset, filesystem)
 			return toPrint.String(), true, nil
 		}
 		// Run assertions
@@ -196,7 +180,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			return "", false, aerr
 		}
 		if adevErrs != nil {
-			outputDeveloperErrors(toPrint, contents, adevErrs, filesystem)
+			outputDeveloperErrors(toPrint, parsed.DisplayContents, adevErrs, filesystem)
 			return toPrint.String(), true, nil
 		}
 		successfullyValidatedFiles++
@@ -207,7 +191,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			return "", false, rerr
 		}
 		if erDevErrs != nil {
-			outputDeveloperErrors(toPrint, contents, erDevErrs, filesystem)
+			outputDeveloperErrors(toPrint, parsed.DisplayContents, erDevErrs, filesystem)
 			return toPrint.String(), true, nil
 		}
 		// Print out any warnings for file
@@ -219,7 +203,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		if len(warnings) > 0 {
 			for _, warning := range warnings {
 				fmt.Fprintf(toPrint, "%s%s\n", warningPrefix(), warning.Message)
-				outputForLine(toPrint, contents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
+				outputForLine(toPrint, parsed.DisplayContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
 				toPrint.WriteString("\n")
 			}
 
