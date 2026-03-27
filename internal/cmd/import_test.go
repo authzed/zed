@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"net/url"
 	"path/filepath"
 	"testing"
 
@@ -74,11 +73,8 @@ func TestImportCmd(t *testing.T) {
 			c, err := zedtesting.ClientFromConn(conn)(cmd)
 			require.NoError(err)
 
-			u, err := url.Parse(f)
-			require.NoError(err)
-
 			// Run the import and assert we don't have errors
-			err = importCmdFunc(cmd, c, c, test.prefix, u)
+			err = importCmdFunc(cmd, c, c, test.prefix, f)
 			require.NoError(err)
 
 			// Run a check with full consistency to assert that the relationships

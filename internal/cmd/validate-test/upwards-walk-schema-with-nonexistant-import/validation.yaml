@@ -1,5 +1,5 @@
 ---
-schemaFile: "../some-schema.zed"
+schemaFile: "../nonexistant-import.zed"
 relationships: >-
   resource:1#user@user:1
 assertions:

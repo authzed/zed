@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,7 +17,6 @@ import (
 	"github.com/authzed/spicedb/pkg/development"
 	core "github.com/authzed/spicedb/pkg/proto/core/v1"
 	devinterface "github.com/authzed/spicedb/pkg/proto/developer/v1"
-	"github.com/authzed/spicedb/pkg/validationfile"
 
 	"github.com/authzed/zed/internal/commands"
 	"github.com/authzed/zed/internal/console"
@@ -145,42 +142,9 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			toPrint.WriteString(filename + "\n")
 		}
 
-		u, err := url.Parse(filename)
+		parsed, contents, err := decode.ValidationFileFromFilename(filename, fileType)
 		if err != nil {
 			return "", true, err
-		}
-
-		d, err := decode.DecoderFromURL(u)
-		if err != nil {
-			return "", true, err
-		}
-		validateContents := d.Contents
-
-		// Root the filesystem at the directory containing the schema file, so
-		// that relative imports resolve correctly.
-		fileDir := filepath.Dir(filename)
-		if fileDir == "" {
-			fileDir = "."
-		}
-		filesystem := os.DirFS(fileDir)
-
-		var parsed *validationfile.ValidationFile
-		switch fileType {
-		case decode.FileTypeYaml:
-			parsed, err = d.UnmarshalYAMLValidationFile()
-		case decode.FileTypeZed:
-			parsed = d.UnmarshalSchemaValidationFile()
-		default:
-			parsed, err = d.UnmarshalAsYAMLOrSchema()
-		}
-		// This block handles the error regardless of which case statement is hit
-		if err != nil {
-			return "", true, err
-		}
-
-		// Ensure that either schema or schemaFile is present
-		if parsed.Schema.Schema == "" && parsed.SchemaFile == "" {
-			return "", false, errors.New("either schema or schemaFile must be present")
 		}
 
 		// This logic will use the zero value of the struct, so we don't need
@@ -193,6 +157,20 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			tuples = append(tuples, rel.ToCoreTuple())
 		}
 
+		// Root the filesystem at the directory containing the schema file, so
+		// that relative schema imports resolve correctly.
+		fileDir := filepath.Dir(filename)
+		if fileDir == "" {
+			fileDir = "."
+		}
+		if parsed.SchemaFile != "" {
+			// If the schemaFile is nonempty, we want to make sure that the import
+			// filesystem is rooted in the dir of that schemafile.
+			// TODO: it seems like there ought to be a better way to handle this.
+			fileDir = filepath.Join(fileDir, filepath.Dir(parsed.SchemaFile))
+		}
+		filesystem := os.DirFS(fileDir)
+
 		// Create the development context for each run
 		ctx := cmd.Context()
 		devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
@@ -204,9 +182,12 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		}
 		if devErrs != nil {
 			schemaOffset := parsed.Schema.SourcePosition.LineNumber
+			if parsed.SchemaFile != "" {
+				contents = []byte(parsed.Schema.Schema)
+			}
 
 			// Output errors
-			outputDeveloperErrorsWithLineOffset(toPrint, validateContents, devErrs.InputErrors, schemaOffset, filesystem)
+			outputDeveloperErrorsWithLineOffset(toPrint, contents, devErrs.InputErrors, schemaOffset, filesystem)
 			return toPrint.String(), true, nil
 		}
 		// Run assertions
@@ -215,7 +196,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			return "", false, aerr
 		}
 		if adevErrs != nil {
-			outputDeveloperErrors(toPrint, validateContents, adevErrs, filesystem)
+			outputDeveloperErrors(toPrint, contents, adevErrs, filesystem)
 			return toPrint.String(), true, nil
 		}
 		successfullyValidatedFiles++
@@ -226,7 +207,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			return "", false, rerr
 		}
 		if erDevErrs != nil {
-			outputDeveloperErrors(toPrint, validateContents, erDevErrs, filesystem)
+			outputDeveloperErrors(toPrint, contents, erDevErrs, filesystem)
 			return toPrint.String(), true, nil
 		}
 		// Print out any warnings for file
@@ -238,7 +219,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		if len(warnings) > 0 {
 			for _, warning := range warnings {
 				fmt.Fprintf(toPrint, "%s%s\n", warningPrefix(), warning.Message)
-				outputForLine(toPrint, validateContents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
+				outputForLine(toPrint, contents, uint64(warning.Line), warning.SourceCode, uint64(warning.Column)) // warning.LineNumber is 1-indexed
 				toPrint.WriteString("\n")
 			}
 

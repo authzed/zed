@@ -1,0 +1,5 @@
+use import
+
+import "./domain.zed"
+
+definition user {}

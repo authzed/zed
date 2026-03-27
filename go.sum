@@ -744,8 +744,8 @@ github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b h1:wbh8IK+aMLTCey
 github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b/go.mod h1:s3qC7V7XIbiNWERv7Lfljy/Lx25/V1Qlexb0WJuA8uQ=
 github.com/authzed/jitterbug v0.0.0-20260128162915-e97d76daaa24 h1:BXaWSanmHFu3P0xWfTDPpwcJIQ/oSol29+CWe4lSGSU=
 github.com/authzed/jitterbug v0.0.0-20260128162915-e97d76daaa24/go.mod h1:WvEk4YHnUsmbUaWA/VseQty3X91f6/jEHek5mjYDZUg=
-github.com/authzed/spicedb v1.50.1-0.20260323205516-b041b8f844df h1:a/75Y/B8eTFBl4GSYBfJvwt5itjycEQqBI/7VLccZuI=
-github.com/authzed/spicedb v1.50.1-0.20260323205516-b041b8f844df/go.mod h1:v1Nn+0sDO42tP6D3fpt1Spz9Ai0+957cyv+G42Nt9f0=
+github.com/authzed/spicedb v1.51.0 h1:Nx202o/6vEXibw+GlPOHX5DwFHu8gYB9vYM5+UXHzvo=
+github.com/authzed/spicedb v1.51.0/go.mod h1:v1Nn+0sDO42tP6D3fpt1Spz9Ai0+957cyv+G42Nt9f0=
 github.com/aws/aws-sdk-go-v2 v1.40.1 h1:difXb4maDZkRH0x//Qkwcfpdg1XQVXEAEs2DdXldFFc=
 github.com/aws/aws-sdk-go-v2 v1.40.1/go.mod h1:MayyLB8y+buD9hZqkCW3kX1AKq07Y5pXxtgB+rRFhz0=
 github.com/aws/aws-sdk-go-v2/config v1.32.3 h1:cpz7H2uMNTDa0h/5CYL5dLUEzPSLo2g0NkbxTRJtSSU=
