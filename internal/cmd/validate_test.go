@@ -97,7 +97,7 @@ total files: 2, successfully validated files: 2
 			},
 			expectStr: filepath.Join("validate-test", "standard-validation.yaml") + `
 Success! - 1 relationships loaded, 2 assertions run, 0 expected relations validated
-` + filepath.Join("validate-test", "invalid-schema.zed") + "\nerror: parse error in `something`, line 1, column 1: Unexpected token at root level: TokenTypeIdentifier                             \n 1 > something something {}\n   > ^~~~~~~~~\n 2 | \n\n\n",
+` + filepath.Join("validate-test", "invalid-schema.zed") + "\nerror: parse error in `invalid-schema.zed`, line 1, column 1: Unexpected token at root level: TokenTypeIdentifier                             \n 1 > something something {}\n   > ^~~~~~~~~\n 2 | \n\n\n",
 			expectNonZeroStatusCode: true,
 		},
 		`schema_only_passes`: {
@@ -116,7 +116,7 @@ Success! - 1 relationships loaded, 2 assertions run, 0 expected relations valida
 			files: []string{
 				filepath.Join("validate-test", "invalid-schema.zed"),
 			},
-			expectStr:               "error: parse error in `something`, line 1, column 1: Unexpected token at root level: TokenTypeIdentifier                             \n 1 > something something {}\n   > ^~~~~~~~~\n 2 | \n\n\n",
+			expectStr:               "error: parse error in `invalid-schema.zed`, line 1, column 1: Unexpected token at root level: TokenTypeIdentifier                             \n 1 > something something {}\n   > ^~~~~~~~~\n 2 | \n\n\n",
 			expectNonZeroStatusCode: true,
 		},
 		`without_schema_fails`: {
@@ -193,7 +193,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "missing-relation.zed"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr: "error: parse error in `write`, line 2, column 21: relation/permission `write` not found under definition `test`                   \n" +
+			expectStr: "error: parse error in `missing-relation.zed`, line 2, column 21: relation/permission `write` not found under definition `test`                   \n" +
 				" 1 |  definition test {\n" +
 				" 2 >   permission view = write\n" +
 				"   >                     ^~~~~\n " +
@@ -205,7 +205,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "missing-relation.yaml"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr: "error: parse error in `write`, line 4, column 21: relation/permission `write` not found under definition `test`                   \n" +
+			expectStr: "error: parse error in `missing-relation.yaml`, line 4, column 21: relation/permission `write` not found under definition `test`                   \n" +
 				"  6 |   definition user {}\n" +
 				"  7 |   definition test {\n" +
 				"  8 |     relation viewer: user\n" +
@@ -269,14 +269,14 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "composable-schema-imports-file-with-error.zed"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr:               "error: parse error in `unknownrel`, line 5, column 23: relation/permission `unknownrel` not found under definition `group`             \n  2 | definition user {}\n  3 | \n  4 | definition group {\n  5 >     permission view = unknownrel\n    >                       ^~~~~~~~~~\n  6 | }\n  7 | \n\n\n",
+			expectStr:               "error: parse error in `composable-schema-imported-with-error.zed`, line 5, column 23: relation/permission `unknownrel` not found under definition `group`             \n  2 | definition user {}\n  3 | \n  4 | definition group {\n  5 >     permission view = unknownrel\n    >                       ^~~~~~~~~~\n  6 | }\n  7 | \n\n\n",
 		},
 		`yaml_with_composable_schemaFile_with_import_error`: {
 			files: []string{
 				filepath.Join("validate-test", "external-composable-with-error.yaml"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr:               "error: parse error in `unknownrel`, line 5, column 23: relation/permission `unknownrel` not found under definition `group`             \n 2 | \n 3 | definition group {\n 4 |     relation member: user\n 5 >     permission view = unknownrel\n   >                       ^~~~~~~~~~\n 6 | }\n 7 | \n\n\n",
+			expectStr:               "error: parse error in `composable-schema-with-import-error-imported.zed`, line 5, column 23: relation/permission `unknownrel` not found under definition `group`             \n 2 | \n 3 | definition group {\n 4 |     relation member: user\n 5 >     permission view = unknownrel\n   >                       ^~~~~~~~~~\n 6 | }\n 7 | \n\n\n",
 		},
 		`yaml_content_with_zed_extension_gives_hint`: {
 			files: []string{
