@@ -77,14 +77,14 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) *cobra.Command {
 	schemaCompileCmd := &cobra.Command{
 		Use:   "compile <file>",
 		Args:  commands.ValidationWrapper(cobra.ExactArgs(1)),
-		Short: "Compile a schema that uses extended syntax into one that can be written to SpiceDB",
+		Short: "Compile a schema that uses import syntax into one that can be written to SpiceDB",
 		Example: `
 	Write to stdout:
-		zed preview schema compile root.zed
+		zed schema compile root.zed
 	Write to redirected stdout:
-		zed preview schema compile schema.zed 1> compiled.zed
+		zed schema compile schema.zed 1> compiled.zed
 	Write to a file:
-		zed preview schema compile root.zed --out compiled.zed
+		zed schema compile root.zed --out compiled.zed
 	`,
 		ValidArgsFunction: commands.FileExtensionCompletions("zed"),
 		RunE: func(cmd *cobra.Command, args []string) error {
