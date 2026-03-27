@@ -278,6 +278,13 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			expectNonZeroStatusCode: true,
 			expectStr:               "error: parse error in `unknownrel`, line 5, column 23: relation/permission `unknownrel` not found under definition `group`             \n 2 | \n 3 | definition group {\n 4 |     relation member: user\n 5 >     permission view = unknownrel\n   >                       ^~~~~~~~~~\n 6 | }\n 7 | \n\n\n",
 		},
+		`yaml_content_with_zed_extension_gives_hint`: {
+			files: []string{
+				filepath.Join("validate-test", "yaml-with-zed-extension.zed"),
+			},
+			expectStr:               "error: file \"" + filepath.Join("validate-test", "yaml-with-zed-extension.zed") + "\" has a .zed extension but appears to be a YAML validation file.\n  Rename the file to use a .yaml extension, or use --type yaml to override:\n    zed validate " + filepath.Join("validate-test", "yaml-with-zed-extension.zed") + " --type yaml\n\n",
+			expectNonZeroStatusCode: true,
+		},
 		`yaml_with_schemaFile_can_traverse_up`: {
 			files: []string{
 				filepath.Join("validate-test", "upwards-walk", "validation.yaml"),
