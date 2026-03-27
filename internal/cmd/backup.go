@@ -247,17 +247,26 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("unable to initialize client: %w", err)
 	}
 
-	return takeBackup(
-		cmd.Context(),
-		spiceClient,
-		nil,
-		backupFileName,
-		backupformat.RewriterFromFlags(cmd),
-		cobrautil.MustGetUint32(cmd, "page-limit"),
-	)
+	fencoder, backupExisted, err := backupformat.NewFileEncoder(backupFileName)
+	if err != nil {
+		return err
+	}
+	encoder := backupformat.WithProgress(backupformat.WithRewriter(backupformat.RewriterFromFlags(cmd), fencoder))
+	defer CloseAndJoin(&err, encoder)
+
+	var cursor string
+	if backupExisted {
+		cursor, err = fencoder.Cursor()
+		if err != nil {
+			return err
+		}
+	}
+
+	return backupCreateImpl(cmd.Context(), spiceClient, encoder, cursor, cobrautil.MustGetUint32(cmd, "page-limit"))
 }
 
-func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupformat.Encoder, backupFileName string, rw backupformat.Rewriter, pageLimit uint32) error {
+// backupCreateImpl performs the backup using an already-configured encoder and optional resume cursor.
+func backupCreateImpl(ctx context.Context, spiceClient client.Client, encoder backupformat.Encoder, resumeCursor string, pageLimit uint32) error {
 	schemaResp, err := spiceClient.ReadSchema(ctx, &v1.ReadSchemaRequest{})
 	if err != nil {
 		return fmt.Errorf("error reading schema: %w", err)
@@ -267,126 +276,57 @@ func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupfo
 	// fallback to using ReadSchema and ReadRelationships.
 	// This codepath can be removed when AuthZed Serverless is fully sunset.
 	if bulkOpsUnsupported := schemaResp.ReadAt == nil; bulkOpsUnsupported {
-		compiledSchema, err := compiler.Compile(
-			compiler.InputSchema{Source: "schema", SchemaString: schemaResp.SchemaText},
-			compiler.AllowUnprefixedObjectType(),
-			compiler.SkipValidation(),
-		)
-		if err != nil {
+		return backupServerless(ctx, spiceClient, encoder, schemaResp, resumeCursor, pageLimit)
+	}
+	return backupModern(ctx, spiceClient, encoder, schemaResp, resumeCursor, pageLimit)
+}
+
+// backupServerless handles the backup path for serverless deployments that don't support
+// ExportBulkRelationships, falling back to ReadRelationships per definition.
+func backupServerless(ctx context.Context, spiceClient client.Client, encoder backupformat.Encoder, schemaResp *v1.ReadSchemaResponse, resumeCursor string, pageLimit uint32) error {
+	compiledSchema, err := compiler.Compile(
+		compiler.InputSchema{Source: "schema", SchemaString: schemaResp.SchemaText},
+		compiler.AllowUnprefixedObjectType(),
+		compiler.SkipValidation(),
+	)
+	if err != nil {
+		return err
+	}
+
+	revision, err := revisionForServerless(ctx, spiceClient, compiledSchema)
+	if err != nil {
+		return err
+	}
+
+	cursor := resumeCursor
+	if cursor == "" {
+		if err := encoder.WriteSchema(schemaResp.SchemaText, revision.Token); err != nil {
 			return err
 		}
+	}
 
-		revision, err := revisionForServerless(ctx, spiceClient, compiledSchema)
-		if err != nil {
-			return err
+	log.Trace().Strs("definitions", lo.Map(compiledSchema.ObjectDefinitions, func(def *corev1.NamespaceDefinition, _ int) string {
+		return def.Name
+	})).Msg("parsed object definitions")
+
+	var cursorObj string // Tracks the definition the cursor was on
+	for _, def := range compiledSchema.ObjectDefinitions {
+		req := &v1.ReadRelationshipsRequest{
+			RelationshipFilter: &v1.RelationshipFilter{ResourceType: def.Name},
+			OptionalLimit:      pageLimit,
 		}
-
-		var cursor string
-		if encoder == nil {
-			fencoder, backupExisted, err := backupformat.NewFileEncoder(backupFileName)
-			if err != nil {
-				return err
-			}
-			encoder = backupformat.WithProgress(backupformat.WithRewriter(rw, fencoder))
-			defer CloseAndJoin(&err, encoder)
-			if backupExisted {
-				cursor, err = fencoder.Cursor()
-				if err != nil {
-					return err
-				}
-			} else {
-				if err := encoder.WriteSchema(schemaResp.SchemaText, revision.Token); err != nil {
-					return err
-				}
-			}
-		}
-		defer CloseAndJoin(&err, encoder)
-
-		log.Trace().Strs("definitions", lo.Map(compiledSchema.ObjectDefinitions, func(def *corev1.NamespaceDefinition, _ int) string {
-			return def.Name
-		})).Msg("parsed object definitions")
-
-		var cursorObj string // Tracks the definition the cursor was on
-		for _, def := range compiledSchema.ObjectDefinitions {
-			req := &v1.ReadRelationshipsRequest{
-				RelationshipFilter: &v1.RelationshipFilter{ResourceType: def.Name},
-				OptionalLimit:      pageLimit,
-			}
-			if cursor != "" && cursorObj == def.Name {
-				req.OptionalCursor = &v1.Cursor{Token: cursor}
-			} else {
-				req.Consistency = &v1.Consistency{
-					Requirement: &v1.Consistency_AtExactSnapshot{
-						AtExactSnapshot: revision,
-					},
-				}
-			}
-			log.Trace().Str("resource", def.Name).Str("cursor", cursor).Str("revision", revision.Token).Msg("iterated over definition")
-
-			stream, err := spiceClient.ReadRelationships(ctx, req)
-			if err != nil {
-				return err
-			}
-
-			for msg, err := stream.Recv(); !errors.Is(err, io.EOF); msg, err = stream.Recv() {
-				switch {
-				case isCanceled(err) || isCanceled(ctx.Err()):
-					return context.Canceled
-				case isRetryableError(err):
-					newReq := req.CloneVT()
-					newReq.OptionalCursor = &v1.Cursor{Token: cursor}
-					stream, err = spiceClient.ReadRelationships(ctx, newReq)
-					if err != nil {
-						return errors.New("failed to retry request")
-					}
-				case err != nil:
-					return err
-				case ctx.Err() != nil:
-					return fmt.Errorf("aborted backup: %w", err)
-				default:
-					cursor = msg.AfterResultCursor.Token
-					cursorObj = def.Name
-					log.Trace().Str("cursor", cursor).Stringer("relationship", msg.Relationship).Msg("appending relationship")
-					if err := encoder.Append(msg.Relationship, cursor); err != nil {
-						return err
-					}
-				}
-			}
-		}
-		encoder.MarkComplete()
-	} else {
-		var cursor string
-		if encoder == nil {
-			fencoder, backupExisted, err := backupformat.NewFileEncoder(backupFileName)
-			if err != nil {
-				return err
-			}
-			encoder = backupformat.WithProgress(backupformat.WithRewriter(rw, fencoder))
-			defer CloseAndJoin(&err, encoder)
-			if backupExisted {
-				cursor, err = fencoder.Cursor()
-				if err != nil {
-					return err
-				}
-			} else {
-				if err := encoder.WriteSchema(schemaResp.SchemaText, schemaResp.ReadAt.Token); err != nil {
-					return err
-				}
-			}
-		}
-
-		req := &v1.ExportBulkRelationshipsRequest{OptionalLimit: pageLimit}
-		if cursor != "" {
+		if cursor != "" && cursorObj == def.Name {
 			req.OptionalCursor = &v1.Cursor{Token: cursor}
 		} else {
 			req.Consistency = &v1.Consistency{
 				Requirement: &v1.Consistency_AtExactSnapshot{
-					AtExactSnapshot: schemaResp.ReadAt,
+					AtExactSnapshot: revision,
 				},
 			}
 		}
+		log.Trace().Str("resource", def.Name).Str("cursor", cursor).Str("revision", revision.Token).Msg("iterated over definition")
 
-		stream, err := spiceClient.ExportBulkRelationships(ctx, req)
+		stream, err := spiceClient.ReadRelationships(ctx, req)
 		if err != nil {
 			return err
 		}
@@ -398,7 +338,7 @@ func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupfo
 			case isRetryableError(err):
 				newReq := req.CloneVT()
 				newReq.OptionalCursor = &v1.Cursor{Token: cursor}
-				stream, err = spiceClient.ExportBulkRelationships(ctx, newReq)
+				stream, err = spiceClient.ReadRelationships(ctx, newReq)
 				if err != nil {
 					return errors.New("failed to retry request")
 				}
@@ -408,20 +348,69 @@ func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupfo
 				return fmt.Errorf("aborted backup: %w", err)
 			default:
 				cursor = msg.AfterResultCursor.Token
-				for _, r := range msg.Relationships {
-					if err := encoder.Append(r, cursor); err != nil {
-						return err
-					}
+				cursorObj = def.Name
+				log.Trace().Str("cursor", cursor).Stringer("relationship", msg.Relationship).Msg("appending relationship")
+				if err := encoder.Append(msg.Relationship, cursor); err != nil {
+					return err
 				}
 			}
 		}
-		encoder.MarkComplete()
+	}
+	encoder.MarkComplete()
+	return nil
+}
+
+// backupModern handles the backup path for servers that support ExportBulkRelationships.
+func backupModern(ctx context.Context, spiceClient client.Client, encoder backupformat.Encoder, schemaResp *v1.ReadSchemaResponse, resumeCursor string, pageLimit uint32) error {
+	cursor := resumeCursor
+	if cursor == "" {
+		if err := encoder.WriteSchema(schemaResp.SchemaText, schemaResp.ReadAt.Token); err != nil {
+			return err
+		}
 	}
 
-	// NOTE: err is returned here because there's cleanup being done
-	// in the `defer` blocks that will modify the `err` if the cleanup
-	// fails
-	return err
+	req := &v1.ExportBulkRelationshipsRequest{OptionalLimit: pageLimit}
+	if cursor != "" {
+		req.OptionalCursor = &v1.Cursor{Token: cursor}
+	} else {
+		req.Consistency = &v1.Consistency{
+			Requirement: &v1.Consistency_AtExactSnapshot{
+				AtExactSnapshot: schemaResp.ReadAt,
+			},
+		}
+	}
+
+	stream, err := spiceClient.ExportBulkRelationships(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	for msg, err := stream.Recv(); !errors.Is(err, io.EOF); msg, err = stream.Recv() {
+		switch {
+		case isCanceled(err) || isCanceled(ctx.Err()):
+			return context.Canceled
+		case isRetryableError(err):
+			newReq := req.CloneVT()
+			newReq.OptionalCursor = &v1.Cursor{Token: cursor}
+			stream, err = spiceClient.ExportBulkRelationships(ctx, newReq)
+			if err != nil {
+				return errors.New("failed to retry request")
+			}
+		case err != nil:
+			return err
+		case ctx.Err() != nil:
+			return fmt.Errorf("aborted backup: %w", err)
+		default:
+			cursor = msg.AfterResultCursor.Token
+			for _, r := range msg.Relationships {
+				if err := encoder.Append(r, cursor); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	encoder.MarkComplete()
+	return nil
 }
 
 // computeBackupFileName computes the backup file name based.

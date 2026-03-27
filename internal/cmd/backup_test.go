@@ -626,7 +626,7 @@ func TestAddSizeErrInfo(t *testing.T) {
 	}
 }
 
-func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
+func TestBackupCreateImplRecoversFromRetryableErrors(t *testing.T) {
 	firstRels := []*v1.Relationship{{
 		Resource: &v1.ObjectReference{ObjectType: "resource", ObjectId: "foo"},
 		Relation: "view",
@@ -642,7 +642,7 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 			Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "jim"},
 		},
 	}}
-	client := &mockClientForBackup{
+	mockClient := &mockClientForBackup{
 		t: t,
 		schemaCalls: []func() (*v1.ReadSchemaResponse, error){
 			func() (*v1.ReadSchemaResponse, error) {
@@ -685,9 +685,8 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 	}
 
 	encoder := &backupformat.MockEncoder{}
-	rw := &backupformat.NoopRewriter{}
 
-	err := takeBackup(t.Context(), client, encoder, "ignored", rw, 0)
+	err := backupCreateImpl(t.Context(), mockClient, encoder, "", 0)
 	require.NoError(t, err)
 
 	require.True(t, encoder.Complete, "expecting encoder to be marked complete")
@@ -695,7 +694,122 @@ func TestTakeBackupRecoversFromRetryableErrors(t *testing.T) {
 	require.Equal(t, "foo", encoder.Relationships[0].Resource.ObjectId)
 	require.Equal(t, "bar", encoder.Relationships[1].Resource.ObjectId)
 
-	client.assertAllRecvCalls()
+	mockClient.assertAllRecvCalls()
+}
+
+func TestBackupCreateImplPermissionDenied(t *testing.T) {
+	mockClient := &mockClientForBackup{
+		t: t,
+		schemaCalls: []func() (*v1.ReadSchemaResponse, error){
+			func() (*v1.ReadSchemaResponse, error) {
+				return nil, status.Error(codes.PermissionDenied, "permission denied")
+			},
+		},
+	}
+
+	encoder := &backupformat.MockEncoder{}
+
+	err := backupCreateImpl(t.Context(), mockClient, encoder, "", 0)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "error reading schema")
+	require.False(t, encoder.Complete, "encoder should not be marked complete on error")
+}
+
+func TestBackupCreateImplServerlessPath(t *testing.T) {
+	mockClient := &mockClientForBackup{
+		t: t,
+		schemaCalls: []func() (*v1.ReadSchemaResponse, error){
+			func() (*v1.ReadSchemaResponse, error) {
+				// ReadAt == nil signals serverless
+				return &v1.ReadSchemaResponse{
+					SchemaText: "definition user {}",
+					ReadAt:     nil,
+				}, nil
+			},
+		},
+		readRelCalls: []func() (*v1.ReadRelationshipsResponse, error){
+			// revisionForServerless will try to read relationships to determine revision
+			func() (*v1.ReadRelationshipsResponse, error) {
+				return &v1.ReadRelationshipsResponse{
+					ReadAt: &v1.ZedToken{Token: "serverless-rev"},
+					Relationship: &v1.Relationship{
+						Resource: &v1.ObjectReference{ObjectType: "user", ObjectId: "1"},
+						Relation: "...",
+						Subject: &v1.SubjectReference{
+							Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "1"},
+						},
+					},
+					AfterResultCursor: &v1.Cursor{Token: "cursor-1"},
+				}, nil
+			},
+			// Then the actual ReadRelationships for backup will read until EOF
+			func() (*v1.ReadRelationshipsResponse, error) {
+				return &v1.ReadRelationshipsResponse{
+					ReadAt: &v1.ZedToken{Token: "serverless-rev"},
+					Relationship: &v1.Relationship{
+						Resource: &v1.ObjectReference{ObjectType: "user", ObjectId: "1"},
+						Relation: "member",
+						Subject: &v1.SubjectReference{
+							Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "2"},
+						},
+					},
+					AfterResultCursor: &v1.Cursor{Token: "cursor-2"},
+				}, nil
+			},
+		},
+	}
+
+	encoder := &backupformat.MockEncoder{}
+
+	err := backupCreateImpl(t.Context(), mockClient, encoder, "", 0)
+	require.NoError(t, err)
+	require.True(t, encoder.Complete, "encoder should be marked complete")
+	require.Len(t, encoder.Relationships, 1)
+	require.Equal(t, "user", encoder.Relationships[0].Resource.ObjectType)
+}
+
+func TestBackupCreateImplResumeWithCursor(t *testing.T) {
+	resumeCursor := "resume-token"
+	mockClient := &mockClientForBackup{
+		t: t,
+		schemaCalls: []func() (*v1.ReadSchemaResponse, error){
+			func() (*v1.ReadSchemaResponse, error) {
+				return &v1.ReadSchemaResponse{
+					ReadAt: &v1.ZedToken{Token: "init"},
+				}, nil
+			},
+		},
+		recvCalls: []func() (*v1.ExportBulkRelationshipsResponse, error){
+			func() (*v1.ExportBulkRelationshipsResponse, error) {
+				return &v1.ExportBulkRelationshipsResponse{
+					Relationships: []*v1.Relationship{{
+						Resource: &v1.ObjectReference{ObjectType: "resource", ObjectId: "resumed"},
+						Relation: "view",
+						Subject: &v1.SubjectReference{
+							Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "jim"},
+						},
+					}},
+					AfterResultCursor: &v1.Cursor{Token: "final-cursor"}, //nolint:gosec
+				}, nil
+			},
+		},
+		exportCalls: []func(t *testing.T, req *v1.ExportBulkRelationshipsRequest){
+			func(t *testing.T, req *v1.ExportBulkRelationshipsRequest) {
+				require.NotNil(t, req.OptionalCursor, "cursor should be set for resume")
+				require.Equal(t, resumeCursor, req.OptionalCursor.Token)
+				require.Nil(t, req.Consistency, "consistency should not be set when resuming")
+			},
+		},
+	}
+
+	encoder := &backupformat.MockEncoder{}
+
+	err := backupCreateImpl(t.Context(), mockClient, encoder, resumeCursor, 0)
+	require.NoError(t, err)
+
+	require.True(t, encoder.Complete)
+	require.Len(t, encoder.Relationships, 1)
+	require.Equal(t, "resumed", encoder.Relationships[0].Resource.ObjectId)
 }
 
 func TestRevisionForServerless(t *testing.T) {
@@ -761,7 +875,6 @@ definition document {
 
 type mockClientForBackup struct {
 	client.Client
-	grpc.ServerStreamingClient[v1.ExportBulkRelationshipsResponse]
 	t                *testing.T
 	schemaCalls      []func() (*v1.ReadSchemaResponse, error)
 	schemaCallsIndex int
@@ -771,24 +884,44 @@ type mockClientForBackup struct {
 	// allowing for assertions to be made against those calls.
 	exportCalls      []func(t *testing.T, req *v1.ExportBulkRelationshipsRequest)
 	exportCallsIndex int
+	// readRelCalls are used for the serverless path (ReadRelationships)
+	readRelCalls     []func() (*v1.ReadRelationshipsResponse, error)
+	readRelCallIndex int
 }
 
-func (m *mockClientForBackup) Recv() (*v1.ExportBulkRelationshipsResponse, error) {
+// mockExportStream implements grpc.ServerStreamingClient for ExportBulkRelationships
+type mockExportStream struct {
+	grpc.ServerStreamingClient[v1.ExportBulkRelationshipsResponse]
+	mock *mockClientForBackup
+}
+
+func (s *mockExportStream) Recv() (*v1.ExportBulkRelationshipsResponse, error) {
 	// If we've run through all our calls, return an EOF
-	if m.recvCallIndex == len(m.recvCalls) {
+	if s.mock.recvCallIndex == len(s.mock.recvCalls) {
 		return nil, io.EOF
 	}
-	recvCall := m.recvCalls[m.recvCallIndex]
-	m.recvCallIndex++
+	recvCall := s.mock.recvCalls[s.mock.recvCallIndex]
+	s.mock.recvCallIndex++
 	return recvCall()
 }
 
-func (m *mockClientForBackup) ReadSchema(ctx context.Context, req *v1.ReadSchemaRequest, opts ...grpc.CallOption) (*v1.ReadSchemaResponse, error) {
-	if m.schemaCalls == nil {
-		// If the caller doesn't supply any calls, pass through
-		return m.ReadSchema(ctx, req, opts...)
-	} else if m.schemaCallsIndex == len(m.schemaCalls) {
-		// If invoked too many times, fail the test
+// mockReadRelStream implements grpc.ServerStreamingClient for ReadRelationships
+type mockReadRelStream struct {
+	grpc.ServerStreamingClient[v1.ReadRelationshipsResponse]
+	mock *mockClientForBackup
+}
+
+func (s *mockReadRelStream) Recv() (*v1.ReadRelationshipsResponse, error) {
+	if s.mock.readRelCallIndex == len(s.mock.readRelCalls) {
+		return nil, io.EOF
+	}
+	call := s.mock.readRelCalls[s.mock.readRelCallIndex]
+	s.mock.readRelCallIndex++
+	return call()
+}
+
+func (m *mockClientForBackup) ReadSchema(_ context.Context, _ *v1.ReadSchemaRequest, _ ...grpc.CallOption) (*v1.ReadSchemaResponse, error) {
+	if m.schemaCalls == nil || m.schemaCallsIndex == len(m.schemaCalls) {
 		m.t.FailNow()
 		return nil, nil
 	}
@@ -800,17 +933,19 @@ func (m *mockClientForBackup) ReadSchema(ctx context.Context, req *v1.ReadSchema
 
 func (m *mockClientForBackup) ExportBulkRelationships(_ context.Context, req *v1.ExportBulkRelationshipsRequest, _ ...grpc.CallOption) (grpc.ServerStreamingClient[v1.ExportBulkRelationshipsResponse], error) {
 	if m.exportCalls == nil {
-		// If the caller doesn't supply exportCalls, pass through
-		return m, nil
+		return &mockExportStream{mock: m}, nil
 	} else if m.exportCallsIndex == len(m.exportCalls) {
-		// If invoked too many times, fail the test
 		m.t.FailNow()
-		return m, nil
+		return &mockExportStream{mock: m}, nil
 	}
 	exportCall := m.exportCalls[m.exportCallsIndex]
 	m.exportCallsIndex++
 	exportCall(m.t, req)
-	return m, nil
+	return &mockExportStream{mock: m}, nil
+}
+
+func (m *mockClientForBackup) ReadRelationships(_ context.Context, _ *v1.ReadRelationshipsRequest, _ ...grpc.CallOption) (grpc.ServerStreamingClient[v1.ReadRelationshipsResponse], error) {
+	return &mockReadRelStream{mock: m}, nil
 }
 
 // assertAllRecvCalls asserts that the number of invocations is as expected
