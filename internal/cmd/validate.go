@@ -182,6 +182,9 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		}
 		if devErrs != nil {
 			schemaOffset := parsed.Schema.SourcePosition.LineNumber
+			if parsed.SchemaFile != "" {
+				contents = []byte(parsed.Schema.Schema)
+			}
 
 			// Output errors
 			outputDeveloperErrorsWithLineOffset(toPrint, contents, devErrs.InputErrors, schemaOffset, filesystem)

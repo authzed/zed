@@ -242,7 +242,7 @@ func ResolveSchemaFileIfPresent(filename string, validationFile *validationfile.
 			return err
 		}
 		validationFile.Schema = blocks.SchemaWithPosition{
-			SourcePosition: spiceerrors.SourcePosition{LineNumber: 1, ColumnPosition: 1},
+			SourcePosition: spiceerrors.SourcePosition{LineNumber: 0, ColumnPosition: 1},
 			Schema:         string(schemaBytes),
 		}
 	}

@@ -276,7 +276,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "external-composable-with-error.yaml"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr:               "error: parse error in `unknownrel`, line 5, column 23: relation/permission `unknownrel` not found under definition `group`             \n 3 | definition group {\n 4 |     relation member: user\n 5 |     permission view = unknownrel\n 6 > }\n 7 | \n\n\n",
+			expectStr:               "error: parse error in `unknownrel`, line 5, column 23: relation/permission `unknownrel` not found under definition `group`             \n 2 | \n 3 | definition group {\n 4 |     relation member: user\n 5 >     permission view = unknownrel\n   >                       ^~~~~~~~~~\n 6 | }\n 7 | \n\n\n",
 		},
 		`yaml_with_schemaFile_can_traverse_up`: {
 			files: []string{
@@ -289,6 +289,13 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "sibling-folders", "tests", "validation.yaml"),
 			},
 			expectStr: "Success! - 0 relationships loaded, 0 assertions run, 0 expected relations validated\n",
+		},
+		`yaml_with_schemaFile_can_traverse_sibling_directories_and_show_correct_error_context`: {
+			files: []string{
+				filepath.Join("validate-test", "upwards-walk-schema-with-nonexistant-import", "validation.yaml"),
+			},
+			expectNonZeroStatusCode: true,
+			expectStr:               "error: parse error in `validation.yaml`, line 7, column 1: failed to read import \"doesnotexist.zed\": open doesnotexist.zed: no such file or\ndirectory                                                                       \n 4 | \n 5 | definition resource {}\n 6 | \n 7 > import \"doesnotexist.zed\"\n 8 | \n\n\n",
 		},
 	}
 
