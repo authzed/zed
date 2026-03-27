@@ -20,6 +20,36 @@ import (
 	"github.com/authzed/spicedb/pkg/validationfile/blocks"
 )
 
+// DecoderResult holds the decoded contents of a validation file or a zed file.
+type DecoderResult struct {
+	// Schema is the parsed schema text to be compiled by SpiceDB.
+	// When a schemaFile is used, this is the content of that file;
+	// otherwise it is the schema block extracted from the YAML,
+	// or the raw text from .zed file.
+	Schema string
+	// DisplayContents is the raw file bytes used for error display context.
+	// This may differ from Schema when the schema is inline: DisplayContents
+	// is the full YAML (so error messages can reference assertions, relations,
+	// etc.), while Schema is only the schema block.
+	DisplayContents []byte
+	// SchemaFileName is the base name of the file containing the schema,
+	// used for error reporting. For inline schemas this is the YAML filename
+	// (e.g. "validation.yaml"); for external schemas it is the schemaFile
+	// basename (e.g. "schema.zed").
+	SchemaFileName string
+	// RootSchemaDir is the directory to root the filesystem at for resolving schema
+	// imports. For inline schemas this is the YAML file's directory; for
+	// external schemas it is the SchemaFileName's directory.
+	RootSchemaDir string
+	// SchemaOffset is the position where the schema block starts within the
+	// YAML file. Used to adjust schema-relative error line numbers to their
+	// absolute positions in DisplayContents.
+	SchemaOffset      spiceerrors.SourcePosition
+	Relationships     blocks.ParsedRelationships
+	Assertions        blocks.Assertions
+	ExpectedRelations blocks.ParsedExpectedRelations
+}
+
 // yamlKeyPatterns match YAML top-level keys that indicate a validation file format.
 // These patterns look for the key at the start of a line (column 0), followed by a colon.
 // This avoids false positives like "relation schema: parent" in a schema file being
@@ -166,21 +196,21 @@ func UnmarshalYAMLValidationFile(contents []byte) (*validationfile.ValidationFil
 }
 
 // ValidationFileFromFilename takes a filename and a desired/expected FileType and
-// returns the contents fetched from the filename and the associated validationFile.
-func ValidationFileFromFilename(filename string, fileType FileType) (vfile *validationfile.ValidationFile, contents []byte, err error) {
+// returns the decoded file.
+func ValidationFileFromFilename(filename string, fileType FileType) (decoderResult *DecoderResult, err error) {
 	u, err := url.Parse(filename)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	sourceType, err := SourceTypeFromURL(u)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	contents, err = FetchFromURL(u)
+	contents, err := FetchFromURL(u)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var parsed *validationfile.ValidationFile
@@ -194,7 +224,7 @@ func ValidationFileFromFilename(filename string, fileType FileType) (vfile *vali
 	}
 	// This block handles the error regardless of which case statement is hit
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	schemaPresent := parsed.Schema.Schema != ""
@@ -202,29 +232,55 @@ func ValidationFileFromFilename(filename string, fileType FileType) (vfile *vali
 
 	// Ensure that either schema or schemaFile is present
 	if !schemaPresent && !schemaFilePresent {
-		return nil, nil, errors.New("either schema or schemaFile must be present")
+		return nil, errors.New("either schema or schemaFile must be present")
 	}
 
 	if schemaPresent && schemaFilePresent {
-		return nil, nil, errors.New("schema and schemaFile keys are both defined; please choose one")
+		return nil, errors.New("schema and schemaFile keys are both defined; please choose one")
 	}
 
 	// We will refuse to read in a `schemaFile` key when the file is fetched from a remote resource
 	// We don't do this for HTTP-fetched ValidationFiles because we don't want them
 	// referencing files in the local filesystem.
 	if sourceType == SourceTypeHTTP && schemaFilePresent {
-		return nil, nil, errors.New("cannot use schemaFile key when fetched from a remote resource")
+		return nil, errors.New("cannot use schemaFile key when fetched from a remote resource")
 	}
 
 	// Attach the SchemaFile if we're dealing with a local file
 	if sourceType == SourceTypeFile {
 		err = ResolveSchemaFileIfPresent(filename, parsed)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
-	return parsed, contents, nil
+	// Compute the root file name and schema directory for the caller.
+	// When schemaFile is set, errors should reference the schema file and
+	// the filesystem should be rooted at the schema file's directory.
+	rootFileName := filepath.Base(filename)
+	schemaDir := filepath.Dir(filename)
+	if schemaDir == "" {
+		schemaDir = "."
+	}
+	displayContents := contents
+	if parsed.SchemaFile != "" {
+		rootFileName = filepath.Base(parsed.SchemaFile)
+		schemaDir = filepath.Join(schemaDir, filepath.Dir(parsed.SchemaFile))
+		displayContents = []byte(parsed.Schema.Schema)
+	}
+
+	decoderResult = &DecoderResult{
+		Schema:            parsed.Schema.Schema,
+		DisplayContents:   displayContents,
+		SchemaOffset:      parsed.Schema.SourcePosition,
+		SchemaFileName:    rootFileName,
+		RootSchemaDir:     schemaDir,
+		Relationships:     parsed.Relationships,
+		Assertions:        parsed.Assertions,
+		ExpectedRelations: parsed.ExpectedRelations,
+	}
+
+	return decoderResult, nil
 }
 
 // ResolveSchemaFileIfPresent takes a ValidationFile and if the SchemaFile key is present,

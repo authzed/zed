@@ -76,13 +76,13 @@ func registerImportCmd(rootCmd *cobra.Command) {
 
 func importCmdFunc(cmd *cobra.Command, schemaClient v1.SchemaServiceClient, relationshipsClient v1.PermissionsServiceClient, prefix, filename string) error {
 	prefix = strings.TrimRight(prefix, "/")
-	p, _, err := decode.ValidationFileFromFilename(filename, decode.FileTypeYaml)
+	p, err := decode.ValidationFileFromFilename(filename, decode.FileTypeYaml)
 	if err != nil {
 		return err
 	}
 
 	if cobrautil.MustGetBool(cmd, "schema") {
-		if err := importSchema(cmd.Context(), schemaClient, p.Schema.Schema, prefix); err != nil {
+		if err := importSchema(cmd.Context(), schemaClient, p.Schema, prefix); err != nil {
 			return fmt.Errorf("error importing schema: %w", err)
 		}
 	}

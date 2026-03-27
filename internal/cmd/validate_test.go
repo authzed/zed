@@ -295,7 +295,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "upwards-walk-schema-with-nonexistant-import", "validation.yaml"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr:               "error: parse error in `validation.yaml`, line 7, column 1: failed to read import \"doesnotexist.zed\": open doesnotexist.zed: no such file or\ndirectory                                                                       \n 4 | \n 5 | definition resource {}\n 6 | \n 7 > import \"doesnotexist.zed\"\n 8 | \n\n\n",
+			expectStr:               "error: parse error in `nonexistant-import.zed`, line 7, column 1: failed to read import \"doesnotexist.zed\": open doesnotexist.zed: no such file or\ndirectory                                                                       \n 4 | \n 5 | definition resource {}\n 6 | \n 7 > import \"doesnotexist.zed\"\n 8 | \n\n\n",
 		},
 	}
 
