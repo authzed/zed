@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -34,6 +35,13 @@ import (
 )
 
 const doNotReturnIfExists = false
+
+const serverlessProgressPrefix = "serverless:"
+
+type serverlessProgress struct {
+	ResourceType string `json:"resource_type"`
+	Cursor       string `json:"cursor"`
+}
 
 // cobraRunEFunc is the signature of a cobra.Command.RunE function.
 type cobraRunEFunc = func(cmd *cobra.Command, args []string) (err error)
@@ -236,6 +244,35 @@ func CloseAndJoin(e *error, maybeCloser any) {
 	}
 }
 
+func encodeServerlessProgress(resourceType, cursor string) (string, error) {
+	progressBytes, err := json.Marshal(serverlessProgress{
+		ResourceType: resourceType,
+		Cursor:       cursor,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to encode backup progress: %w", err)
+	}
+
+	return serverlessProgressPrefix + string(progressBytes), nil
+}
+
+func decodeServerlessProgress(progress string) (string, string, error) {
+	if !strings.HasPrefix(progress, serverlessProgressPrefix) {
+		return "", progress, nil
+	}
+
+	var state serverlessProgress
+	if err := json.Unmarshal([]byte(strings.TrimPrefix(progress, serverlessProgressPrefix)), &state); err != nil {
+		return "", "", fmt.Errorf("failed to decode backup progress: %w", err)
+	}
+
+	if state.ResourceType == "" || state.Cursor == "" {
+		return "", "", errors.New("backup progress marker is missing required fields")
+	}
+
+	return state.ResourceType, state.Cursor, nil
+}
+
 func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 	backupFileName, err := computeBackupFileName(cmd, args)
 	if err != nil {
@@ -281,7 +318,8 @@ func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupfo
 			return err
 		}
 
-		var cursor string
+		var resumeCursor string
+		var resumeCursorObj string
 		if encoder == nil {
 			fencoder, backupExisted, err := backupformat.NewFileEncoder(backupFileName)
 			if err != nil {
@@ -290,9 +328,16 @@ func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupfo
 			encoder = backupformat.WithProgress(backupformat.WithRewriter(rw, fencoder))
 			defer CloseAndJoin(&err, encoder)
 			if backupExisted {
-				cursor, err = fencoder.Cursor()
+				progress, err := fencoder.Cursor()
 				if err != nil {
 					return err
+				}
+				resumeCursorObj, resumeCursor, err = decodeServerlessProgress(progress)
+				if err != nil {
+					return err
+				}
+				if resumeCursor != "" && resumeCursorObj == "" {
+					return errors.New("cannot resume this backup: the saved serverless progress marker was created by an older zed version without resource type metadata; remove the incomplete backup and rerun the backup")
 				}
 			} else {
 				if err := encoder.WriteSchema(schemaResp.SchemaText, revision.Token); err != nil {
@@ -306,14 +351,21 @@ func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupfo
 			return def.Name
 		})).Msg("parsed object definitions")
 
-		var cursorObj string // Tracks the definition the cursor was on
 		for _, def := range compiledSchema.ObjectDefinitions {
+			if resumeCursor != "" && def.Name != resumeCursorObj {
+				continue
+			}
+
 			req := &v1.ReadRelationshipsRequest{
 				RelationshipFilter: &v1.RelationshipFilter{ResourceType: def.Name},
 				OptionalLimit:      pageLimit,
 			}
-			if cursor != "" && cursorObj == def.Name {
+			cursor := ""
+			if resumeCursor != "" {
+				cursor = resumeCursor
 				req.OptionalCursor = &v1.Cursor{Token: cursor}
+				resumeCursor = ""
+				resumeCursorObj = ""
 			} else {
 				req.Consistency = &v1.Consistency{
 					Requirement: &v1.Consistency_AtExactSnapshot{
@@ -345,9 +397,12 @@ func takeBackup(ctx context.Context, spiceClient client.Client, encoder backupfo
 					return fmt.Errorf("aborted backup: %w", err)
 				default:
 					cursor = msg.AfterResultCursor.Token
-					cursorObj = def.Name
 					log.Trace().Str("cursor", cursor).Stringer("relationship", msg.Relationship).Msg("appending relationship")
-					if err := encoder.Append(msg.Relationship, cursor); err != nil {
+					progress, err := encodeServerlessProgress(def.Name, cursor)
+					if err != nil {
+						return err
+					}
+					if err := encoder.Append(msg.Relationship, progress); err != nil {
 						return err
 					}
 				}
