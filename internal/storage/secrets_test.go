@@ -16,4 +16,5 @@ func TestTokenAnyValue(t *testing.T) {
 	require.True(t, Token{Insecure: &b}.AnyValue())
 	require.True(t, Token{NoVerifyCA: &b}.AnyValue())
 	require.True(t, Token{CACert: []byte("a")}.AnyValue())
+	require.True(t, Token{HostnameOverride: "foo"}.AnyValue())
 }

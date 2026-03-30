@@ -15,16 +15,17 @@ import (
 )
 
 type Token struct {
-	Name       string
-	Endpoint   string
-	APIToken   string //nolint:gosec // not a hardcoded credential, this is a user-provided API token field
-	Insecure   *bool
-	NoVerifyCA *bool
-	CACert     []byte
+	Name             string
+	Endpoint         string
+	APIToken         string //nolint:gosec // not a hardcoded credential, this is a user-provided API token field
+	Insecure         *bool
+	NoVerifyCA       *bool
+	CACert           []byte
+	HostnameOverride string
 }
 
 func (t Token) AnyValue() bool {
-	if t.Endpoint != "" || t.APIToken != "" || t.Insecure != nil || t.NoVerifyCA != nil || len(t.CACert) > 0 {
+	if t.Endpoint != "" || t.APIToken != "" || t.Insecure != nil || t.NoVerifyCA != nil || len(t.CACert) > 0 || t.HostnameOverride != "" {
 		return true
 	}
 

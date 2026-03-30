@@ -10,22 +10,24 @@ import (
 func TestTokenWithOverride(t *testing.T) {
 	bTrue := true
 	referenceToken := Token{
-		Name:       "n1",
-		Endpoint:   "e1",
-		APIToken:   "a1",
-		Insecure:   &bTrue,
-		NoVerifyCA: &bTrue,
-		CACert:     []byte("c1"),
+		Name:             "n1",
+		Endpoint:         "e1",
+		APIToken:         "a1",
+		Insecure:         &bTrue,
+		NoVerifyCA:       &bTrue,
+		CACert:           []byte("c1"),
+		HostnameOverride: "h1",
 	}
 
 	bFalse := false
 	override := Token{
-		Name:       "n2",
-		Endpoint:   "e2",
-		APIToken:   "a2",
-		Insecure:   &bFalse,
-		NoVerifyCA: &bFalse,
-		CACert:     []byte("c2"),
+		Name:             "n2",
+		Endpoint:         "e2",
+		APIToken:         "a2",
+		Insecure:         &bFalse,
+		NoVerifyCA:       &bFalse,
+		CACert:           []byte("c2"),
+		HostnameOverride: "h2",
 	}
 
 	result, err := TokenWithOverride(override, referenceToken)
@@ -36,6 +38,7 @@ func TestTokenWithOverride(t *testing.T) {
 	require.False(t, *result.Insecure)
 	require.False(t, *result.NoVerifyCA)
 	require.Equal(t, 0, bytes.Compare([]byte("c2"), result.CACert))
+	require.Equal(t, "h2", result.HostnameOverride)
 
 	result, err = TokenWithOverride(Token{}, referenceToken)
 	require.NoError(t, err)
@@ -45,4 +48,5 @@ func TestTokenWithOverride(t *testing.T) {
 	require.True(t, *result.Insecure)
 	require.True(t, *result.NoVerifyCA)
 	require.Equal(t, 0, bytes.Compare([]byte("c1"), result.CACert))
+	require.Equal(t, "h1", result.HostnameOverride)
 }
