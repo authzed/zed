@@ -8,7 +8,6 @@ on:  # yamllint disable-line rule:truthy
 env:
   DOCS_REPO: "authzed/docs"
   TARGET_DOCS_FILE: "app/spicedb/getting-started/installing-zed/page.mdx"
-  CHANGES_DETECTED: false
 
 permissions:
   contents: "write"
