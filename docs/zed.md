@@ -845,7 +845,7 @@ zed permission lookup-subjects <resource:id> <permission> <subject_type#optional
 
 ## Reference: `zed preview schema compile`
 
-Compile a schema that uses extended syntax into one that can be written to SpiceDB
+Compile a schema that uses import syntax into one that can be written to SpiceDB
 
 ```
 zed preview schema compile <file> [flags]
@@ -856,11 +856,11 @@ zed preview schema compile <file> [flags]
 ```
 
 	Write to stdout:
-		zed preview schema compile root.zed
+		zed schema compile root.zed
 	Write to redirected stdout:
-		zed preview schema compile schema.zed 1> compiled.zed
+		zed schema compile schema.zed 1> compiled.zed
 	Write to a file:
-		zed preview schema compile root.zed --out compiled.zed
+		zed schema compile root.zed --out compiled.zed
 	
 ```
 
@@ -1214,7 +1214,7 @@ Manage schema for a permissions system
 
 ### Children commands
 
-- [zed schema compile](#reference-zed-schema-compile)	 - Compile a schema that uses extended syntax into one that can be written to SpiceDB
+- [zed schema compile](#reference-zed-schema-compile)	 - Compile a schema that uses import syntax into one that can be written to SpiceDB
 - [zed schema copy](#reference-zed-schema-copy)	 - Copy a schema from one context into another
 - [zed schema diff](#reference-zed-schema-diff)	 - Diff two schema files
 - [zed schema read](#reference-zed-schema-read)	 - Read the schema of a permissions system
@@ -1430,6 +1430,7 @@ zed validate <validation_files_or_schema_files> [flags]
 ```
       --fail-on-warn   treat warnings as errors during validation
       --force-color    force color code output even in non-tty environments
+      --type string    the type of the validated file. use this when zed cannot auto-detect the format of the file properly. valid options are "zed" and "yaml"
 ```
 
 ### Options Inherited From Parent Flags
