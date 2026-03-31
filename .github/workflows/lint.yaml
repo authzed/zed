@@ -53,7 +53,7 @@ jobs:
     runs-on: "depot-ubuntu-latest"
     steps:
       - uses: "actions/checkout@v6"
-      - uses: "aquasecurity/trivy-action@master"
+      - uses: "aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1" # For https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23
         with:
           scan-type: "fs"
           ignore-unfixed: true
