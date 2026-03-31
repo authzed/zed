@@ -127,8 +127,8 @@ zed permission check --explain document:firstdoc writer user:emilia
 	commands.RegisterWatchRelationshipCmd(relCmd)
 
 	schemaCmd := commands.RegisterSchemaCmd(rootCmd)
-	schemaCompileCmd := registerAdditionalSchemaCmds(schemaCmd)
-	registerPreviewCmd(rootCmd, schemaCompileCmd)
+	registerAdditionalSchemaCmds(schemaCmd)
+	registerPreviewCmd(rootCmd)
 
 	return rootCmd
 }
