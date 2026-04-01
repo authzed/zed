@@ -32,7 +32,7 @@ jobs:
           GEMFURY_PUSH_TOKEN: "${{ secrets.GEMFURY_PUSH_TOKEN }}"
       - name: "Notify in Slack if failure"
         if: "${{ failure() }}"
-        uses: "slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a" # v2.1.1
+        uses: "slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95" # v3.0.1
         with:
           webhook: "${{ secrets.SLACK_BUILDS_WEBHOOK_URL }}"
           webhook-type: "incoming-webhook"
@@ -72,7 +72,7 @@ jobs:
           GORELEASER_KEY: "${{ secrets.GORELEASER_KEY }}"
       - name: "Notify in Slack if failure"
         if: "${{ failure() }}"
-        uses: "slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a" # v2.1.1
+        uses: "slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95" # v3.0.1
         with:
           webhook: "${{ secrets.SLACK_BUILDS_WEBHOOK_URL }}"
           webhook-type: "incoming-webhook"
