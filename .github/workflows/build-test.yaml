@@ -34,7 +34,7 @@ jobs:
       - uses: "authzed/actions/setup-go@main"
       - name: "Generate docs"
         run: "go run mage.go gen:docs"
-      - uses: "chainguard-dev/actions/nodiff@71714a76c3df10b544595a2294c16649dc3472e5" # main
+      - uses: "chainguard-dev/actions/nodiff@8bb24c24be6871bee44f19be55ea11e3b2aea3dd" # main
         with:
           path: ""
           fixup-command: "mage gen:docs"
@@ -52,7 +52,7 @@ jobs:
       - name: "Unit tests with coverage"
         run: "go run mage.go test:runWithCoverage"
       - name: "Upload coverage to Codecov"
-        uses: "codecov/codecov-action@v5.5.2"
+        uses: "codecov/codecov-action@v6.0.0"
         with:
           files: "./coverage.txt"
           verbose: true
@@ -88,7 +88,7 @@ jobs:
         # There's a whole bunch of vars in the environment that aren't needed for running this test, so we clear them out.
         # NOTE: if you need to do this in the future, I recommend bashing into the container and running `env | sort | less`
         # NOTE: wasmbrowsertest can have flaky websocket timeouts, so we retry up to 3 times
-        uses: "nick-fields/retry@v3"
+        uses: "nick-fields/retry@v4"
         with:
           max_attempts: 3
           timeout_minutes: 5
