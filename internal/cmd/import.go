@@ -76,7 +76,7 @@ func registerImportCmd(rootCmd *cobra.Command) {
 
 func importCmdFunc(cmd *cobra.Command, schemaClient v1.SchemaServiceClient, relationshipsClient v1.PermissionsServiceClient, prefix, filename string) error {
 	prefix = strings.TrimRight(prefix, "/")
-	p, err := decode.ValidationFileFromFilename(filename, decode.FileTypeYaml)
+	p, err := decode.ValidationFileFromFilename(filename, decode.FileTypeYaml, false)
 	if err != nil {
 		return err
 	}
