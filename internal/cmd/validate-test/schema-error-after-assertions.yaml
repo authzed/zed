@@ -1,0 +1,12 @@
+---
+assertions:
+  assertTrue:
+    - "test:1#view@user:1"
+relationships: >-
+  test:1#viewer@user:1
+schema: |-
+  definition user {}
+  definition test {
+    relation viewer: user
+    permission view = nonexistent
+  }

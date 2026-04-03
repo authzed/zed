@@ -205,7 +205,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "missing-relation.yaml"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr: "error: parse error in `missing-relation.yaml`, line 4, column 21: relation/permission `write` not found under definition `test`                   \n" +
+			expectStr: "error: parse error in `missing-relation.yaml`, line 9, column 21: relation/permission `write` not found under definition `test`                   \n" +
 				"  6 |   definition user {}\n" +
 				"  7 |   definition test {\n" +
 				"  8 |     relation viewer: user\n" +
@@ -277,6 +277,62 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			},
 			expectNonZeroStatusCode: true,
 			expectStr:               "error: parse error in `composable-schema-with-import-error-imported.zed`, line 5, column 23: relation/permission `unknownrel` not found under definition `group`             \n 2 | \n 3 | definition group {\n 4 |     relation member: user\n 5 >     permission view = unknownrel\n   >                       ^~~~~~~~~~\n 6 | }\n 7 | \n\n\n",
+		},
+		`relationship_error_points_at_correct_line_when_relationships_before_schema`: {
+			files: []string{
+				filepath.Join("validate-test", "relationship-error-before-schema.yaml"),
+			},
+			expectNonZeroStatusCode: true,
+			expectStr: "error: parse error in `test:1#idontexisttt@user:1`, line 2, column 0: relation/permission `idontexisttt` not found under definition `test`            \n" +
+				"  1 | ---\n" +
+				"  2 > relationships: >-\n" +
+				"  3 |   test:1#idontexisttt@user:1\n" +
+				"  4 | # notice how schema isn't the first section of the yaml\n\n\n",
+		},
+		`schema_error_points_at_correct_line_when_schema_after_relationships`: {
+			files: []string{
+				filepath.Join("validate-test", "schema-error-after-relationships.yaml"),
+			},
+			expectNonZeroStatusCode: true,
+			expectStr: "error: parse error in `schema-error-after-relationships.yaml`, line 8, column 21: relation/permission `nonexistent` not found under definition `test`             \n" +
+				"  5 |   definition user {}\n" +
+				"  6 |   definition test {\n" +
+				"  7 |     relation viewer: user\n" +
+				"  8 >     permission view = nonexistent\n" +
+				"    >                       ^~~~~~~~~~~\n" +
+				"  9 |   }\n" +
+				" 10 | \n\n\n",
+		},
+		`assertion_error_points_at_correct_line_when_before_schema`: {
+			files: []string{
+				filepath.Join("validate-test", "assertion-error-before-schema.yaml"),
+			},
+			expectNonZeroStatusCode: true,
+			expectStr: "error: parse error in `document:1#viewer@user:maria`, line 6, column 7: Expected relation or permission document:1#viewer@user:maria to exist           \n" +
+				"  3 |   document:1#viewer@user:tom\n" +
+				"  4 | assertions:\n" +
+				"  5 |   assertTrue:\n" +
+				"  6 >     - \"document:1#viewer@user:maria\"\n" +
+				"    >        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+				"  7 | schema: |-\n" +
+				"  8 |   definition user {}\n\n" +
+				"  Explanation:\n" +
+				"  ⨉ document:1 viewer (105.292µs)\n" +
+				"  \n\n\n",
+		},
+		`schema_error_points_at_correct_line_when_schema_after_assertions_and_relationships`: {
+			files: []string{
+				filepath.Join("validate-test", "schema-error-after-assertions.yaml"),
+			},
+			expectNonZeroStatusCode: true,
+			expectStr: "error: parse error in `schema-error-after-assertions.yaml`, line 11, column 21: relation/permission `nonexistent` not found under definition `test`             \n" +
+				"  8 |   definition user {}\n" +
+				"  9 |   definition test {\n" +
+				" 10 |     relation viewer: user\n" +
+				" 11 >     permission view = nonexistent\n" +
+				"    >                       ^~~~~~~~~~~\n" +
+				" 12 |   }\n" +
+				" 13 | \n\n\n",
 		},
 		`yaml_content_with_zed_extension_gives_hint`: {
 			files: []string{

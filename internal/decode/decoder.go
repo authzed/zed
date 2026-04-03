@@ -22,11 +22,8 @@ import (
 
 // DecoderResult holds the decoded contents of a validation file or a zed file.
 type DecoderResult struct {
-	// Schema is the parsed schema text to be compiled by SpiceDB.
-	// When a schemaFile is used, this is the content of that file;
-	// otherwise it is the schema block extracted from the YAML,
-	// or the raw text from .zed file.
-	Schema string
+	// Schema is the parsed schema, including its source position within the YAML file.
+	Schema blocks.SchemaWithPosition
 	// DisplayContents is the raw file bytes used for error display context.
 	// This may differ from Schema when the schema is inline: DisplayContents
 	// is the full YAML (so error messages can reference assertions, relations,
@@ -40,13 +37,9 @@ type DecoderResult struct {
 	// RootSchemaDir is the directory to root the filesystem at for resolving schema
 	// imports. For inline schemas this is the YAML file's directory; for
 	// external schemas it is the SchemaFileName's directory.
-	RootSchemaDir string
-	// SchemaOffset is the position where the schema block starts within the
-	// YAML file. Used to adjust schema-relative error line numbers to their
-	// absolute positions in DisplayContents.
-	SchemaOffset      spiceerrors.SourcePosition
-	Relationships     blocks.ParsedRelationships
-	Assertions        blocks.Assertions
+	RootSchemaDir   string
+	Relationships   blocks.ParsedRelationships
+	Assertions      blocks.Assertions
 	ExpectedRelations blocks.ParsedExpectedRelations
 }
 
@@ -270,9 +263,8 @@ func ValidationFileFromFilename(filename string, fileType FileType, mustDefineSc
 	}
 
 	decoderResult = &DecoderResult{
-		Schema:            parsed.Schema.Schema,
+		Schema:            parsed.Schema,
 		DisplayContents:   displayContents,
-		SchemaOffset:      parsed.Schema.SourcePosition,
 		SchemaFileName:    rootFileName,
 		RootSchemaDir:     schemaDir,
 		Relationships:     parsed.Relationships,

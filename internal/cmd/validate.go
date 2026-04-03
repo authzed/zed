@@ -174,17 +174,15 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		// Create the development context for each run
 		ctx := cmd.Context()
 		devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
-			Schema:        parsed.Schema,
+			Schema:        parsed.Schema.Schema,
 			Relationships: tuples,
 		}, development.WithSourceFS(filesystem), development.WithRootFileName(parsed.SchemaFileName))
 		if err != nil {
 			return "", false, err
 		}
 		if devErrs != nil {
-			schemaOffset := parsed.SchemaOffset.LineNumber
-
-			// Output errors
-			outputDeveloperErrorsWithLineOffset(toPrint, parsed.DisplayContents, devErrs.InputErrors, schemaOffset, filesystem)
+			normalizeErrorLines(devErrs.InputErrors, parsed)
+			outputDeveloperErrors(toPrint, parsed.DisplayContents, devErrs.InputErrors, filesystem)
 			return toPrint.String(), true, nil
 		}
 		// Run assertions
@@ -265,32 +263,60 @@ func outputForLine(sb *strings.Builder, validateContents []byte, oneIndexedLineN
 	}
 }
 
-func outputDeveloperErrors(sb *strings.Builder, validateContents []byte, devErrors []*devinterface.DeveloperError, sourceFS fs.FS) {
-	outputDeveloperErrorsWithLineOffset(sb, validateContents, devErrors, 0, sourceFS)
-}
-
-func outputDeveloperErrorsWithLineOffset(sb *strings.Builder, validateContents []byte, devErrors []*devinterface.DeveloperError, lineOffset int, sourceFS fs.FS) {
+// normalizeErrorLines adjusts DeveloperError line numbers from block-relative
+// to absolute positions within the YAML file. Schema and relationship errors
+// are reported by SpiceDB with line numbers relative to their block; assertion
+// and validation errors already use absolute YAML line numbers.
+// Errors referencing external files (via Path) are left unchanged.
+func normalizeErrorLines(devErrors []*devinterface.DeveloperError, parsed *decode.DecoderResult) {
 	for _, devErr := range devErrors {
-		// If the error has a Path, read the contents from that file instead.
-		if len(devErr.Path) > 0 {
-			fileContents, err := fs.ReadFile(sourceFS, devErr.Path[0])
-			if err == nil {
-				validateContents = fileContents
-			}
+		// Don't adjust line numbers for errors in external files (e.g. imported schemas).
+		// Errors whose Path matches the root schema file are still in the main YAML.
+		if len(devErr.Path) > 0 && devErr.Path[0] != "" && devErr.Path[0] != parsed.SchemaFileName {
+			continue
 		}
-		lines := strings.Split(string(validateContents), "\n")
-		outputDeveloperError(sb, devErr, lines, lineOffset)
+
+		var offset int
+		switch devErr.Source {
+		case devinterface.DeveloperError_SCHEMA:
+			offset = parsed.Schema.SourcePosition.LineNumber
+		case devinterface.DeveloperError_RELATIONSHIP:
+			offset = parsed.Relationships.SourcePosition.LineNumber
+		default:
+			// Assertion and validation errors already use absolute line numbers.
+			continue
+		}
+
+		adjusted, err := safecast.Convert[uint32](int(devErr.Line) + offset)
+		if err == nil {
+			devErr.Line = adjusted
+		}
 	}
 }
 
-func outputDeveloperError(sb *strings.Builder, devError *devinterface.DeveloperError, lines []string, lineOffset int) {
+func outputDeveloperErrors(sb *strings.Builder, validateContents []byte, devErrors []*devinterface.DeveloperError, sourceFS fs.FS) {
+	for _, devErr := range devErrors {
+		contents := validateContents
+		if len(devErr.Path) > 0 {
+			fileContents, err := fs.ReadFile(sourceFS, devErr.Path[0])
+			if err == nil {
+				contents = fileContents
+			}
+		}
+
+		lines := strings.Split(string(contents), "\n")
+		outputDeveloperError(sb, devErr, lines)
+	}
+}
+
+func outputDeveloperError(sb *strings.Builder, devError *devinterface.DeveloperError, lines []string) {
 	errorSource := devError.Context
 	if len(devError.Path) > 0 && devError.Path[0] != "" {
 		errorSource = devError.Path[0]
 	}
 	lineContext := fmt.Sprintf("parse error in `%s`, line %d, column %d:", errorSource, devError.Line, devError.Column)
 	fmt.Fprintf(sb, "%s%s %s\n", errorPrefix(), lineContext, errorMessageStyle().Render(devError.Message))
-	errorLineNumber := int(devError.Line) - 1 + lineOffset // devError.Line is 1-indexed
+	errorLineNumber := int(devError.Line) - 1 // devError.Line is 1-indexed
 	for i := errorLineNumber - 3; i < errorLineNumber+3; i++ {
 		if i == errorLineNumber {
 			renderLine(sb, lines, i, devError.Context, errorLineNumber, -1)
