@@ -464,11 +464,11 @@ relationships: |-
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, tt.expectedSchema, vFile.Schema)
+			require.Equal(t, tt.expectedSchema, vFile.Schema.Schema)
 			require.Equal(t, tt.expectedDisplayContent, string(vFile.DisplayContents))
 			require.Equal(t, tt.expectedSchemaFileName, vFile.SchemaFileName)
 			require.Equal(t, tt.expectedDir, vFile.RootSchemaDir)
-			require.Equal(t, tt.expectedSchemaOffset, vFile.SchemaOffset)
+			require.Equal(t, tt.expectedSchemaOffset, vFile.Schema.SourcePosition)
 			require.Equal(t, tt.expectedRels, vFile.Relationships.RelationshipsString)
 		})
 	}

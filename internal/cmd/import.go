@@ -82,7 +82,7 @@ func importCmdFunc(cmd *cobra.Command, schemaClient v1.SchemaServiceClient, rela
 	}
 
 	if cobrautil.MustGetBool(cmd, "schema") {
-		if err := importSchema(cmd.Context(), schemaClient, p.Schema, prefix); err != nil {
+		if err := importSchema(cmd.Context(), schemaClient, p.Schema.Schema, prefix); err != nil {
 			return fmt.Errorf("error importing schema: %w", err)
 		}
 	}
