@@ -1,0 +1,12 @@
+---
+relationships: >-
+  document:1#viewer@user:tom
+assertions:
+  assertTrue:
+    - "document:1#viewer@user:maria"
+schema: |-
+  definition user {}
+  definition document {
+    relation viewer: user
+    permission view = viewer
+  }
