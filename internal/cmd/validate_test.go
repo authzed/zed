@@ -283,11 +283,27 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "relationship-error-before-schema.yaml"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr: "error: parse error in `test:1#idontexisttt@user:1`, line 2, column 0: relation/permission `idontexisttt` not found under definition `test`            \n" +
+			expectStr: "error: parse error in `test:1#idontexisttt@user:1`, line 3, column 0: relation/permission `idontexisttt` not found under definition `test`            \n" +
 				"  1 | ---\n" +
-				"  2 > relationships: >-\n" +
-				"  3 |   test:1#idontexisttt@user:1\n" +
-				"  4 | # notice how schema isn't the first section of the yaml\n\n\n",
+				"  2 | relationships: >-\n" +
+				"  3 >   test:1#idontexisttt@user:1\n" +
+				"    >   ^~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+				"  4 | # notice how schema isn't the first section of the yaml\n" +
+				"  5 | schema: |-\n\n\n",
+		},
+		`relationship_error_points_at_failing_line_among_multiple_relationships`: {
+			files: []string{
+				filepath.Join("validate-test", "relationship-error-before-schema-multi.yaml"),
+			},
+			expectNonZeroStatusCode: true,
+			expectStr: "error: parse error in `test:1#idontexisttt@user:1`, line 5, column 0: relation/permission `idontexisttt` not found under definition `test`            \n" +
+				"  2 | relationships: |-\n" +
+				"  3 |   test:1#viewer@user:1\n" +
+				"  4 |   test:2#viewer@user:2\n" +
+				"  5 >   test:1#idontexisttt@user:1\n" +
+				"    >   ^~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+				"  6 | schema: |-\n" +
+				"  7 |   definition user {}\n\n\n",
 		},
 		`schema_error_points_at_correct_line_when_schema_after_relationships`: {
 			files: []string{

@@ -287,7 +287,29 @@ func normalizeErrorLines(devErrors []*devinterface.DeveloperError, parsed *decod
 			continue
 		}
 
-		adjusted, err := safecast.Convert[uint32](int(devErr.Line) + offset)
+		// SpiceDB may report Line=0 for errors where it doesn't track the
+		// exact line within the block (e.g. relationship validation errors).
+		// When that happens, search for the error context string in the file
+		// to find the actual line number.
+		line := int(devErr.Line)
+		if line == 0 && devErr.Context != "" && len(parsed.DisplayContents) > 0 {
+			lines := strings.Split(string(parsed.DisplayContents), "\n")
+			for i, l := range lines {
+				if strings.Contains(l, devErr.Context) {
+					// Use the absolute line number directly (1-indexed).
+					devErr.Line = uint32(i + 1)
+					line = -1 // signal that we already set the absolute line
+					break
+				}
+			}
+		}
+
+		if line == -1 {
+			// Already set to an absolute line number above.
+			continue
+		}
+
+		adjusted, err := safecast.Convert[uint32](line + offset)
 		if err == nil {
 			devErr.Line = adjusted
 		}
