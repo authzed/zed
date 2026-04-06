@@ -37,9 +37,9 @@ type DecoderResult struct {
 	// RootSchemaDir is the directory to root the filesystem at for resolving schema
 	// imports. For inline schemas this is the YAML file's directory; for
 	// external schemas it is the SchemaFileName's directory.
-	RootSchemaDir   string
-	Relationships   blocks.ParsedRelationships
-	Assertions      blocks.Assertions
+	RootSchemaDir     string
+	Relationships     blocks.ParsedRelationships
+	Assertions        blocks.Assertions
 	ExpectedRelations blocks.ParsedExpectedRelations
 }
 
