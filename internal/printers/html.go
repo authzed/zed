@@ -234,29 +234,29 @@ func (h *HTMLCheckTraceRenderer) writeHeader() {
 	h.builder.WriteString(htmlHeaderPrefix)
 
 	// Write timestamp
-	h.builder.WriteString(fmt.Sprintf(
+	fmt.Fprintf(&h.builder,
 		"        <p class=\"metadata-timestamp\">Generated: %s</p>\n",
 		html.EscapeString(h.options.Timestamp.Format("2006-01-02 15:04:05 MST")),
-	))
+	)
 
 	// Write optional metadata
 	if h.options.Command != "" {
-		h.builder.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&h.builder,
 			"        <p class=\"metadata-item\">Command: <code class=\"metadata-code\">%s</code></p>\n",
 			html.EscapeString(h.options.Command),
-		))
+		)
 	}
 	if h.options.SpiceDBServer != "" {
-		h.builder.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&h.builder,
 			"        <p class=\"metadata-item\">SpiceDB Server: %s</p>\n",
 			html.EscapeString(h.options.SpiceDBServer),
-		))
+		)
 	}
 	if h.options.SpiceDBVersion != "" {
-		h.builder.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&h.builder,
 			"        <p class=\"metadata-item\">SpiceDB Version: %s</p>\n",
 			html.EscapeString(h.options.SpiceDBVersion),
-		))
+		)
 	}
 
 	h.builder.WriteString(htmlHeaderSuffix)
@@ -382,7 +382,7 @@ func (h *HTMLCheckTraceRenderer) renderCheckTrace(checkTrace *v1.CheckDebugTrace
 			checkTrace.Resource.ObjectType,
 			checkTrace.Resource.ObjectId,
 			checkTrace.Permission)
-		h.builder.WriteString(fmt.Sprintf(`<details open aria-label="%s">`, html.EscapeString(ariaLabel)))
+		fmt.Fprintf(&h.builder, `<details open aria-label="%s">`, html.EscapeString(ariaLabel))
 		h.builder.WriteString(`<summary role="button" tabindex="0">`)
 		h.writeNodeContent(pres, checkTrace, resourceClass, permissionClass, badges, timing)
 		h.builder.WriteString(`</summary>`)
@@ -442,16 +442,16 @@ func (h *HTMLCheckTraceRenderer) renderCaveatInfo(caveatInfo *v1.CaveatEvalInfo)
 	}
 
 	h.builder.WriteString(`<div class="caveat-node">`)
-	h.builder.WriteString(fmt.Sprintf(`<span class="icon %s">%s</span> `, iconClass, icon))
-	h.builder.WriteString(fmt.Sprintf(
+	fmt.Fprintf(&h.builder, `<span class="icon %s">%s</span> `, iconClass, icon)
+	fmt.Fprintf(&h.builder,
 		`<span class="caveat-expr%s">%s</span> `,
 		exprClass,
 		html.EscapeString(caveatInfo.Expression),
-	))
-	h.builder.WriteString(fmt.Sprintf(
+	)
+	fmt.Fprintf(&h.builder,
 		`<span class="caveat-name">%s</span>`,
 		html.EscapeString(caveatInfo.CaveatName),
-	))
+	)
 
 	contextMap := caveatInfo.Context.AsMap()
 	if len(contextMap) > 0 {
@@ -462,18 +462,18 @@ func (h *HTMLCheckTraceRenderer) renderCaveatInfo(caveatInfo *v1.CaveatEvalInfo)
 		contextJSON, err := json.MarshalIndent(contextMap, "", "  ")
 		if err != nil {
 			// Defensive: handle unexpected marshaling errors (no details wrapper for errors)
-			h.builder.WriteString(fmt.Sprintf(
+			fmt.Fprintf(&h.builder,
 				`<div class="context-json">(error marshaling context: %s)</div>`,
 				html.EscapeString(err.Error()),
-			))
+			)
 		} else {
 			// Wrap context in collapsible details element for large JSON payloads
 			// Only rendered when len(contextMap) > 0, so always has data
 			h.builder.WriteString(`<details open class="context-details"><summary class="context-summary">Context</summary>`)
-			h.builder.WriteString(fmt.Sprintf(
+			fmt.Fprintf(&h.builder,
 				`<div class="context-json">%s</div>`,
 				html.EscapeString(string(contextJSON)),
-			))
+			)
 			h.builder.WriteString(`</details>`)
 		}
 	} else if caveatInfo.Result != v1.CaveatEvalInfo_RESULT_MISSING_SOME_CONTEXT {
@@ -483,10 +483,10 @@ func (h *HTMLCheckTraceRenderer) renderCaveatInfo(caveatInfo *v1.CaveatEvalInfo)
 
 	if caveatInfo.Result == v1.CaveatEvalInfo_RESULT_MISSING_SOME_CONTEXT {
 		if caveatInfo.PartialCaveatInfo != nil && len(caveatInfo.PartialCaveatInfo.MissingRequiredContext) > 0 {
-			h.builder.WriteString(fmt.Sprintf(
+			fmt.Fprintf(&h.builder,
 				`<div class="missing-context">missing context: %s</div>`,
 				html.EscapeString(strings.Join(caveatInfo.PartialCaveatInfo.MissingRequiredContext, ", ")),
-			))
+			)
 		} else {
 			h.builder.WriteString(`<div class="missing-context">missing context</div>`)
 		}
@@ -561,7 +561,7 @@ func DisplayBulkCheckTracesWithErrorsHTMLWithOptions(tracesWithError []CheckTrac
 			// Clear encountered map between traces (Go 1.21+)
 			clear(renderer.encountered)
 		}
-		renderer.builder.WriteString(fmt.Sprintf(bulkCheckHeader, i+1))
+		fmt.Fprintf(&renderer.builder, bulkCheckHeader, i+1)
 		renderer.renderCheckTrace(item.Trace, item.HasError, 0)
 		renderer.builder.WriteString("</div>\n")
 	}
