@@ -142,7 +142,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			toPrint.WriteString(filename + "\n")
 		}
 
-		parsed, err := decode.ValidationFileFromFilename(filename, fileType)
+		parsed, err := decode.ValidationFileFromFilename(filename, fileType, true)
 		if err != nil {
 			return "", true, err
 		}

@@ -457,7 +457,7 @@ relationships: |-
 			f := filepath.Join(dir, tt.name+".yaml")
 			require.NoError(t, os.WriteFile(f, []byte(tt.yamlContent), 0o600))
 
-			vFile, err := ValidationFileFromFilename(f, FileTypeYaml)
+			vFile, err := ValidationFileFromFilename(f, FileTypeYaml, true)
 
 			if tt.expectedErrText != "" {
 				require.ErrorContains(t, err, tt.expectedErrText)
@@ -482,7 +482,7 @@ func TestValidationFileFromURLWithHTTP(t *testing.T) {
 	serverURL := SetupTestServer(t)
 
 	t.Run("schema file does not get populated", func(t *testing.T) {
-		_, err := ValidationFileFromFilename(serverURL+"/valid-with-schemaFile.zed", FileTypeYaml)
+		_, err := ValidationFileFromFilename(serverURL+"/valid-with-schemaFile.zed", FileTypeYaml, true)
 		require.ErrorContains(t, err, "cannot use schemaFile key")
 	})
 }
