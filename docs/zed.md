@@ -649,6 +649,8 @@ zed permission bulk <resource:id#permission@subject:id> <resource:id#permission@
       --consistency-full                evaluate at the newest zedtoken in the database
       --consistency-min-latency         evaluate at the zedtoken preferred by the database
       --explain                         requests debug information from SpiceDB and prints out a trace of the requests
+      --html                            output explain trace as an interactive HTML file
+      --html-output string              path for HTML output file (used with --html) (default "trace.html")
       --json                            output as JSON
       --revision string                 optional revision at which to check
       --schema                          requests debug information from SpiceDB and prints out the schema used
@@ -693,6 +695,8 @@ zed permission check <resource:id> <permission> <subject:id> [flags]
       --consistency-min-latency         evaluate at the zedtoken preferred by the database
       --error-on-no-permission          if true, zed will return exit code 1 if subject does not have unconditional permission
       --explain                         requests debug information from SpiceDB and prints out a trace of the requests
+      --html                            output explain trace as an interactive HTML file
+      --html-output string              path for HTML output file (used with --html) (default "trace.html")
       --json                            output as JSON
       --schema                          requests debug information from SpiceDB and prints out the schema used
 ```
