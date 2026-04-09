@@ -2,8 +2,10 @@ module github.com/authzed/zed
 
 go 1.26.2
 
-// 0.14.0 was published as 1.14.0 by mistake
-retract v1.14.0
+retract (
+	v1.14.1 // this version retracts itself too
+	v1.14.0 // 0.14.0 was published as 1.14.0 by mistake
+)
 
 tool (
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
