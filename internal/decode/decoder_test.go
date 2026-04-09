@@ -405,8 +405,12 @@ schemaFile: "./schema.zed"
 relationships: |-
   resource:1#reader@user:1
 `,
-			expectedSchema:         schemaContent,
-			expectedDisplayContent: schemaContent,
+			expectedSchema: schemaContent,
+			expectedDisplayContent: `---
+schemaFile: "./schema.zed"
+relationships: |-
+  resource:1#reader@user:1
+`,
 			expectedSchemaFileName: "schema.zed",
 			expectedDir:            filepath.Join(dir, "."),
 			expectedSchemaOffset:   spiceerrors.SourcePosition{LineNumber: 0, ColumnPosition: 1},
@@ -421,8 +425,12 @@ schemaFile: "../%s/schema.zed"
 relationships: |-
   resource:1#reader@user:1
 `, dirName),
-			expectedSchema:         schemaContent,
-			expectedDisplayContent: schemaContent,
+			expectedSchema: schemaContent,
+			expectedDisplayContent: fmt.Sprintf(`---
+schemaFile: "../%s/schema.zed"
+relationships: |-
+  resource:1#reader@user:1
+`, dirName),
 			expectedSchemaFileName: "schema.zed",
 			expectedDir:            filepath.Join(dir, "../"+dirName),
 			expectedSchemaOffset:   spiceerrors.SourcePosition{LineNumber: 0, ColumnPosition: 1},

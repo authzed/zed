@@ -41,6 +41,11 @@ type DecoderResult struct {
 	Relationships     blocks.ParsedRelationships
 	Assertions        blocks.Assertions
 	ExpectedRelations blocks.ParsedExpectedRelations
+	// ValidationFile is the parsed validation file. For schemaFile YAML, the
+	// schema has been inlined into Schema and SchemaFile is still set; callers
+	// that pass this to development.NewDevContextForValidationFile should clear
+	// SchemaFile on a copy first.
+	ValidationFile *validationfile.ValidationFile
 }
 
 // yamlKeyPatterns match YAML top-level keys that indicate a validation file format.
@@ -255,21 +260,20 @@ func ValidationFileFromFilename(filename string, fileType FileType, mustDefineSc
 	if schemaDir == "" {
 		schemaDir = "."
 	}
-	displayContents := contents
 	if parsed.SchemaFile != "" {
 		rootFileName = filepath.Base(parsed.SchemaFile)
 		schemaDir = filepath.Join(schemaDir, filepath.Dir(parsed.SchemaFile))
-		displayContents = []byte(parsed.Schema.Schema)
 	}
 
 	decoderResult = &DecoderResult{
 		Schema:            parsed.Schema,
-		DisplayContents:   displayContents,
+		DisplayContents:   contents,
 		SchemaFileName:    rootFileName,
 		RootSchemaDir:     schemaDir,
 		Relationships:     parsed.Relationships,
 		Assertions:        parsed.Assertions,
 		ExpectedRelations: parsed.ExpectedRelations,
+		ValidationFile:    parsed,
 	}
 
 	return decoderResult, nil

@@ -15,7 +15,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/authzed/spicedb/pkg/development"
-	core "github.com/authzed/spicedb/pkg/proto/core/v1"
 	devinterface "github.com/authzed/spicedb/pkg/proto/developer/v1"
 
 	"github.com/authzed/zed/internal/commands"
@@ -161,32 +160,30 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 
 		filesystem := os.DirFS(parsed.RootSchemaDir)
 
-		// This logic will use the zero value of the struct, so we don't need
-		// to do it conditionally.
-		tuples := make([]*core.RelationTuple, 0)
 		totalAssertions := 0
 		totalRelationsValidated := 0
 
-		for _, rel := range parsed.Relationships.Relationships {
-			tuples = append(tuples, rel.ToCoreTuple())
-		}
-
-		// Create the development context for each run
+		// Create the development context for each run. If a schemaFile was used,
+		// the schema has already been inlined by ResolveSchemaFileIfPresent; clear
+		// SchemaFile on the copy so the new API uses the inlined schema directly
+		// rather than trying to re-read it via fs.FS (which doesn't support ../paths).
 		ctx := cmd.Context()
-		devCtx, devErrs, err := development.NewDevContext(ctx, &devinterface.RequestContext{
-			Schema:        parsed.Schema.Schema,
-			Relationships: tuples,
-		}, development.WithSourceFS(filesystem), development.WithRootFileName(parsed.SchemaFileName))
+		vfForDev := *parsed.ValidationFile
+		if vfForDev.SchemaFile != "" {
+			vfForDev.SchemaFile = ""
+		}
+		yctx, devErrs, err := development.NewDevContextForValidationFile(ctx, &vfForDev,
+			development.WithSourceFS(filesystem),
+			development.WithRootFileName(parsed.SchemaFileName))
 		if err != nil {
 			return "", false, err
 		}
 		if devErrs != nil {
-			normalizeErrorLines(devErrs.InputErrors, parsed)
 			outputDeveloperErrors(toPrint, parsed.DisplayContents, devErrs.InputErrors, filesystem)
 			return toPrint.String(), true, nil
 		}
 		// Run assertions
-		adevErrs, aerr := development.RunAllAssertions(devCtx, &parsed.Assertions)
+		adevErrs, aerr := development.RunAllAssertions(yctx.DevContext, &yctx.Assertions)
 		if aerr != nil {
 			return "", false, aerr
 		}
@@ -197,7 +194,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		successfullyValidatedFiles++
 
 		// Run expected relations for file
-		_, erDevErrs, rerr := development.RunValidation(devCtx, &parsed.ExpectedRelations)
+		_, erDevErrs, rerr := development.RunValidation(yctx.DevContext, &yctx.ExpectedRelations)
 		if rerr != nil {
 			return "", false, rerr
 		}
@@ -206,7 +203,7 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 			return toPrint.String(), true, nil
 		}
 		// Print out any warnings for file
-		warnings, err := development.GetWarnings(ctx, devCtx)
+		warnings, err := development.GetWarnings(ctx, yctx.DevContext)
 		if err != nil {
 			return "", false, err
 		}
@@ -225,11 +222,11 @@ func validateCmdFunc(cmd *cobra.Command, filenames []string) (string, bool, erro
 		} else {
 			toPrint.WriteString(success())
 		}
-		totalAssertions += len(parsed.Assertions.AssertTrue) + len(parsed.Assertions.AssertFalse)
-		totalRelationsValidated += len(parsed.ExpectedRelations.ValidationMap)
+		totalAssertions += len(yctx.Assertions.AssertTrue) + len(yctx.Assertions.AssertFalse)
+		totalRelationsValidated += len(yctx.ExpectedRelations.ValidationMap)
 
 		fmt.Fprintf(toPrint, " - %d relationships loaded, %d assertions run, %d expected relations validated\n",
-			len(tuples),
+			len(vfForDev.Relationships.Relationships),
 			totalAssertions,
 			totalRelationsValidated)
 	}
@@ -259,59 +256,6 @@ func outputForLine(sb *strings.Builder, validateContents []byte, oneIndexedLineN
 			renderLine(sb, lines, i, sourceCodeString, errorLineNumber, intColumnPosition-1)
 		} else {
 			renderLine(sb, lines, i, "", errorLineNumber, -1)
-		}
-	}
-}
-
-// normalizeErrorLines adjusts DeveloperError line numbers from block-relative
-// to absolute positions within the YAML file. Schema and relationship errors
-// are reported by SpiceDB with line numbers relative to their block; assertion
-// and validation errors already use absolute YAML line numbers.
-// Errors referencing external files (via Path) are left unchanged.
-func normalizeErrorLines(devErrors []*devinterface.DeveloperError, parsed *decode.DecoderResult) {
-	for _, devErr := range devErrors {
-		// Don't adjust line numbers for errors in external files (e.g. imported schemas).
-		// Errors whose Path matches the root schema file are still in the main YAML.
-		if len(devErr.Path) > 0 && devErr.Path[0] != "" && devErr.Path[0] != parsed.SchemaFileName {
-			continue
-		}
-
-		var offset int
-		switch devErr.Source {
-		case devinterface.DeveloperError_SCHEMA:
-			offset = parsed.Schema.SourcePosition.LineNumber
-		case devinterface.DeveloperError_RELATIONSHIP:
-			offset = parsed.Relationships.SourcePosition.LineNumber
-		default:
-			// Assertion and validation errors already use absolute line numbers.
-			continue
-		}
-
-		// SpiceDB may report Line=0 for errors where it doesn't track the
-		// exact line within the block (e.g. relationship validation errors).
-		// When that happens, search for the error context string in the file
-		// to find the actual line number.
-		line := int(devErr.Line)
-		if line == 0 && devErr.Context != "" && len(parsed.DisplayContents) > 0 {
-			lines := strings.Split(string(parsed.DisplayContents), "\n")
-			for i, l := range lines {
-				if strings.Contains(l, devErr.Context) {
-					// Use the absolute line number directly (1-indexed).
-					devErr.Line = uint32(i + 1)
-					line = -1 // signal that we already set the absolute line
-					break
-				}
-			}
-		}
-
-		if line == -1 {
-			// Already set to an absolute line number above.
-			continue
-		}
-
-		adjusted, err := safecast.Convert[uint32](line + offset)
-		if err == nil {
-			devErr.Line = adjusted
 		}
 	}
 }

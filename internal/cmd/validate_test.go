@@ -283,7 +283,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "relationship-error-before-schema.yaml"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr: "error: parse error in `test:1#idontexisttt@user:1`, line 3, column 0: relation/permission `idontexisttt` not found under definition `test`            \n" +
+			expectStr: "error: parse error in `test:1#idontexisttt@user:1`, line 3, column 16: relation/permission `idontexisttt` not found under definition `test`            \n" +
 				"  1 | ---\n" +
 				"  2 | relationships: >-\n" +
 				"  3 >   test:1#idontexisttt@user:1\n" +
@@ -296,7 +296,7 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 				filepath.Join("validate-test", "relationship-error-before-schema-multi.yaml"),
 			},
 			expectNonZeroStatusCode: true,
-			expectStr: "error: parse error in `test:1#idontexisttt@user:1`, line 5, column 0: relation/permission `idontexisttt` not found under definition `test`            \n" +
+			expectStr: "error: parse error in `test:1#idontexisttt@user:1`, line 5, column 16: relation/permission `idontexisttt` not found under definition `test`            \n" +
 				"  2 | relationships: |-\n" +
 				"  3 |   test:1#viewer@user:1\n" +
 				"  4 |   test:2#viewer@user:2\n" +
