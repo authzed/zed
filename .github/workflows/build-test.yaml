@@ -69,7 +69,7 @@ jobs:
           # NOTE: This needs to match the toolchain version, or else
           # go env gopath won't point at the right install location for the
           # wasm tool.
-          go-version: "1.25.8"
+          go-version: "1.26.2"
       - name: "Disable AppArmor"
         if:
           "runner.os == 'Linux'"
