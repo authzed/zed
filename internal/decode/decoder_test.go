@@ -68,6 +68,26 @@ func TestDecoderFromURL(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, schemaContent, vFile.Schema.Schema)
 	})
+
+	t.Run("HTTP 404 returns an error instead of parsing response body", func(t *testing.T) {
+		u, err := url.Parse(serverURL + "/nonexistent")
+		require.NoError(t, err)
+
+		_, err = FetchFromURL(u)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "HTTP 404")
+	})
+
+	t.Run("error message does not leak query parameters", func(t *testing.T) {
+		u, err := url.Parse(serverURL + "/nonexistent?token=secret&key=private")
+		require.NoError(t, err)
+
+		_, err = FetchFromURL(u)
+		require.Error(t, err)
+		require.NotContains(t, err.Error(), "secret")
+		require.NotContains(t, err.Error(), "private")
+		require.Contains(t, err.Error(), "/nonexistent")
+	})
 }
 
 func TestRewriteURL(t *testing.T) {

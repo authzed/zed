@@ -150,6 +150,12 @@ func fetchHTTPDirectly(u *url.URL) ([]byte, error) {
 		return nil, err
 	}
 	defer r.Body.Close()
+
+	if r.StatusCode != http.StatusOK {
+		sanitized := fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, u.Path)
+		return nil, fmt.Errorf("failed to fetch %s: received HTTP %d", sanitized, r.StatusCode)
+	}
+
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
