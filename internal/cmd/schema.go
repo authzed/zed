@@ -235,7 +235,7 @@ func schemaCopyInner(ctx context.Context, srcClient, destClient v1.SchemaService
 		return nil, err
 	}
 
-	schemaText, err := rewriteSchema(ctx, readResp.SchemaText, prefix)
+	schemaText, err := rewriteSchema(ctx, readResp.SchemaText, prefix, "")
 	if err != nil {
 		return nil, err
 	}
@@ -263,12 +263,14 @@ func schemaWriteCmdImpl(cmd *cobra.Command, args []string, client v1.SchemaServi
 	}
 
 	var schemaBytes []byte
+	var sourceFolder string
 	switch len(args) {
 	case 1:
 		schemaBytes, err = os.ReadFile(args[0])
 		if err != nil {
 			return fmt.Errorf("failed to read schema file: %w", err)
 		}
+		sourceFolder = filepath.Dir(args[0])
 		log.Trace().Str("schema", string(schemaBytes)).Str("file", args[0]).Msg("read schema from file")
 	case 0:
 		schemaBytes, err = io.ReadAll(os.Stdin)
@@ -289,7 +291,7 @@ func schemaWriteCmdImpl(cmd *cobra.Command, args []string, client v1.SchemaServi
 		return err
 	}
 
-	schemaText, err := rewriteSchema(cmd.Context(), string(schemaBytes), prefix)
+	schemaText, err := rewriteSchema(cmd.Context(), string(schemaBytes), prefix, sourceFolder)
 	if err != nil {
 		return err
 	}
@@ -316,15 +318,24 @@ func schemaWriteCmdImpl(cmd *cobra.Command, args []string, client v1.SchemaServi
 }
 
 // rewriteSchema rewrites the given existing schema to include the specified prefix on all definitions and caveats.
-func rewriteSchema(ctx context.Context, existingSchemaText string, definitionPrefix string) (string, error) {
-	if definitionPrefix == "" {
+func rewriteSchema(ctx context.Context, existingSchemaText string, definitionPrefix string, sourceFolder string) (string, error) {
+	if definitionPrefix == "" && sourceFolder == "" {
 		return existingSchemaText, nil
 	}
 
+	var prefixOpt compiler.ObjectPrefixOption
+	if definitionPrefix != "" {
+		prefixOpt = compiler.ObjectTypePrefix(definitionPrefix)
+	} else {
+		prefixOpt = compiler.AllowUnprefixedObjectType()
+	}
+
+	opts := []compiler.Option{compiler.SkipValidation(), compiler.SourceFolder(sourceFolder)}
+
 	compiled, err := compiler.Compile(
 		compiler.InputSchema{Source: input.Source("schema"), SchemaString: existingSchemaText},
-		compiler.ObjectTypePrefix(definitionPrefix),
-		compiler.SkipValidation(),
+		prefixOpt,
+		opts...,
 	)
 	if err != nil {
 		return "", err
