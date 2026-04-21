@@ -323,19 +323,11 @@ func rewriteSchema(ctx context.Context, existingSchemaText string, definitionPre
 		return existingSchemaText, nil
 	}
 
-	var prefixOpt compiler.ObjectPrefixOption
-	if definitionPrefix != "" {
-		prefixOpt = compiler.ObjectTypePrefix(definitionPrefix)
-	} else {
-		prefixOpt = compiler.AllowUnprefixedObjectType()
-	}
-
-	opts := []compiler.Option{compiler.SkipValidation(), compiler.SourceFolder(sourceFolder)}
-
 	compiled, err := compiler.Compile(
 		compiler.InputSchema{Source: input.Source("schema"), SchemaString: existingSchemaText},
-		prefixOpt,
-		opts...,
+		compiler.ObjectTypePrefix(definitionPrefix),
+		compiler.SkipValidation(),
+		compiler.SourceFolder(sourceFolder),
 	)
 	if err != nil {
 		return "", err
