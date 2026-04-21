@@ -103,6 +103,53 @@ func TestImportCmd(t *testing.T) {
 	}
 }
 
+func TestImportCmdSchemaWithImports(t *testing.T) {
+	require := require.New(t)
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.StringFlag{FlagName: "schema-definition-prefix"},
+		zedtesting.BoolFlag{FlagName: "schema", FlagValue: true},
+		zedtesting.BoolFlag{FlagName: "relationships", FlagValue: true},
+		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
+		zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
+	)
+	f := filepath.Join("import-test", "with-import-validation-file.yaml")
+
+	ctx := t.Context()
+	srv := zedtesting.NewTestServer(ctx, t)
+	go func() {
+		assert.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(err)
+	t.Cleanup(func() {
+		conn.Close()
+	})
+
+	c, err := zedtesting.ClientFromConn(conn)(cmd)
+	require.NoError(err)
+
+	// The YAML points to a .zed file that uses `import "with-import-common.zed"`. WriteSchema
+	// rejects `import` statements, so this exercises that the client flattens the schema
+	// (via rewriteSchema + SourceFolder) before sending.
+	err = importCmdFunc(cmd, c, c, "", f)
+	require.NoError(err)
+
+	rel := tuple.MustParse(`resource:1#view@user:1[mycaveat]`)
+	resp, err := c.CheckPermission(ctx, &v1.CheckPermissionRequest{
+		Consistency: fullyConsistent,
+		Subject:     &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: rel.Subject.ObjectType, ObjectId: rel.Subject.ObjectID}},
+		Permission:  "view",
+		Resource:    &v1.ObjectReference{ObjectType: rel.Resource.ObjectType, ObjectId: rel.Resource.ObjectID},
+		Context: &structpb.Struct{
+			Fields: map[string]*structpb.Value{
+				"day_of_week": structpb.NewStringValue("friday"),
+			},
+		},
+	})
+	require.NoError(err)
+	require.Equal(v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION, resp.Permissionship)
+}
+
 func TestImportCmdRelationsOnly(t *testing.T) {
 	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
 		zedtesting.StringFlag{FlagName: "schema-definition-prefix"},

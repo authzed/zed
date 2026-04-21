@@ -123,7 +123,7 @@ caveat test/some_caveat(someCondition int) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			found, err := rewriteSchema(t.Context(), test.existingSchema, test.definitionPrefix)
+			found, err := rewriteSchema(t.Context(), test.existingSchema, test.definitionPrefix, "")
 			require.NoError(t, err)
 			require.Equal(t, test.expectedSchema, found)
 		})
@@ -375,9 +375,10 @@ func TestSchemaWrite(t *testing.T) {
 				}, nil
 			},
 			expectSchemaWritten: `definition user {}
+
 definition resource {
-  relation view: user
-  permission viewer = view
+	relation view: user
+	permission viewer = view
 }`,
 			terminalChecker: &mockTermChecker{returnVal: false},
 		},
