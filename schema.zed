@@ -1,0 +1,13 @@
+	definition user {}
+
+	definition folder {
+		relation viewer: user
+		relation parent: folder
+		permission view = parent->view + viewer
+	}
+
+	definition resource {
+		relation folder: folder
+		permission view = folder->view
+	}
+
