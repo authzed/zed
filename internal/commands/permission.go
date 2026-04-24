@@ -544,7 +544,6 @@ func handleLookupResourcesErr(err error) error {
 	return err
 }
 
-
 func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
 	var objectNS, objectID string
 	err := stringz.SplitExact(args[0], ":", &objectNS, &objectID)

@@ -197,22 +197,72 @@ func isPartOfCycle(checkTrace *v1.CheckDebugTrace, encountered map[string]struct
 	return false
 }
 
+const (
+	originalSubjectMarker = "<-- Original subject"
+	cycleStartMarker = "<-- Cycle start"
+	cycleEndMarker = "<-- Cycle end"
+)
+
 func DisplayLookupResourcesTrace(trace *dispatchv1.LookupDebugTrace) {
-	var output strings.Builder
 	seen := mapz.NewSet[string]()
+	framesToPrint := make([]string, 0, len(trace.Frames))
+	cyclicFrame := ""
+
+	// Iterate through frames to determine whether it's cyclic and
+	// construct framesToPrint
 	for _, frame := range trace.Frames {
-		frameStr := frameToString(frame)
-		output.WriteString("\t" + frameStr + "\n")
-		notSeen := seen.Add(frameStr)
+		frameString := frameToString(frame)
+		notSeen := seen.Add(frameString)
+		framesToPrint = append(framesToPrint, frameString)
 		// If we see something we've seen before, we've got a cycle.
-		// Print the cycle along with a notification
+		// We mark it as such and stop appending frames.
 		if !notSeen {
-			console.Errorf("Data cycle detected:\n")
-			console.Errorf(output.String())
-			return
+			cyclicFrame = frameString
+			break
 		}
 	}
-	console.Errorf("Recursion depth hit:\n")
+
+	if cyclicFrame != "" {
+		printCyclicFrames(framesToPrint, cyclicFrame)
+	} else {
+		printRecursionDepthFrames(framesToPrint)
+	}
+}
+
+func printCyclicFrames(frameStrings []string, cyclicFrame string) {
+	console.Errorf("Cycle found in data:\n")
+	var output strings.Builder
+	for i, frameString := range frameStrings {
+		switch {
+			// The first frame will be the original subject -
+			// print it first and mark it.
+		case i == 0:
+			output.WriteString("\t" + frameString + "\t" + originalSubjectMarker + "\n")
+			// We mark the last string as the end of the cycle,
+			// since that's where we stopped counting.
+		case i == len(frameStrings) - 1:
+			output.WriteString("\t" + frameString + "\t" + cycleEndMarker + "\n")
+			// We mark the cyclic frame as the start of the cycle.
+		case frameString == cyclicFrame:
+			output.WriteString("\t" + frameString + "\t" + cycleStartMarker + "\n")
+			// Otherwise we just print the frame.
+		default:
+			output.WriteString("\t" + frameString + "\n")
+		}
+	}
+	console.Errorf(output.String())
+}
+
+func printRecursionDepthFrames(frameStrings []string) {
+	console.Errorf("Recursion depth hit along path:\n")
+	var output strings.Builder
+	for i, frameString := range frameStrings {
+		if i == 0 {
+			output.WriteString("\t" + frameString + "\t" + originalSubjectMarker + "\n")
+		} else {
+			output.WriteString("\t" + frameString + "\n")
+		}
+	}
 	console.Errorf(output.String())
 }
 
