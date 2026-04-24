@@ -8,7 +8,10 @@ import (
 	"github.com/gookit/color"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/genutil/mapz"
+	dispatchv1 "github.com/authzed/spicedb/pkg/proto/dispatch/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
+	"github.com/authzed/zed/internal/console"
 )
 
 // DisplayCheckTrace prints out the check trace found in the given debug message.
@@ -192,4 +195,27 @@ func isPartOfCycle(checkTrace *v1.CheckDebugTrace, encountered map[string]struct
 	}
 
 	return false
+}
+
+func DisplayLookupResourcesTrace(trace *dispatchv1.LookupDebugTrace) {
+	var output strings.Builder
+	seen := mapz.NewSet[string]()
+	for _, frame := range trace.Frames {
+		frameStr := frameToString(frame)
+		output.WriteString("\t" + frameStr + "\n")
+		notSeen := seen.Add(frameStr)
+		// If we see something we've seen before, we've got a cycle.
+		// Print the cycle along with a notification
+		if !notSeen {
+			console.Errorf("Data cycle detected:\n")
+			console.Errorf(output.String())
+			return
+		}
+	}
+	console.Errorf("Recursion depth hit:\n")
+	console.Errorf(output.String())
+}
+
+func frameToString(frame *dispatchv1.LookupDebugFrame) string {
+	return fmt.Sprintf("%s:%s#%s", frame.ResourceType, frame.ResourceId, frame.Relation)
 }
