@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -231,23 +232,28 @@ func TestLookupResourcesMaxRecursionDebug(t *testing.T) {
 	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{Updates: updates})
 	require.NoError(t, err)
 
-	var count int
+	var output strings.Builder
 	// we override this to obtain the results being printed and validate them
-	/*
-	previous := console.Println
+	previous := console.Errorf
 	defer func() {
-		console.Println = previous
+		console.Errorf = previous
 	}()
-	console.Println = func(values ...any) {
-		count += len(values)
+	console.Errorf = func(format string, _ ...any) {
+		output.WriteString(format)
 	}
-	*/
 
 	// test no page size, server computes returns all resources in one go
 	cmd := testLookupResourcesCommand(t, 0, true)
 	err = lookupResourcesCmdFunc(cmd, []string{"resource", "view", "user:someuser"})
-	require.NoError(t, err)
-	require.Equal(t, 10, count)
+
+	outputString := output.String()
+
+	// Expecting a max depth error
+	require.ErrorContains(t, err, "max depth exceeded")
+	// Expecting certain output
+	require.Contains(t, outputString, "Cycle found")
+	require.Contains(t, outputString, "Cycle start")
+	require.Contains(t, outputString, "Cycle end")
 }
 
 func testLookupResourcesCommand(t *testing.T, limit uint32, debug bool) *cobra.Command {
