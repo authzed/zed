@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/genutil/slicez"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
 	"github.com/authzed/spicedb/pkg/tuple"
 
@@ -101,8 +103,7 @@ func TestCheckErrorWithInvalidDebugInformation(t *testing.T) {
 }
 
 func TestLookupResourcesCommand(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
@@ -154,7 +155,7 @@ func TestLookupResourcesCommand(t *testing.T) {
 	}()
 
 	// test no page size, server computes returns all resources in one go
-	cmd := testLookupResourcesCommand(t, 0)
+	cmd := testLookupResourcesCommand(t, 0, false)
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
 	require.Equal(t, 10, count)
@@ -163,7 +164,7 @@ func TestLookupResourcesCommand(t *testing.T) {
 	// use page size same as number of elements
 	count = 0
 	receivedPageSizes = nil
-	cmd = testLookupResourcesCommand(t, 10)
+	cmd = testLookupResourcesCommand(t, 10, false)
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
 	require.Equal(t, 10, count)
@@ -172,14 +173,90 @@ func TestLookupResourcesCommand(t *testing.T) {
 	// use odd page size
 	count = 0
 	receivedPageSizes = nil
-	cmd = testLookupResourcesCommand(t, 3)
+	cmd = testLookupResourcesCommand(t, 3, false)
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
 	require.Equal(t, 10, count)
 	require.Equal(t, []uint{3, 3, 3, 1}, receivedPageSizes)
 }
 
-func testLookupResourcesCommand(t *testing.T, limit uint32) *cobra.Command {
+func TestLookupResourcesMaxRecursionDebug(t *testing.T) {
+	ctx := t.Context()
+	srv := zedtesting.NewTestServer(ctx, t)
+	go func() {
+		assert.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(t, err)
+
+	originalClient := client.NewClient
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	client.NewClient = zedtesting.ClientFromConn(conn)
+
+	c, err := zedtesting.ClientFromConn(conn)(nil)
+	require.NoError(t, err)
+
+	circularSchema := `
+	definition user {}
+
+	definition folder {
+		relation viewer: user
+		relation parent: folder
+		permission view = parent->view + viewer
+	}
+
+	definition resource {
+		relation folder: folder
+		permission view = folder->view
+	}
+	`
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: circularSchema})
+	require.NoError(t, err)
+
+	relationships := []*v1.Relationship{
+		tuple.MustParseV1Rel("folder:a#parent@folder:b"),
+		tuple.MustParseV1Rel("folder:b#parent@folder:a"),
+		tuple.MustParseV1Rel("folder:a#viewer@user:someuser"),
+	}
+
+	updates := slicez.Map(relationships, func(relationship *v1.Relationship) *v1.RelationshipUpdate {
+		return &v1.RelationshipUpdate{
+			Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+			Relationship: relationship,
+		}
+	})
+
+	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{Updates: updates})
+	require.NoError(t, err)
+
+	var output strings.Builder
+	// we override this to obtain the results being printed and validate them
+	previous := console.Errorf
+	defer func() {
+		console.Errorf = previous
+	}()
+	console.Errorf = func(format string, _ ...any) {
+		output.WriteString(format)
+	}
+
+	// test no page size, server computes returns all resources in one go
+	cmd := testLookupResourcesCommand(t, 0, true)
+	err = lookupResourcesCmdFunc(cmd, []string{"resource", "view", "user:someuser"})
+
+	outputString := output.String()
+
+	// Expecting a max depth error
+	require.ErrorContains(t, err, "max depth exceeded")
+	// Expecting certain output
+	require.Contains(t, outputString, "Cycle found")
+	require.Contains(t, outputString, "Cycle start")
+	require.Contains(t, outputString, "Cycle end")
+}
+
+func testLookupResourcesCommand(t *testing.T, limit uint32, debug bool) *cobra.Command {
 	return zedtesting.CreateTestCobraCommandWithFlagValue(t,
 		zedtesting.BoolFlag{FlagName: "consistency-full", FlagValue: true},
 		zedtesting.StringFlag{FlagName: "consistency-at-least"},
@@ -190,5 +267,6 @@ func testLookupResourcesCommand(t *testing.T, limit uint32) *cobra.Command {
 		zedtesting.UintFlag32{FlagName: "page-limit", FlagValue: limit},
 		zedtesting.BoolFlag{FlagName: "json"},
 		zedtesting.StringFlag{FlagName: "cursor"},
-		zedtesting.BoolFlag{FlagName: "show-cursor", FlagValue: false})
+		zedtesting.BoolFlag{FlagName: "show-cursor", FlagValue: false},
+		zedtesting.BoolFlag{FlagName: "debug", FlagValue: debug})
 }
