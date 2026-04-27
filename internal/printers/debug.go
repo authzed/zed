@@ -8,9 +8,9 @@ import (
 	"github.com/gookit/color"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
-	"github.com/authzed/spicedb/pkg/genutil/mapz"
 	dispatchv1 "github.com/authzed/spicedb/pkg/proto/dispatch/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
+
 	"github.com/authzed/zed/internal/console"
 )
 
@@ -197,75 +197,15 @@ func isPartOfCycle(checkTrace *v1.CheckDebugTrace, encountered map[string]struct
 	return false
 }
 
-const (
-	originalSubjectMarker = "<-- Original subject"
-	cycleStartMarker = "<-- Cycle start"
-	cycleEndMarker = "<-- Cycle end"
-)
-
-func DisplayLookupResourcesTrace(trace *dispatchv1.LookupDebugTrace) {
-	seen := mapz.NewSet[string]()
-	framesToPrint := make([]string, 0, len(trace.Frames))
-	cyclicFrame := ""
-
-	// Iterate through frames to determine whether it's cyclic and
-	// construct framesToPrint
-	for _, frame := range trace.Frames {
-		frameString := frameToString(frame)
-		notSeen := seen.Add(frameString)
-		framesToPrint = append(framesToPrint, frameString)
-		// If we see something we've seen before, we've got a cycle.
-		// We mark it as such and stop appending frames.
-		if !notSeen {
-			cyclicFrame = frameString
-			break
-		}
-	}
-
-	if cyclicFrame != "" {
-		printCyclicFrames(framesToPrint, cyclicFrame)
-	} else {
-		printRecursionDepthFrames(framesToPrint)
-	}
-}
-
-func printCyclicFrames(frameStrings []string, cyclicFrame string) {
-	console.Errorf("Cycle found in data:\n")
+func DisplayLookupResourcesDebugInfo(debugInfo *dispatchv1.LookupDebugInfo) {
 	var output strings.Builder
-	for i, frameString := range frameStrings {
-		switch {
-			// The first frame will be the original subject -
-			// print it first and mark it.
-		case i == 0:
-			output.WriteString("\t" + frameString + "\t" + originalSubjectMarker + "\n")
-			// We mark the last string as the end of the cycle,
-			// since that's where we stopped counting.
-		case i == len(frameStrings) - 1:
-			output.WriteString("\t" + frameString + "\t" + cycleEndMarker + "\n")
-			// We mark the cyclic frame as the start of the cycle.
-		case frameString == cyclicFrame:
-			output.WriteString("\t" + frameString + "\t" + cycleStartMarker + "\n")
-			// Otherwise we just print the frame.
-		default:
-			output.WriteString("\t" + frameString + "\n")
-		}
+	output.WriteString("\nThe following resource/relation pairs were found in a cycle in LookupResources:\n\n")
+	for _, member := range debugInfo.CycleMembers {
+		fmt.Fprintf(&output, "\t- %s\n", member)
 	}
-	console.Errorf(output.String())
-}
-
-func printRecursionDepthFrames(frameStrings []string) {
-	console.Errorf("Recursion depth hit along path:\n")
-	var output strings.Builder
-	for i, frameString := range frameStrings {
-		if i == 0 {
-			output.WriteString("\t" + frameString + "\t" + originalSubjectMarker + "\n")
-		} else {
-			output.WriteString("\t" + frameString + "\n")
-		}
-	}
-	console.Errorf(output.String())
-}
-
-func frameToString(frame *dispatchv1.LookupDebugFrame) string {
-	return fmt.Sprintf("%s:%s#%s", frame.ResourceType, frame.ResourceId, frame.Relation)
+	output.WriteString("\nTo further debug this, issue a check from the resource to itself across the relation.\n")
+	output.WriteString("For example, with the identified pair `resource:foo#view`, you would make the following call:\n")
+	output.WriteString("\n\tzed permission check resource:foo view resource:foo --explain\n\n")
+	output.WriteString("For more information, see the LookupResources section under https://spicedb.dev/d/debug-max-depth\n\n")
+	console.Error(output.String())
 }

@@ -234,11 +234,11 @@ func TestLookupResourcesMaxRecursionDebug(t *testing.T) {
 
 	var output strings.Builder
 	// we override this to obtain the results being printed and validate them
-	previous := console.Errorf
+	previous := console.Error
 	defer func() {
-		console.Errorf = previous
+		console.Error = previous
 	}()
-	console.Errorf = func(format string, _ ...any) {
+	console.Error = func(format string) {
 		output.WriteString(format)
 	}
 
@@ -251,9 +251,7 @@ func TestLookupResourcesMaxRecursionDebug(t *testing.T) {
 	// Expecting a max depth error
 	require.ErrorContains(t, err, "max depth exceeded")
 	// Expecting certain output
-	require.Contains(t, outputString, "Cycle found")
-	require.Contains(t, outputString, "Cycle start")
-	require.Contains(t, outputString, "Cycle end")
+	require.Contains(t, outputString, "- folder:a#view", "should contain reference to cycle member")
 }
 
 func testLookupResourcesCommand(t *testing.T, limit uint32, debug bool) *cobra.Command {

@@ -526,17 +526,17 @@ func handleLookupResourcesErr(err error) error {
 	for _, detail := range s.Details() {
 		if errInfo, ok := detail.(*errdetails.ErrorInfo); ok {
 			if errInfo.Reason == v1.ErrorReason_ERROR_REASON_MAXIMUM_DEPTH_EXCEEDED.String() {
-				traceString, ok := errInfo.Metadata[string(spiceerrors.DebugTraceErrorDetailsKey)]
+				debugInfoString, ok := errInfo.Metadata[string(spiceerrors.DebugTraceErrorDetailsKey)]
 				if !ok {
 					// If the metadata isn't present we pass
 					continue
 				}
-				trace := &dispatchv1.LookupDebugTrace{}
-				if marshalErr := protojson.Unmarshal([]byte(traceString), trace); marshalErr != nil {
+				debugInfo := &dispatchv1.LookupDebugInfo{}
+				if marshalErr := prototext.Unmarshal([]byte(debugInfoString), debugInfo); marshalErr != nil {
 					// If we can't unmarshal we'll pass it along
 					continue
 				}
-				printers.DisplayLookupResourcesTrace(trace)
+				printers.DisplayLookupResourcesDebugInfo(debugInfo)
 				break
 			}
 		}

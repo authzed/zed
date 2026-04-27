@@ -26,6 +26,14 @@ var Errorf = func(format string, a ...any) {
 	}
 }
 
+// Error defines an (overridable) function for printing to the console via stderr.
+var Error = func(format string) {
+	_, err := fmt.Fprint(os.Stderr, format)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // Println prints a line with optional values to the console.
 var Println = func(values ...any) {
 	for _, value := range values {
