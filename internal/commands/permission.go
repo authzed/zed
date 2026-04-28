@@ -438,8 +438,8 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 
 	ctx := cmd.Context()
 	if cobrautil.MustGetBool(cmd, "debug") {
+		// Just let the user know that we're in this mode.
 		log.Info().Msg("debugging requested on LookupResources")
-		ctx = requestmeta.AddRequestHeaders(ctx, requestmeta.RequestDebugInformation)
 	}
 	var cursor *v1.Cursor
 	if cursorStr := cobrautil.MustGetString(cmd, "cursor"); cursorStr != "" {
@@ -462,6 +462,7 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 			Consistency:    consistency,
 			OptionalLimit:  pageLimit,
 			OptionalCursor: cursor,
+			WithDebug: cobrautil.MustGetBool(cmd, "debug"),
 		}
 		log.Trace().Interface("request", request).Uint32("page-limit", pageLimit).Send()
 
