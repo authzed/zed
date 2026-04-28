@@ -1017,8 +1017,10 @@ zed relationship read <resource_type:optional_resource_id> <optional_relation> <
       --consistency-at-least string     evaluate at least as consistent as the provided zedtoken
       --consistency-full                evaluate at the newest zedtoken in the database
       --consistency-min-latency         evaluate at the zedtoken preferred by the database
+      --cursor string                   resume pagination from a specific cursor token
       --json                            output as JSON
       --page-limit uint32               limit of relations returned per page (default 100)
+      --show-cursor                     display the cursor token after pagination
       --subject-filter string           optional subject filter
 ```
 

@@ -107,6 +107,8 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	readCmd.Flags().Bool("json", false, "output as JSON")
 	readCmd.Flags().String("subject-filter", "", "optional subject filter")
 	readCmd.Flags().Uint32("page-limit", 100, "limit of relations returned per page")
+	readCmd.Flags().String("cursor", "", "resume pagination from a specific cursor token")
+	readCmd.Flags().Bool("show-cursor", false, "display the cursor token after pagination")
 	registerConsistencyFlags(readCmd.Flags())
 
 	relationshipCmd.AddCommand(bulkDeleteCmd)
@@ -278,7 +280,10 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	lastCursor := request.OptionalCursor
+	var lastCursor *v1.Cursor
+	if cursorStr := cobrautil.MustGetString(cmd, "cursor"); cursorStr != "" {
+		lastCursor = &v1.Cursor{Token: cursorStr}
+	}
 	for {
 		request.OptionalCursor = lastCursor
 		var cursorToken string
@@ -313,16 +318,27 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 			}
 		}
 
+		if newReadRelationshipsPageCallbackForTests != nil {
+			newReadRelationshipsPageCallbackForTests(uint(relCount))
+		}
+
 		if relCount < limit || limit == 0 {
-			return nil
+			break
 		}
 
 		if relCount > limit {
 			log.Warn().Uint32("limit-specified", limit).Uint32("relationships-received", relCount).Msg("page limit ignored, pagination may not be supported by the server, consider updating SpiceDB")
-			return nil
+			break
 		}
 	}
+
+	if cobrautil.MustGetBool(cmd, "show-cursor") && lastCursor != nil {
+		console.Printf("Last cursor: %s\n", lastCursor.Token)
+	}
+	return nil
 }
+
+var newReadRelationshipsPageCallbackForTests func(readByPage uint)
 
 func printRelationship(cmd *cobra.Command, msg *v1.ReadRelationshipsResponse) error {
 	if cobrautil.MustGetBool(cmd, "json") {

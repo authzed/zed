@@ -21,6 +21,7 @@ import (
 	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/console"
 	"github.com/authzed/zed/internal/zedtesting"
 )
 
@@ -819,4 +820,167 @@ func assertRelationshipCount(ctx context.Context, t *testing.T, c client.Client,
 
 	require.NoError(t, rrCli.CloseSend())
 	require.Equal(t, count, relCount)
+}
+
+func testReadRelationshipsCommand(t *testing.T, pageLimit uint32, cursor string, showCursor bool) *cobra.Command {
+	t.Helper()
+	return zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.BoolFlag{FlagName: "consistency-full", FlagValue: true},
+		zedtesting.StringFlag{FlagName: "consistency-at-least"},
+		zedtesting.BoolFlag{FlagName: "consistency-min-latency", FlagValue: false},
+		zedtesting.StringFlag{FlagName: "consistency-at-exactly"},
+		zedtesting.StringFlag{FlagName: "revision"},
+		zedtesting.StringFlag{FlagName: "subject-filter"},
+		zedtesting.UintFlag32{FlagName: "page-limit", FlagValue: pageLimit},
+		zedtesting.BoolFlag{FlagName: "json"},
+		zedtesting.StringFlag{FlagName: "cursor", FlagValue: cursor},
+		zedtesting.BoolFlag{FlagName: "show-cursor", FlagValue: showCursor})
+}
+
+func TestReadRelationshipsCursor(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	srv := zedtesting.NewTestServer(ctx, t)
+	go func() {
+		assert.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(t, err)
+
+	originalClient := client.NewClient
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	client.NewClient = zedtesting.ClientFromConn(conn)
+
+	c, err := zedtesting.ClientFromConn(conn)(nil)
+	require.NoError(t, err)
+
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: testSchema})
+	require.NoError(t, err)
+
+	var updates []*v1.RelationshipUpdate
+	for i := 0; i < 10; i++ {
+		updates = append(updates, &v1.RelationshipUpdate{
+			Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+			Relationship: tuple.MustParseV1Rel(fmt.Sprintf("test/resource:%d#reader@test/user:1", i)),
+		})
+	}
+	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{Updates: updates})
+	require.NoError(t, err)
+
+	previousPrintln := console.Println
+	previousPrintf := console.Printf
+	defer func() {
+		console.Println = previousPrintln
+		console.Printf = previousPrintf
+	}()
+	var printedLines []string
+	console.Println = func(values ...any) {
+		for _, v := range values {
+			printedLines = append(printedLines, fmt.Sprint(v))
+		}
+	}
+	var printedFormatted []string
+	console.Printf = func(format string, a ...any) {
+		printedFormatted = append(printedFormatted, fmt.Sprintf(format, a...))
+	}
+
+	var receivedPageSizes []uint
+	newReadRelationshipsPageCallbackForTests = func(readPageSize uint) {
+		receivedPageSizes = append(receivedPageSizes, readPageSize)
+	}
+	defer func() {
+		newReadRelationshipsPageCallbackForTests = nil
+	}()
+
+	t.Run("no page limit returns all in one page", func(t *testing.T) {
+		printedLines = nil
+		printedFormatted = nil
+		receivedPageSizes = nil
+
+		cmd := testReadRelationshipsCommand(t, 0, "", false)
+		err := readRelationships(cmd, []string{"test/resource"})
+		require.NoError(t, err)
+		require.Len(t, printedLines, 10)
+		require.Equal(t, []uint{10}, receivedPageSizes)
+		require.Empty(t, printedFormatted)
+	})
+
+	t.Run("page limit paginates through results", func(t *testing.T) {
+		printedLines = nil
+		printedFormatted = nil
+		receivedPageSizes = nil
+
+		cmd := testReadRelationshipsCommand(t, 3, "", false)
+		err := readRelationships(cmd, []string{"test/resource"})
+		require.NoError(t, err)
+		require.Len(t, printedLines, 10)
+		require.Equal(t, []uint{3, 3, 3, 1}, receivedPageSizes)
+	})
+
+	t.Run("show-cursor prints last cursor", func(t *testing.T) {
+		printedLines = nil
+		printedFormatted = nil
+		receivedPageSizes = nil
+
+		cmd := testReadRelationshipsCommand(t, 3, "", true)
+		err := readRelationships(cmd, []string{"test/resource"})
+		require.NoError(t, err)
+		require.Len(t, printedLines, 10)
+		require.Len(t, printedFormatted, 1)
+		require.Contains(t, printedFormatted[0], "Last cursor: ")
+		require.NotEqual(t, "Last cursor: \n", printedFormatted[0])
+	})
+
+	t.Run("starting cursor resumes pagination", func(t *testing.T) {
+		// First, fetch the cursor after the first page using the same page-limit
+		// the resume call will use (the cursor must match the original API call).
+		const resumePageLimit uint32 = 4
+		stream, err := c.ReadRelationships(ctx, &v1.ReadRelationshipsRequest{
+			Consistency: &v1.Consistency{
+				Requirement: &v1.Consistency_FullyConsistent{FullyConsistent: true},
+			},
+			RelationshipFilter: &v1.RelationshipFilter{ResourceType: "test/resource"},
+			OptionalLimit:      resumePageLimit,
+		})
+		require.NoError(t, err)
+
+		var resumeCursor *v1.Cursor
+		var firstPageSeen int
+		for {
+			msg, err := stream.Recv()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			require.NoError(t, err)
+			firstPageSeen++
+			resumeCursor = msg.AfterResultCursor
+		}
+		require.Equal(t, int(resumePageLimit), firstPageSeen)
+		require.NotNil(t, resumeCursor)
+		require.NotEmpty(t, resumeCursor.Token)
+
+		// Now call read with the cursor and confirm only the remaining 6 are emitted.
+		printedLines = nil
+		printedFormatted = nil
+		receivedPageSizes = nil
+
+		cmd := testReadRelationshipsCommand(t, resumePageLimit, resumeCursor.Token, false)
+		err = readRelationships(cmd, []string{"test/resource"})
+		require.NoError(t, err)
+		require.Len(t, printedLines, 6)
+		require.Equal(t, []uint{4, 2}, receivedPageSizes)
+	})
+
+	t.Run("invalid cursor returns error", func(t *testing.T) {
+		printedLines = nil
+		printedFormatted = nil
+		receivedPageSizes = nil
+
+		cmd := testReadRelationshipsCommand(t, 0, "not-a-real-cursor", false)
+		err := readRelationships(cmd, []string{"test/resource"})
+		require.Error(t, err)
+	})
 }
