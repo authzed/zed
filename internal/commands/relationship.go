@@ -261,6 +261,10 @@ func buildRelationshipsFilter(cmd *cobra.Command, args []string) (*v1.Relationsh
 }
 
 func readRelationships(cmd *cobra.Command, args []string) error {
+	return readRelationshipsImpl(cmd, args, printRelationship)
+}
+
+func readRelationshipsImpl(cmd *cobra.Command, args []string, responseHandler func(cmd *cobra.Command, responses []*v1.ReadRelationshipsResponse) error) error {
 	spicedbClient, err := client.NewClient(cmd)
 	if err != nil {
 		return err
@@ -297,6 +301,7 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 		}
 
 		var relCount uint32
+		responses := make([]*v1.ReadRelationshipsResponse, 0, limit)
 		for {
 			if err := cmd.Context().Err(); err != nil {
 				return err
@@ -311,15 +316,13 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 				return err
 			}
 
+			responses = append(responses, msg)
 			lastCursor = msg.AfterResultCursor
 			relCount++
-			if err := printRelationship(cmd, msg); err != nil {
-				return err
-			}
 		}
 
-		if newReadRelationshipsPageCallbackForTests != nil {
-			newReadRelationshipsPageCallbackForTests(uint(relCount))
+		if err := responseHandler(cmd, responses); err != nil {
+			return err
 		}
 
 		if relCount < limit || limit == 0 {
@@ -338,22 +341,22 @@ func readRelationships(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-var newReadRelationshipsPageCallbackForTests func(readByPage uint)
+func printRelationship(cmd *cobra.Command, responses []*v1.ReadRelationshipsResponse) error {
+	for _, response := range responses {
+		if cobrautil.MustGetBool(cmd, "json") {
+			prettyProto, err := PrettyProto(response)
+			if err != nil {
+				return err
+			}
 
-func printRelationship(cmd *cobra.Command, msg *v1.ReadRelationshipsResponse) error {
-	if cobrautil.MustGetBool(cmd, "json") {
-		prettyProto, err := PrettyProto(msg)
-		if err != nil {
-			return err
+			console.Println(string(prettyProto))
+		} else {
+			relString, err := relationshipToString(response.Relationship)
+			if err != nil {
+				return err
+			}
+			console.Println(relString)
 		}
-
-		console.Println(string(prettyProto))
-	} else {
-		relString, err := relationshipToString(msg.Relationship)
-		if err != nil {
-			return err
-		}
-		console.Println(relString)
 	}
 
 	return nil

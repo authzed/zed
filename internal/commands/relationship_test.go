@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/genutil/slicez"
 	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
@@ -648,8 +649,7 @@ func (m *mockClient) WriteRelationships(_ context.Context, in *v1.WriteRelations
 }
 
 func TestBulkDeleteForcing(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
@@ -698,8 +698,7 @@ func TestBulkDeleteForcing(t *testing.T) {
 }
 
 func TestBulkDeleteManyForcing(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
@@ -740,8 +739,7 @@ func TestBulkDeleteManyForcing(t *testing.T) {
 }
 
 func TestBulkDeleteNotForcing(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
@@ -837,9 +835,19 @@ func testReadRelationshipsCommand(t *testing.T, pageLimit uint32, cursor string,
 		zedtesting.BoolFlag{FlagName: "show-cursor", FlagValue: showCursor})
 }
 
+// makeTestCallback is a convenience function that returns a callback and a pointer to
+// the slice it modifies.
+func makeTestCallback() (func(_ *cobra.Command, responses []*v1.ReadRelationshipsResponse) error, *[][]*v1.ReadRelationshipsResponse) {
+	var pages [][]*v1.ReadRelationshipsResponse
+	callback := func(_ *cobra.Command, responses []*v1.ReadRelationshipsResponse) error {
+		pages = append(pages, responses)
+		return nil
+	}
+	return callback, &pages
+}
+
 func TestReadRelationshipsCursor(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
@@ -870,68 +878,46 @@ func TestReadRelationshipsCursor(t *testing.T) {
 	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{Updates: updates})
 	require.NoError(t, err)
 
-	previousPrintln := console.Println
-	previousPrintf := console.Printf
-	defer func() {
-		console.Println = previousPrintln
-		console.Printf = previousPrintf
-	}()
-	var printedLines []string
-	console.Println = func(values ...any) {
-		for _, v := range values {
-			printedLines = append(printedLines, fmt.Sprint(v))
-		}
-	}
-	var printedFormatted []string
-	console.Printf = func(format string, a ...any) {
-		printedFormatted = append(printedFormatted, fmt.Sprintf(format, a...))
-	}
-
-	var receivedPageSizes []uint
-	newReadRelationshipsPageCallbackForTests = func(readPageSize uint) {
-		receivedPageSizes = append(receivedPageSizes, readPageSize)
-	}
-	defer func() {
-		newReadRelationshipsPageCallbackForTests = nil
-	}()
-
 	t.Run("no page limit returns all in one page", func(t *testing.T) {
-		printedLines = nil
-		printedFormatted = nil
-		receivedPageSizes = nil
+		callback, pages := makeTestCallback()
 
 		cmd := testReadRelationshipsCommand(t, 0, "", false)
-		err := readRelationships(cmd, []string{"test/resource"})
+		err := readRelationshipsImpl(cmd, []string{"test/resource"}, callback)
 		require.NoError(t, err)
-		require.Len(t, printedLines, 10)
-		require.Equal(t, []uint{10}, receivedPageSizes)
-		require.Empty(t, printedFormatted)
+		require.Len(t, *pages, 1, "there should only be one page of results")
+		require.Len(t, (*pages)[0], 10, "there should be 10 results in the page")
 	})
 
 	t.Run("page limit paginates through results", func(t *testing.T) {
-		printedLines = nil
-		printedFormatted = nil
-		receivedPageSizes = nil
+		callback, pages := makeTestCallback()
 
 		cmd := testReadRelationshipsCommand(t, 3, "", false)
-		err := readRelationships(cmd, []string{"test/resource"})
+		err := readRelationshipsImpl(cmd, []string{"test/resource"}, callback)
 		require.NoError(t, err)
-		require.Len(t, printedLines, 10)
-		require.Equal(t, []uint{3, 3, 3, 1}, receivedPageSizes)
+		require.NoError(t, err)
+		require.Len(t, *pages, 4, "there should be four pages of results")
+
+		lengths := slicez.Map(*pages, func(page []*v1.ReadRelationshipsResponse) int {
+			return len(page)
+		})
+		require.Equal(t, []int{3, 3, 3, 1}, lengths)
 	})
 
 	t.Run("show-cursor prints last cursor", func(t *testing.T) {
-		printedLines = nil
-		printedFormatted = nil
-		receivedPageSizes = nil
+		originalPrint := console.Printf
+		defer func() {
+			console.Printf = originalPrint
+		}()
+
+		var output strings.Builder
+		console.Printf = func(format string, a ...any) {
+			fmt.Fprintf(&output, format, a...)
+		}
 
 		cmd := testReadRelationshipsCommand(t, 3, "", true)
 		err := readRelationships(cmd, []string{"test/resource"})
 		require.NoError(t, err)
-		require.Len(t, printedLines, 10)
-		require.Len(t, printedFormatted, 1)
-		require.Contains(t, printedFormatted[0], "Last cursor: ")
-		require.NotEqual(t, "Last cursor: \n", printedFormatted[0])
+		require.Contains(t, output.String(), "Last cursor: ")
 	})
 
 	t.Run("starting cursor resumes pagination", func(t *testing.T) {
@@ -963,22 +949,20 @@ func TestReadRelationshipsCursor(t *testing.T) {
 		require.NotEmpty(t, resumeCursor.Token)
 
 		// Now call read with the cursor and confirm only the remaining 6 are emitted.
-		printedLines = nil
-		printedFormatted = nil
-		receivedPageSizes = nil
+		callback, pages := makeTestCallback()
 
 		cmd := testReadRelationshipsCommand(t, resumePageLimit, resumeCursor.Token, false)
-		err = readRelationships(cmd, []string{"test/resource"})
+		err = readRelationshipsImpl(cmd, []string{"test/resource"}, callback)
 		require.NoError(t, err)
-		require.Len(t, printedLines, 6)
-		require.Equal(t, []uint{4, 2}, receivedPageSizes)
+		require.Len(t, *pages, 2)
+
+		lengths := slicez.Map(*pages, func(page []*v1.ReadRelationshipsResponse) int {
+			return len(page)
+		})
+		require.Equal(t, []int{4, 2}, lengths)
 	})
 
 	t.Run("invalid cursor returns error", func(t *testing.T) {
-		printedLines = nil
-		printedFormatted = nil
-		receivedPageSizes = nil
-
 		cmd := testReadRelationshipsCommand(t, 0, "not-a-real-cursor", false)
 		err := readRelationships(cmd, []string{"test/resource"})
 		require.Error(t, err)
