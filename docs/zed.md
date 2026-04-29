@@ -1019,7 +1019,8 @@ zed relationship read <resource_type:optional_resource_id> <optional_relation> <
       --consistency-min-latency         evaluate at the zedtoken preferred by the database
       --cursor string                   resume pagination from a specific cursor token
       --json                            output as JSON
-      --page-limit uint32               limit of relations returned per page (default 100)
+      --limit uint32                    number of relationships returned in a single request. overrides --page-limit when both are provided.
+      --page-limit uint32               number of relationships queried in each batch when making a no-limit call. used to tune impact on SpiceDB. overridden by --limit when provided (default 100)
       --show-cursor                     display the cursor token after pagination
       --subject-filter string           optional subject filter
 ```

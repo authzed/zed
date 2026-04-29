@@ -820,7 +820,7 @@ func assertRelationshipCount(ctx context.Context, t *testing.T, c client.Client,
 	require.Equal(t, count, relCount)
 }
 
-func testReadRelationshipsCommand(t *testing.T, pageLimit uint32, cursor string, showCursor bool) *cobra.Command {
+func testReadRelationshipsCommand(t *testing.T, limit, pageLimit uint32, cursor string, showCursor bool) *cobra.Command {
 	t.Helper()
 	return zedtesting.CreateTestCobraCommandWithFlagValue(t,
 		zedtesting.BoolFlag{FlagName: "consistency-full", FlagValue: true},
@@ -829,6 +829,7 @@ func testReadRelationshipsCommand(t *testing.T, pageLimit uint32, cursor string,
 		zedtesting.StringFlag{FlagName: "consistency-at-exactly"},
 		zedtesting.StringFlag{FlagName: "revision"},
 		zedtesting.StringFlag{FlagName: "subject-filter"},
+		zedtesting.UintFlag32{FlagName: "limit", FlagValue: limit},
 		zedtesting.UintFlag32{FlagName: "page-limit", FlagValue: pageLimit},
 		zedtesting.BoolFlag{FlagName: "json"},
 		zedtesting.StringFlag{FlagName: "cursor", FlagValue: cursor},
@@ -878,20 +879,22 @@ func TestReadRelationshipsCursor(t *testing.T) {
 	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{Updates: updates})
 	require.NoError(t, err)
 
-	t.Run("no page limit returns all in one page", func(t *testing.T) {
+	t.Run("setting limit returns all in one page", func(t *testing.T) {
 		callback, pages := makeTestCallback()
 
-		cmd := testReadRelationshipsCommand(t, 0, "", false)
+		cmd := testReadRelationshipsCommand(t, 5, 100, "", false)
 		err := readRelationshipsImpl(cmd, []string{"test/resource"}, callback)
 		require.NoError(t, err)
 		require.Len(t, *pages, 1, "there should only be one page of results")
-		require.Len(t, (*pages)[0], 10, "there should be 10 results in the page")
+		require.Len(t, (*pages)[0], 5, "there should be 5 results in the page")
 	})
 
+	// When page limit is set and limit is not, it should iterate through all
+	// results using the page size.
 	t.Run("page limit paginates through results", func(t *testing.T) {
 		callback, pages := makeTestCallback()
 
-		cmd := testReadRelationshipsCommand(t, 3, "", false)
+		cmd := testReadRelationshipsCommand(t, 0, 3, "", false)
 		err := readRelationshipsImpl(cmd, []string{"test/resource"}, callback)
 		require.NoError(t, err)
 		require.NoError(t, err)
@@ -914,7 +917,7 @@ func TestReadRelationshipsCursor(t *testing.T) {
 			fmt.Fprintf(&output, format, a...)
 		}
 
-		cmd := testReadRelationshipsCommand(t, 3, "", true)
+		cmd := testReadRelationshipsCommand(t, 5, 100, "", true)
 		err := readRelationships(cmd, []string{"test/resource"})
 		require.NoError(t, err)
 		require.Contains(t, output.String(), "Last cursor: ")
@@ -948,22 +951,22 @@ func TestReadRelationshipsCursor(t *testing.T) {
 		require.NotNil(t, resumeCursor)
 		require.NotEmpty(t, resumeCursor.Token)
 
-		// Now call read with the cursor and confirm only the remaining 6 are emitted.
+		// Now call read with the cursor and confirm only 4 are emitted
 		callback, pages := makeTestCallback()
 
-		cmd := testReadRelationshipsCommand(t, resumePageLimit, resumeCursor.Token, false)
+		cmd := testReadRelationshipsCommand(t, resumePageLimit, 100, resumeCursor.Token, false)
 		err = readRelationshipsImpl(cmd, []string{"test/resource"}, callback)
 		require.NoError(t, err)
-		require.Len(t, *pages, 2)
+		require.Len(t, *pages, 1)
 
 		lengths := slicez.Map(*pages, func(page []*v1.ReadRelationshipsResponse) int {
 			return len(page)
 		})
-		require.Equal(t, []int{4, 2}, lengths)
+		require.Equal(t, []int{4}, lengths)
 	})
 
 	t.Run("invalid cursor returns error", func(t *testing.T) {
-		cmd := testReadRelationshipsCommand(t, 0, "not-a-real-cursor", false)
+		cmd := testReadRelationshipsCommand(t, 0, 100, "not-a-real-cursor", false)
 		err := readRelationships(cmd, []string{"test/resource"})
 		require.Error(t, err)
 	})

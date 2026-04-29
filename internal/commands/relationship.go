@@ -106,7 +106,8 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	relationshipCmd.AddCommand(readCmd)
 	readCmd.Flags().Bool("json", false, "output as JSON")
 	readCmd.Flags().String("subject-filter", "", "optional subject filter")
-	readCmd.Flags().Uint32("page-limit", 100, "limit of relations returned per page")
+	readCmd.Flags().Uint32("page-limit", 100, "number of relationships queried in each batch when making a no-limit call. used to tune impact on SpiceDB. overridden by --limit when provided")
+	readCmd.Flags().Uint32("limit", 0, "number of relationships returned in a single request. overrides --page-limit when both are provided.")
 	readCmd.Flags().String("cursor", "", "resume pagination from a specific cursor token")
 	readCmd.Flags().Bool("show-cursor", false, "display the cursor token after pagination")
 	registerConsistencyFlags(readCmd.Flags())
@@ -277,7 +278,13 @@ func readRelationshipsImpl(cmd *cobra.Command, args []string, responseHandler fu
 
 	request := &v1.ReadRelationshipsRequest{RelationshipFilter: filter}
 
-	limit := cobrautil.MustGetUint32(cmd, "page-limit")
+	pageSize := cobrautil.MustGetUint32(cmd, "page-limit")
+	limit := cobrautil.MustGetUint32(cmd, "limit")
+	limitSet := limit > 0
+	// If --limit is not set, use --page-size as the per-request limit
+	if !limitSet {
+		limit = pageSize
+	}
 	request.OptionalLimit = limit
 	request.Consistency, err = consistencyFromCmd(cmd)
 	if err != nil {
@@ -325,7 +332,9 @@ func readRelationshipsImpl(cmd *cobra.Command, args []string, responseHandler fu
 			return err
 		}
 
-		if relCount < limit || limit == 0 {
+		// If we set an explicit limit or if we find a page smaller than the page limit,
+		// we stop.
+		if limitSet || relCount < limit {
 			break
 		}
 
