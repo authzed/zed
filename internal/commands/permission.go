@@ -12,14 +12,19 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/encoding/prototext"
 
 	"github.com/authzed/authzed-go/pkg/requestmeta"
 	"github.com/authzed/authzed-go/pkg/responsemeta"
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	dispatchv1 "github.com/authzed/spicedb/pkg/proto/dispatch/v1"
+	"github.com/authzed/spicedb/pkg/spiceerrors"
 	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
@@ -133,6 +138,7 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	lookupResourcesCmd.Flags().Uint32("page-limit", 0, "limit of relations returned per page")
 	lookupResourcesCmd.Flags().String("cursor", "", "resume pagination from a specific cursor token")
 	lookupResourcesCmd.Flags().Bool("show-cursor", true, "display the cursor token after pagination")
+	lookupResourcesCmd.Flags().Bool("debug", false, "send debug header to spicedb. useful for debugging recursion depth errors")
 	registerConsistencyFlags(lookupResourcesCmd.Flags())
 
 	permissionCmd.AddCommand(lookupSubjectsCmd)
@@ -430,6 +436,11 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	ctx := cmd.Context()
+	if cobrautil.MustGetBool(cmd, "debug") {
+		// Just let the user know that we're in this mode.
+		log.Info().Msg("debugging requested on LookupResources")
+	}
 	var cursor *v1.Cursor
 	if cursorStr := cobrautil.MustGetString(cmd, "cursor"); cursorStr != "" {
 		cursor = &v1.Cursor{Token: cursorStr}
@@ -451,10 +462,11 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 			Consistency:    consistency,
 			OptionalLimit:  pageLimit,
 			OptionalCursor: cursor,
+			WithDebug:      cobrautil.MustGetBool(cmd, "debug"),
 		}
 		log.Trace().Interface("request", request).Uint32("page-limit", pageLimit).Send()
 
-		respStream, err := client.LookupResources(cmd.Context(), request)
+		respStream, err := client.LookupResources(ctx, request)
 		if err != nil {
 			return err
 		}
@@ -468,7 +480,7 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 			case errors.Is(err, io.EOF):
 				break stream
 			case err != nil:
-				return err
+				return handleLookupResourcesErr(err)
 			default:
 				count++
 				totalCount++
@@ -501,6 +513,36 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// handleLookupResourcesErr does any additional handling of LR errors.
+// Primarily used to print a traceback when in debug mode.
+func handleLookupResourcesErr(err error) error {
+	s, ok := status.FromError(err)
+	// If it's not a FailedPrecondition, it's not a recursion depth
+	// error, so we short circuit and return the error
+	if !ok || s.Code() != codes.FailedPrecondition {
+		return err
+	}
+	for _, detail := range s.Details() {
+		if errInfo, ok := detail.(*errdetails.ErrorInfo); ok {
+			if errInfo.Reason == v1.ErrorReason_ERROR_REASON_MAXIMUM_DEPTH_EXCEEDED.String() {
+				debugInfoString, ok := errInfo.Metadata[string(spiceerrors.DebugTraceErrorDetailsKey)]
+				if !ok {
+					// If the metadata isn't present we pass
+					continue
+				}
+				debugInfo := &dispatchv1.LookupDebugInfo{}
+				if marshalErr := prototext.Unmarshal([]byte(debugInfoString), debugInfo); marshalErr != nil {
+					// If we can't unmarshal we'll pass it along
+					continue
+				}
+				printers.DisplayLookupResourcesDebugInfo(debugInfo)
+				break
+			}
+		}
+	}
+	return err
 }
 
 func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {

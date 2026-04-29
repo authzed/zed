@@ -8,7 +8,10 @@ import (
 	"github.com/gookit/color"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	dispatchv1 "github.com/authzed/spicedb/pkg/proto/dispatch/v1"
 	"github.com/authzed/spicedb/pkg/tuple"
+
+	"github.com/authzed/zed/internal/console"
 )
 
 // DisplayCheckTrace prints out the check trace found in the given debug message.
@@ -192,4 +195,24 @@ func isPartOfCycle(checkTrace *v1.CheckDebugTrace, encountered map[string]struct
 	}
 
 	return false
+}
+
+func DisplayLookupResourcesDebugInfo(debugInfo *dispatchv1.LookupDebugInfo) {
+	if debugInfo == nil || len(debugInfo.CycleMembers) == 0 {
+		return
+	}
+	parts := strings.Split(debugInfo.CycleMembers[0], "#")
+	object := parts[0]
+	rel := parts[1]
+	var output strings.Builder
+	output.WriteString("\nThe following resource/relation pairs were found in a cycle in LookupResources:\n\n")
+	for _, member := range debugInfo.CycleMembers {
+		fmt.Fprintf(&output, "\t- %s\n", member)
+	}
+	output.WriteString("\nYou will need to delete a relationship to break the cycle.")
+	output.WriteString("\nTo find the pairs involved in the cycle, issue a check from the resource to itself across the relation.\n")
+	output.WriteString("For example:\n")
+	fmt.Fprintf(&output, "\n\tzed permission check %s %s %s --explain\n\n", object, rel, object)
+	output.WriteString("For more information, see the LookupResources section under https://spicedb.dev/d/debug-max-depth\n\n")
+	console.Error(output.String())
 }
