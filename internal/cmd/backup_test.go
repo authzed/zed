@@ -122,7 +122,7 @@ func TestFilterSchemaDefs(t *testing.T) {
 			inputSchema:  "definition a/test {}\n\ncaveat a/one(a int) {\n\ta == 1\n}",
 			inputPrefix:  "a",
 			outputSchema: "definition a/test {}\n\ncaveat a/one(a int) {\n\ta == 1\n}",
-			err:          "value does not match regex pattern",
+			err:          "does not match regex pattern",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

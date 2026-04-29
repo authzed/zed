@@ -773,6 +773,7 @@ zed permission lookup-resources <type> <permission> <subject:id> [flags]
       --consistency-full                evaluate at the newest zedtoken in the database
       --consistency-min-latency         evaluate at the zedtoken preferred by the database
       --cursor string                   resume pagination from a specific cursor token
+      --debug                           send debug header to spicedb. useful for debugging recursion depth errors
       --json                            output as JSON
       --page-limit uint32               limit of relations returned per page
       --show-cursor                     display the cursor token after pagination (default true)

@@ -212,7 +212,7 @@ func DisplayLookupResourcesDebugInfo(debugInfo *dispatchv1.LookupDebugInfo) {
 	output.WriteString("\nYou will need to delete a relationship to break the cycle.")
 	output.WriteString("\nTo find the pairs involved in the cycle, issue a check from the resource to itself across the relation.\n")
 	output.WriteString("For example:\n")
-	output.WriteString(fmt.Sprintf("\n\tzed permission check %s %s %s --explain\n\n", object, rel, object))
+	fmt.Fprintf(&output, "\n\tzed permission check %s %s %s --explain\n\n", object, rel, object)
 	output.WriteString("For more information, see the LookupResources section under https://spicedb.dev/d/debug-max-depth\n\n")
 	console.Error(output.String())
 }

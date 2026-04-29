@@ -462,7 +462,7 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 			Consistency:    consistency,
 			OptionalLimit:  pageLimit,
 			OptionalCursor: cursor,
-			WithDebug: cobrautil.MustGetBool(cmd, "debug"),
+			WithDebug:      cobrautil.MustGetBool(cmd, "debug"),
 		}
 		log.Trace().Interface("request", request).Uint32("page-limit", pageLimit).Send()
 
