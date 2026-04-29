@@ -198,14 +198,21 @@ func isPartOfCycle(checkTrace *v1.CheckDebugTrace, encountered map[string]struct
 }
 
 func DisplayLookupResourcesDebugInfo(debugInfo *dispatchv1.LookupDebugInfo) {
+	if debugInfo == nil || len(debugInfo.CycleMembers) == 0 {
+		return
+	}
+	parts := strings.Split(debugInfo.CycleMembers[0], "#")
+	object := parts[0]
+	rel := parts[1]
 	var output strings.Builder
 	output.WriteString("\nThe following resource/relation pairs were found in a cycle in LookupResources:\n\n")
 	for _, member := range debugInfo.CycleMembers {
 		fmt.Fprintf(&output, "\t- %s\n", member)
 	}
-	output.WriteString("\nTo further debug this, issue a check from the resource to itself across the relation.\n")
-	output.WriteString("For example, with the identified pair `resource:foo#view`, you would make the following call:\n")
-	output.WriteString("\n\tzed permission check resource:foo view resource:foo --explain\n\n")
+	output.WriteString("\nYou will need to delete a relationship to break the cycle.")
+	output.WriteString("\nTo find the pairs involved in the cycle, issue a check from the resource to itself across the relation.\n")
+	output.WriteString("For example:\n")
+	output.WriteString(fmt.Sprintf("\n\tzed permission check %s %s %s --explain\n\n", object, rel, object))
 	output.WriteString("For more information, see the LookupResources section under https://spicedb.dev/d/debug-max-depth\n\n")
 	console.Error(output.String())
 }
