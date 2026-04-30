@@ -107,7 +107,7 @@ func RegisterRelationshipCmd(rootCmd *cobra.Command) *cobra.Command {
 	readCmd.Flags().Bool("json", false, "output as JSON")
 	readCmd.Flags().String("subject-filter", "", "optional subject filter")
 	readCmd.Flags().Uint32("page-limit", 100, "number of relationships queried in each batch when making a no-limit call. used to tune impact on SpiceDB. overridden by --limit when provided")
-	readCmd.Flags().Uint32("limit", 0, "number of relationships returned in a single request. overrides --page-limit when both are provided.")
+	readCmd.Flags().Uint32("limit", 0, "number of relationships returned in total. overrides --page-limit when both are provided.")
 	readCmd.Flags().String("cursor", "", "resume pagination from a specific cursor token")
 	readCmd.Flags().Bool("show-cursor", false, "display the cursor token after pagination")
 	registerConsistencyFlags(readCmd.Flags())
