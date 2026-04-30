@@ -18,9 +18,11 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
+	"github.com/authzed/spicedb/pkg/genutil/slicez"
 	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/console"
 	"github.com/authzed/zed/internal/zedtesting"
 )
 
@@ -647,8 +649,7 @@ func (m *mockClient) WriteRelationships(_ context.Context, in *v1.WriteRelations
 }
 
 func TestBulkDeleteForcing(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
@@ -697,8 +698,7 @@ func TestBulkDeleteForcing(t *testing.T) {
 }
 
 func TestBulkDeleteManyForcing(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
@@ -739,8 +739,7 @@ func TestBulkDeleteManyForcing(t *testing.T) {
 }
 
 func TestBulkDeleteNotForcing(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	srv := zedtesting.NewTestServer(ctx, t)
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
@@ -819,4 +818,156 @@ func assertRelationshipCount(ctx context.Context, t *testing.T, c client.Client,
 
 	require.NoError(t, rrCli.CloseSend())
 	require.Equal(t, count, relCount)
+}
+
+func testReadRelationshipsCommand(t *testing.T, limit, pageLimit uint32, cursor string, showCursor bool) *cobra.Command {
+	t.Helper()
+	return zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.BoolFlag{FlagName: "consistency-full", FlagValue: true},
+		zedtesting.StringFlag{FlagName: "consistency-at-least"},
+		zedtesting.BoolFlag{FlagName: "consistency-min-latency", FlagValue: false},
+		zedtesting.StringFlag{FlagName: "consistency-at-exactly"},
+		zedtesting.StringFlag{FlagName: "revision"},
+		zedtesting.StringFlag{FlagName: "subject-filter"},
+		zedtesting.UintFlag32{FlagName: "limit", FlagValue: limit},
+		zedtesting.UintFlag32{FlagName: "page-limit", FlagValue: pageLimit},
+		zedtesting.BoolFlag{FlagName: "json"},
+		zedtesting.StringFlag{FlagName: "cursor", FlagValue: cursor},
+		zedtesting.BoolFlag{FlagName: "show-cursor", FlagValue: showCursor})
+}
+
+// makeTestCallback is a convenience function that returns a callback and a pointer to
+// the slice it modifies.
+func makeTestCallback() (func(_ *cobra.Command, responses []*v1.ReadRelationshipsResponse) error, *[][]*v1.ReadRelationshipsResponse) {
+	var pages [][]*v1.ReadRelationshipsResponse
+	callback := func(_ *cobra.Command, responses []*v1.ReadRelationshipsResponse) error {
+		pages = append(pages, responses)
+		return nil
+	}
+	return callback, &pages
+}
+
+func TestReadRelationshipsCursor(t *testing.T) {
+	ctx := t.Context()
+	srv := zedtesting.NewTestServer(ctx, t)
+	go func() {
+		assert.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.GRPCDialContext(ctx)
+	require.NoError(t, err)
+
+	originalClient := client.NewClient
+	defer func() {
+		client.NewClient = originalClient
+	}()
+
+	client.NewClient = zedtesting.ClientFromConn(conn)
+
+	c, err := zedtesting.ClientFromConn(conn)(nil)
+	require.NoError(t, err)
+
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: testSchema})
+	require.NoError(t, err)
+
+	var updates []*v1.RelationshipUpdate
+	for i := 0; i < 10; i++ {
+		updates = append(updates, &v1.RelationshipUpdate{
+			Operation:    v1.RelationshipUpdate_OPERATION_TOUCH,
+			Relationship: tuple.MustParseV1Rel(fmt.Sprintf("test/resource:%d#reader@test/user:1", i)),
+		})
+	}
+	_, err = c.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{Updates: updates})
+	require.NoError(t, err)
+
+	t.Run("setting limit returns all in one page", func(t *testing.T) {
+		callback, pages := makeTestCallback()
+
+		cmd := testReadRelationshipsCommand(t, 5, 100, "", false)
+		err := readRelationshipsImpl(cmd, []string{"test/resource"}, callback)
+		require.NoError(t, err)
+		require.Len(t, *pages, 1, "there should only be one page of results")
+		require.Len(t, (*pages)[0], 5, "there should be 5 results in the page")
+	})
+
+	// When page limit is set and limit is not, it should iterate through all
+	// results using the page size.
+	t.Run("page limit paginates through results", func(t *testing.T) {
+		callback, pages := makeTestCallback()
+
+		cmd := testReadRelationshipsCommand(t, 0, 3, "", false)
+		err := readRelationshipsImpl(cmd, []string{"test/resource"}, callback)
+		require.NoError(t, err)
+		require.NoError(t, err)
+		require.Len(t, *pages, 4, "there should be four pages of results")
+
+		lengths := slicez.Map(*pages, func(page []*v1.ReadRelationshipsResponse) int {
+			return len(page)
+		})
+		require.Equal(t, []int{3, 3, 3, 1}, lengths)
+	})
+
+	t.Run("show-cursor prints last cursor", func(t *testing.T) {
+		originalPrint := console.Printf
+		defer func() {
+			console.Printf = originalPrint
+		}()
+
+		var output strings.Builder
+		console.Printf = func(format string, a ...any) {
+			fmt.Fprintf(&output, format, a...)
+		}
+
+		cmd := testReadRelationshipsCommand(t, 5, 100, "", true)
+		err := readRelationships(cmd, []string{"test/resource"})
+		require.NoError(t, err)
+		require.Contains(t, output.String(), "Last cursor: ")
+	})
+
+	t.Run("starting cursor resumes pagination", func(t *testing.T) {
+		// First, fetch the cursor after the first page using the same page-limit
+		// the resume call will use (the cursor must match the original API call).
+		const resumePageLimit uint32 = 4
+		stream, err := c.ReadRelationships(ctx, &v1.ReadRelationshipsRequest{
+			Consistency: &v1.Consistency{
+				Requirement: &v1.Consistency_FullyConsistent{FullyConsistent: true},
+			},
+			RelationshipFilter: &v1.RelationshipFilter{ResourceType: "test/resource"},
+			OptionalLimit:      resumePageLimit,
+		})
+		require.NoError(t, err)
+
+		var resumeCursor *v1.Cursor
+		var firstPageSeen int
+		for {
+			msg, err := stream.Recv()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			require.NoError(t, err)
+			firstPageSeen++
+			resumeCursor = msg.AfterResultCursor
+		}
+		require.Equal(t, int(resumePageLimit), firstPageSeen)
+		require.NotNil(t, resumeCursor)
+		require.NotEmpty(t, resumeCursor.Token)
+
+		// Now call read with the cursor and confirm only 4 are emitted
+		callback, pages := makeTestCallback()
+
+		cmd := testReadRelationshipsCommand(t, resumePageLimit, 100, resumeCursor.Token, false)
+		err = readRelationshipsImpl(cmd, []string{"test/resource"}, callback)
+		require.NoError(t, err)
+		require.Len(t, *pages, 1)
+
+		lengths := slicez.Map(*pages, func(page []*v1.ReadRelationshipsResponse) int {
+			return len(page)
+		})
+		require.Equal(t, []int{4}, lengths)
+	})
+
+	t.Run("invalid cursor returns error", func(t *testing.T) {
+		cmd := testReadRelationshipsCommand(t, 0, 100, "not-a-real-cursor", false)
+		err := readRelationships(cmd, []string{"test/resource"})
+		require.Error(t, err)
+	})
 }
