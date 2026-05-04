@@ -202,7 +202,7 @@ definition resource {
 	var buf []byte
 	writer := &testWriter{buffer: &buf}
 
-	err := schemaCompileInner(t.Context(), files, writer)
+	err := schemaCompileInner(t.Context(), files, false, writer)
 
 	require.NoError(err)
 	require.Equal(expected, string(buf))
@@ -214,7 +214,7 @@ func TestSchemaCompileFileNotFound(t *testing.T) {
 
 	files := []string{filepath.Join("preview-test", "nonexistent.zed")}
 
-	err := schemaCompileInner(t.Context(), files, io.Discard)
+	err := schemaCompileInner(t.Context(), files, false, io.Discard)
 	require.Error(err)
 	require.ErrorIs(err, fs.ErrNotExist)
 }
@@ -226,7 +226,7 @@ func TestSchemaCompileFailureFromReservedKeyword(t *testing.T) {
 	files := []string{filepath.Join("preview-test", "composable-schema-invalid-root.zed")}
 	var expectedErr compiler.BaseCompilerError
 
-	err := schemaCompileInner(t.Context(), files, io.Discard)
+	err := schemaCompileInner(t.Context(), files, false, io.Discard)
 	require.Error(err)
 	require.ErrorAs(err, &expectedErr)
 }
@@ -237,7 +237,7 @@ func TestSchemaCompileWriteError(t *testing.T) {
 
 	files := []string{filepath.Join("preview-test", "composable-schema-root.zed")}
 
-	err := schemaCompileInner(t.Context(), files, &failingWriter{err: errors.New("simulated write failure")})
+	err := schemaCompileInner(t.Context(), files,false,  &failingWriter{err: errors.New("simulated write failure")})
 
 	require.Error(err)
 	require.ErrorContains(err, "failed to write schema")
@@ -254,7 +254,7 @@ func TestSchemaCompileEmptySchema(t *testing.T) {
 
 	files := []string{emptySchemaFile}
 
-	err = schemaCompileInner(t.Context(), files, io.Discard)
+	err = schemaCompileInner(t.Context(), files, false, io.Discard)
 
 	require.Error(err)
 	require.ErrorContains(err, "attempted to compile empty schema")
