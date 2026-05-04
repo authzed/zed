@@ -179,7 +179,8 @@ func TestVersionCommandWithUnavailableServer(t *testing.T) {
 	})
 
 	// Create command with all required flags
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
 		zedtesting.BoolFlag{FlagName: "include-remote-version", FlagValue: true},
 		zedtesting.BoolFlag{FlagName: "include-deps", FlagValue: false},
 		zedtesting.UintFlag{FlagName: "max-retries", FlagValue: 10},

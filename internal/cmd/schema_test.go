@@ -170,7 +170,8 @@ definition resource {
 	permission view = user
 }
 `
-			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+				t,
 				zedtesting.StringFlag{FlagName: "out", FlagValue: tc.outFile},
 			)
 			usedStdout, err := schemaCompileOuter(cmd, files)
@@ -438,7 +439,8 @@ definition resource {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+				t,
 				zedtesting.StringFlag{FlagName: "schema-definition-prefix", FlagValue: ""},
 				zedtesting.BoolFlag{FlagName: "json", FlagValue: true},
 			)

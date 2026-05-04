@@ -176,7 +176,8 @@ func TestBackupParseRelsCmdFunc(t *testing.T) {
 			tt := tt
 			t.Parallel()
 
-			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+				t,
 				zedtesting.StringToStringFlag{FlagName: "prefix-replacements"},
 				zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: tt.filter},
 				zedtesting.BoolFlag{FlagName: "rewrite-legacy"},
@@ -519,7 +520,8 @@ func validateBackupWithFunc(t testing.TB, backupFileName, schema string, token *
 }
 
 func TestBackupRestoreCmdFunc(t *testing.T) {
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
 		zedtesting.StringToStringFlag{FlagName: "prefix-replacements"},
 		zedtesting.StringFlag{FlagName: "prefix-filter", FlagValue: "test"},
 		zedtesting.BoolFlag{FlagName: "rewrite-legacy"},

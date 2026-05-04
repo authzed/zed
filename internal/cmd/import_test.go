@@ -53,7 +53,8 @@ func TestImportCmd(t *testing.T) {
 	for testName, test := range testcases {
 		t.Run(testName, func(t *testing.T) {
 			require := require.New(t)
-			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+				t,
 				zedtesting.StringFlag{FlagName: "schema-definition-prefix", FlagValue: test.prefix},
 				zedtesting.BoolFlag{FlagName: "schema", FlagValue: test.importSchema},
 				zedtesting.BoolFlag{FlagName: "relationships", FlagValue: test.importRels},
@@ -104,7 +105,8 @@ func TestImportCmd(t *testing.T) {
 }
 
 func TestImportCmdRelationsOnly(t *testing.T) {
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
 		zedtesting.StringFlag{FlagName: "schema-definition-prefix"},
 		zedtesting.BoolFlag{FlagName: "schema", FlagValue: false},
 		zedtesting.BoolFlag{FlagName: "relationships", FlagValue: true},

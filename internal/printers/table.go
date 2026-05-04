@@ -10,7 +10,8 @@ import (
 
 // PrintTable writes an terminal-friendly table of the values to the target.
 func PrintTable(target io.Writer, headers []string, rows [][]string) {
-	table := tablewriter.NewTable(target,
+	table := tablewriter.NewTable(
+		target,
 		tablewriter.WithRenderer(renderer.NewBlueprint()),
 		tablewriter.WithRowAutoWrap(tw.WrapNone),
 		tablewriter.WithHeaderAutoFormat(tw.On),

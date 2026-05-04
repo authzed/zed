@@ -164,7 +164,8 @@ func processResponse(resp *v1.WatchResponse) {
 			subjectRelation = " " + update.Relationship.Subject.OptionalRelation
 		}
 
-		console.Printf("%s:%s %s %s:%s%s\n",
+		console.Printf(
+			"%s:%s %s %s:%s%s\n",
 			update.Relationship.Resource.ObjectType,
 			update.Relationship.Resource.ObjectId,
 			update.Relationship.Relation,
