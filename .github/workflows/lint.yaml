@@ -53,7 +53,7 @@ jobs:
     runs-on: "depot-ubuntu-latest"
     steps:
       - uses: "actions/checkout@v6"
-      - uses: "aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1" # For https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23
+      - uses: "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25" # For https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23
         with:
           scan-type: "fs"
           ignore-unfixed: true
@@ -104,4 +104,4 @@ jobs:
     if: "github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened' || github.event.action == 'edited')"
     steps:
       - uses: "actions/checkout@v6"
-      - uses: "webiny/action-conventional-commits@v1.3.1"
+      - uses: "webiny/action-conventional-commits@v1.4.2"

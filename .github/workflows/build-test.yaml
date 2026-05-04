@@ -34,7 +34,7 @@ jobs:
       - uses: "authzed/actions/setup-go@main"
       - name: "Generate docs"
         run: "go run mage.go gen:docs"
-      - uses: "chainguard-dev/actions/nodiff@8bb24c24be6871bee44f19be55ea11e3b2aea3dd" # main
+      - uses: "chainguard-dev/actions/nodiff@916fec00fb80f3cd124a0b41eef79ee63f607c5d" # main
         with:
           path: ""
           fixup-command: "mage gen:docs"
