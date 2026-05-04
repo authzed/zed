@@ -24,6 +24,7 @@ import (
 	"github.com/authzed/spicedb/pkg/tuple"
 
 	"github.com/authzed/zed/internal/client"
+	"github.com/authzed/zed/internal/console"
 	"github.com/authzed/zed/internal/storage"
 	"github.com/authzed/zed/internal/zedtesting"
 	"github.com/authzed/zed/pkg/backupformat"
@@ -587,6 +588,47 @@ func TestBackupRestoreCmdFunc(t *testing.T) {
 
 	require.NoError(t, rrCli.CloseSend())
 	require.Equal(t, "test/resource:1#reader@test/user:1", tuple.MustV1StringRelationship(rrResp.Relationship))
+}
+
+func TestPrintBackupFileLocation(t *testing.T) {
+	previous := console.Errorf
+	t.Cleanup(func() {
+		console.Errorf = previous
+	})
+
+	t.Run("does not print when destination is stdout", func(t *testing.T) {
+		var captured strings.Builder
+		console.Errorf = func(format string, a ...any) {
+			fmt.Fprintf(&captured, format, a...)
+		}
+
+		printBackupFileLocation("-")
+		require.Empty(t, captured.String())
+	})
+
+	t.Run("prints absolute path for relative filename", func(t *testing.T) {
+		var captured strings.Builder
+		console.Errorf = func(format string, a ...any) {
+			fmt.Fprintf(&captured, format, a...)
+		}
+
+		printBackupFileLocation("backup.zedbackup")
+
+		wd, err := os.Getwd()
+		require.NoError(t, err)
+		require.Equal(t, fmt.Sprintf("Backup written to %s\n", filepath.Join(wd, "backup.zedbackup")), captured.String())
+	})
+
+	t.Run("prints absolute path as-is when already absolute", func(t *testing.T) {
+		var captured strings.Builder
+		console.Errorf = func(format string, a ...any) {
+			fmt.Fprintf(&captured, format, a...)
+		}
+
+		abs := filepath.Join(t.TempDir(), "backup.zedbackup")
+		printBackupFileLocation(abs)
+		require.Equal(t, fmt.Sprintf("Backup written to %s\n", abs), captured.String())
+	})
 }
 
 func TestAddSizeErrInfo(t *testing.T) {
