@@ -31,7 +31,8 @@ func TestGetTokenWithCLIOverride(t *testing.T) {
 	})
 	_, err = testCert.Write([]byte("hi"))
 	require.NoError(err)
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
 		zedtesting.StringFlag{FlagName: "token", FlagValue: "t1", Changed: true},
 		zedtesting.StringFlag{FlagName: "certificate-path", FlagValue: testCert.Name(), Changed: true},
 		zedtesting.StringFlag{FlagName: "endpoint", FlagValue: "e1", Changed: true},
@@ -53,7 +54,8 @@ func TestGetTokenWithCLIOverride(t *testing.T) {
 	require.Equal(&bTrue, to.NoVerifyCA)
 
 	// storage token takes precedence when defined
-	cmd = zedtesting.CreateTestCobraCommandWithFlagValue(t,
+	cmd = zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
 		zedtesting.StringFlag{FlagName: "token", FlagValue: "", Changed: false},
 		zedtesting.StringFlag{FlagName: "certificate-path", FlagValue: "", Changed: false},
 		zedtesting.StringFlag{FlagName: "endpoint", FlagValue: "", Changed: false},
@@ -80,7 +82,8 @@ func TestGetCurrentTokenWithCLIOverrideWithoutConfigFile(t *testing.T) {
 	// When we refactored the token setting logic, we broke the workflow where zed is used without a saved
 	// configuration. This asserts that that workflow works.
 	require := require.New(t)
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
 		zedtesting.StringFlag{FlagName: "token", FlagValue: "t1", Changed: true},
 		zedtesting.StringFlag{FlagName: "endpoint", FlagValue: "e1", Changed: true},
 		zedtesting.StringFlag{FlagName: "certificate-path", FlagValue: "", Changed: false},
@@ -104,7 +107,8 @@ func TestGetCurrentTokenWithCLIOverrideWithoutSecretFile(t *testing.T) {
 	// When we refactored the token setting logic, we broke the workflow where zed is used without a saved
 	// context. This asserts that that workflow works.
 	require := require.New(t)
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
 		zedtesting.StringFlag{FlagName: "token", FlagValue: "t1", Changed: true},
 		zedtesting.StringFlag{FlagName: "endpoint", FlagValue: "e1", Changed: true},
 		zedtesting.StringFlag{FlagName: "certificate-path", FlagValue: "", Changed: false},
@@ -173,7 +177,8 @@ func TestRetries(t *testing.T) {
 
 	secure := true
 	retries := uint(2)
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
 		zedtesting.BoolFlag{FlagName: "skip-version-check", FlagValue: true, Changed: true},
 		zedtesting.UintFlag{FlagName: "max-retries", FlagValue: retries, Changed: true},
 		zedtesting.StringFlag{FlagName: "proxy", FlagValue: "", Changed: true},
@@ -217,7 +222,8 @@ func TestDoesNotRetry(t *testing.T) {
 
 	secure := true
 	retries := uint(2)
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
 		zedtesting.BoolFlag{FlagName: "skip-version-check", FlagValue: true, Changed: true},
 		zedtesting.UintFlag{FlagName: "max-retries", FlagValue: retries, Changed: true},
 		zedtesting.StringFlag{FlagName: "proxy", FlagValue: "", Changed: true},

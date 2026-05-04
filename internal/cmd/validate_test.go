@@ -47,7 +47,8 @@ func normalizeNewlines(s string) string {
 func TestValidatePreRun(t *testing.T) {
 	t.Parallel()
 
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
 		zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
 		zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
 		zedtesting.StringFlag{FlagName: "type", FlagValue: ""},
@@ -383,7 +384,8 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			t.Parallel()
 
 			require := require.New(t)
-			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+				t,
 				zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
 				zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 				zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
@@ -409,7 +411,8 @@ func TestFailOnWarn(t *testing.T) {
 	require := require.New(t)
 
 	// Run once with fail-on-warn set to false
-	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
 		zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
 		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100}, zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
 		zedtesting.BoolFlag{FlagName: "fail-on-warn", FlagValue: false},
@@ -420,7 +423,8 @@ func TestFailOnWarn(t *testing.T) {
 	require.False(shouldError, "validation pass should not fail without fail-on-warn")
 
 	// Run again with fail-on-warn set to true
-	cmd = zedtesting.CreateTestCobraCommandWithFlagValue(t,
+	cmd = zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
 		zedtesting.BoolFlag{FlagName: "force-color", FlagValue: false},
 		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
 		zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},

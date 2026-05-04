@@ -365,7 +365,8 @@ func TestChainRewriter(t *testing.T) {
 			},
 		}
 
-		rels := toV1Rels(t,
+		rels := toV1Rels(
+			t,
 			"test/resource:1#reader@test/user:1",
 			"other/resource:2#reader@other/user:2",
 		)

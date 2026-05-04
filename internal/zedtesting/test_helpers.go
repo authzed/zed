@@ -34,7 +34,8 @@ func ClientFromConn(conn *grpc.ClientConn) func(_ *cobra.Command) (client.Client
 func NewTestServer(ctx context.Context, t *testing.T) server.RunnableServer {
 	t.Helper()
 
-	ds, err := datastore.NewDatastore(ctx,
+	ds, err := datastore.NewDatastore(
+		ctx,
 		datastore.DefaultDatastoreConfig().ToOption(),
 		datastore.WithRequestHedgingEnabled(false),
 	)

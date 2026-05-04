@@ -604,7 +604,8 @@ func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
 
 				console.Println(string(prettyProto))
 			}
-			console.Printf("%s:%s%s\n",
+			console.Printf(
+				"%s:%s%s\n",
 				subjectType,
 				prettyLookupPermissionship(resp.Subject.SubjectObjectId, resp.Subject.Permissionship, resp.Subject.PartialCaveatInfo),
 				excludedSubjectsString(resp.ExcludedSubjects),

@@ -43,13 +43,15 @@ var Println = func(values ...any) {
 
 // CreateProgressBar creates a new progress bar with the given description and defaults adjusted to zed's UX experience
 func CreateProgressBar(description string) *progressbar.ProgressBar {
-	bar := progressbar.NewOptions(-1,
+	bar := progressbar.NewOptions(
+		-1,
 		progressbar.OptionSetWidth(10),
 		progressbar.OptionSetRenderBlankState(true),
 		progressbar.OptionSetVisibility(false),
 	)
 	if isatty.IsTerminal(os.Stderr.Fd()) {
-		bar = progressbar.NewOptions64(-1,
+		bar = progressbar.NewOptions64(
+			-1,
 			progressbar.OptionSetDescription(description),
 			progressbar.OptionSetWriter(os.Stderr),
 			progressbar.OptionSetWidth(10),

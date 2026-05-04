@@ -133,9 +133,11 @@ func (smcp *spiceDBMCPServer) Run(portNumber int) error {
 	console.Printf("Setting up MCP tools and resources...\n")
 
 	// Add schema write tool
-	writeSchemaTools := mcp.NewTool("write_schema",
+	writeSchemaTools := mcp.NewTool(
+		"write_schema",
 		mcp.WithDescription("Write a SpiceDB schema definition"),
-		mcp.WithString("schema",
+		mcp.WithString(
+			"schema",
 			mcp.Required(),
 			mcp.Description("The schema definition text"),
 		),
@@ -143,9 +145,11 @@ func (smcp *spiceDBMCPServer) Run(portNumber int) error {
 	s.AddTool(writeSchemaTools, smcp.writeSchemaHandler)
 
 	// Add update relationships tool
-	updateRelationshipsTool := mcp.NewTool("update_relationships",
+	updateRelationshipsTool := mcp.NewTool(
+		"update_relationships",
 		mcp.WithDescription("Update relationships in SpiceDB with create, touch, and delete operations"),
-		mcp.WithArray("create",
+		mcp.WithArray(
+			"create",
 			mcp.Description("Array of relationships to create"),
 			mcp.Items(map[string]any{
 				"type": "object",
@@ -163,7 +167,8 @@ func (smcp *spiceDBMCPServer) Run(portNumber int) error {
 				"required": []string{"resource_type", "resource_id", "relation", "subject_type", "subject_id"},
 			}),
 		),
-		mcp.WithArray("touch",
+		mcp.WithArray(
+			"touch",
 			mcp.Description("Array of relationships to touch (update timestamp)"),
 			mcp.Items(map[string]any{
 				"type": "object",
@@ -181,7 +186,8 @@ func (smcp *spiceDBMCPServer) Run(portNumber int) error {
 				"required": []string{"resource_type", "resource_id", "relation", "subject_type", "subject_id"},
 			}),
 		),
-		mcp.WithArray("delete",
+		mcp.WithArray(
+			"delete",
 			mcp.Description("Array of relationships to delete"),
 			mcp.Items(map[string]any{
 				"type": "object",
@@ -203,112 +209,141 @@ func (smcp *spiceDBMCPServer) Run(portNumber int) error {
 	s.AddTool(updateRelationshipsTool, smcp.updateRelationshipsHandlerWrapper)
 
 	// Add delete relationships tool
-	deleteRelationshipsTool := mcp.NewTool("delete_relationships",
+	deleteRelationshipsTool := mcp.NewTool(
+		"delete_relationships",
 		mcp.WithDescription("Delete relationships matching a filter from SpiceDB"),
-		mcp.WithString("resource_type",
+		mcp.WithString(
+			"resource_type",
 			mcp.Description("Filter by resource type"),
 		),
-		mcp.WithString("resource_id",
+		mcp.WithString(
+			"resource_id",
 			mcp.Description("Filter by resource ID"),
 		),
-		mcp.WithString("relation",
+		mcp.WithString(
+			"relation",
 			mcp.Description("Filter by relation name"),
 		),
-		mcp.WithString("subject_type",
+		mcp.WithString(
+			"subject_type",
 			mcp.Description("Filter by subject type"),
 		),
-		mcp.WithString("subject_id",
+		mcp.WithString(
+			"subject_id",
 			mcp.Description("Filter by subject ID"),
 		),
-		mcp.WithString("optional_subject_relation",
+		mcp.WithString(
+			"optional_subject_relation",
 			mcp.Description("Filter by optional subject relation"),
 		),
 	)
 	s.AddTool(deleteRelationshipsTool, smcp.deleteRelationshipsHandlerWrapper)
 
 	// Add check permission tool
-	checkPermissionTool := mcp.NewTool("check_permission",
+	checkPermissionTool := mcp.NewTool(
+		"check_permission",
 		mcp.WithDescription("Check permission with full consistency and debug tracing"),
-		mcp.WithString("resource_type",
+		mcp.WithString(
+			"resource_type",
 			mcp.Required(),
 			mcp.Description("Resource type (e.g., 'document')"),
 		),
-		mcp.WithString("resource_id",
+		mcp.WithString(
+			"resource_id",
 			mcp.Required(),
 			mcp.Description("Resource ID (e.g., 'document1')"),
 		),
-		mcp.WithString("permission_or_relation",
+		mcp.WithString(
+			"permission_or_relation",
 			mcp.Required(),
 			mcp.Description("Permission or relation to check (e.g., 'view' or 'reader')"),
 		),
-		mcp.WithString("subject_type",
+		mcp.WithString(
+			"subject_type",
 			mcp.Required(),
 			mcp.Description("Subject type (e.g., 'user')"),
 		),
-		mcp.WithString("subject_id",
+		mcp.WithString(
+			"subject_id",
 			mcp.Required(),
 			mcp.Description("Subject ID (e.g., 'user1')"),
 		),
-		mcp.WithString("optional_subject_relation",
+		mcp.WithString(
+			"optional_subject_relation",
 			mcp.Description("Optional subject relation"),
 		),
-		mcp.WithString("optional_caveat_context_json",
+		mcp.WithString(
+			"optional_caveat_context_json",
 			mcp.Description("Optional caveat context, as a JSON string"),
 		),
 	)
 	s.AddTool(checkPermissionTool, smcp.checkPermissionHandler)
 
 	// Add lookup resources tool
-	lookupResourcesTool := mcp.NewTool("lookup_resources",
+	lookupResourcesTool := mcp.NewTool(
+		"lookup_resources",
 		mcp.WithDescription("Lookup resources that a subject has permission to access"),
-		mcp.WithString("resource_object_type",
+		mcp.WithString(
+			"resource_object_type",
 			mcp.Required(),
 			mcp.Description("Type of resources to lookup (e.g., 'document')"),
 		),
-		mcp.WithString("permission",
+		mcp.WithString(
+			"permission",
 			mcp.Required(),
 			mcp.Description("Permission to check (e.g., 'view')"),
 		),
-		mcp.WithString("subject_type",
+		mcp.WithString(
+			"subject_type",
 			mcp.Required(),
 			mcp.Description("Subject type (e.g., 'user')"),
 		),
-		mcp.WithString("subject_id",
+		mcp.WithString(
+			"subject_id",
 			mcp.Required(),
 			mcp.Description("Subject ID (e.g., 'user1')"),
 		),
-		mcp.WithString("optional_subject_relation",
+		mcp.WithString(
+			"optional_subject_relation",
 			mcp.Description("Optional subject relation"),
 		),
-		mcp.WithString("optional_caveat_context_json",
+		mcp.WithString(
+			"optional_caveat_context_json",
 			mcp.Description("Optional caveat context, as a JSON string"),
 		),
 	)
 	s.AddTool(lookupResourcesTool, smcp.lookupResourcesHandler)
 
 	// Add lookup subjects tool
-	lookupSubjectsTool := mcp.NewTool("lookup_subjects",
+	lookupSubjectsTool := mcp.NewTool(
+		"lookup_subjects",
 		mcp.WithDescription("Lookup subjects that have permission to access a resource"),
-		mcp.WithString("subject_object_type",
+		mcp.WithString(
+			"subject_object_type",
 			mcp.Required(),
 			mcp.Description("Type of subjects to lookup (e.g., 'user')"),
 		),
-		mcp.WithString("permission",
+		mcp.WithString(
+			"permission",
 			mcp.Required(),
 			mcp.Description("Permission to check (e.g., 'view')"),
 		),
-		mcp.WithString("resource_type",
+		mcp.WithString(
+			"resource_type",
 			mcp.Required(),
 			mcp.Description("Resource type (e.g., 'document')"),
 		),
-		mcp.WithString("resource_id",
+		mcp.WithString(
+			"resource_id",
 			mcp.Required(),
 			mcp.Description("Resource ID (e.g., 'document1')"),
 		),
-		mcp.WithString("optional_resource_relation",
+		mcp.WithString(
+			"optional_resource_relation",
 			mcp.Description("Optional resource relation"),
 		),
-		mcp.WithString("optional_caveat_context_json",
+		mcp.WithString(
+			"optional_caveat_context_json",
 			mcp.Description("Optional caveat context, as a JSON string"),
 		),
 	)
@@ -1106,7 +1141,8 @@ func (smcp *spiceDBMCPServer) getValidationFileHandler(ctx context.Context, requ
 }
 
 func newSpiceDBServer(ctx context.Context) (server.RunnableServer, error) {
-	ds, err := datastore.NewDatastore(ctx,
+	ds, err := datastore.NewDatastore(
+		ctx,
 		datastore.DefaultDatastoreConfig().ToOption(),
 		datastore.WithRequestHedgingEnabled(false),
 	)
