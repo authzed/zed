@@ -1,0 +1,5 @@
+---
+schemaFile: "./with-import-root.zed"
+relationships: |-
+  resource:1#reader@user:1[mycaveat]
+  resource:2#writer@user:1
