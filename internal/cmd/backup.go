@@ -242,6 +242,17 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
+	// Defer the success message so it runs only after the encoder has been
+	// closed without error. Defers run LIFO, so this fires after the encoder
+	// close below has had a chance to mutate err. The completed flag prevents
+	// printing during panic unwinding.
+	completed := false
+	defer func() {
+		if completed && err == nil {
+			printBackupFileLocation(backupFileName)
+		}
+	}()
+
 	spiceClient, err := client.NewClient(cmd)
 	if err != nil {
 		return fmt.Errorf("unable to initialize client: %w", err)
@@ -262,7 +273,24 @@ func backupCreateCmdFunc(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
-	return backupCreateImpl(cmd.Context(), spiceClient, encoder, cursor, cobrautil.MustGetUint32(cmd, "page-limit"))
+	if err := backupCreateImpl(cmd.Context(), spiceClient, encoder, cursor, cobrautil.MustGetUint32(cmd, "page-limit")); err != nil {
+		return err
+	}
+	completed = true
+	return nil
+}
+
+// printBackupFileLocation prints the absolute path of the backup file to stderr,
+// unless the destination is stdout (i.e. "-").
+func printBackupFileLocation(filename string) {
+	if filename == "-" {
+		return
+	}
+	absPath, err := filepath.Abs(filename)
+	if err != nil {
+		absPath = filename
+	}
+	console.Errorf("Backup written to %s\n", absPath)
 }
 
 // backupCreateImpl performs the backup using an already-configured encoder and optional resume cursor.
@@ -415,6 +443,7 @@ func backupModern(ctx context.Context, spiceClient client.Client, encoder backup
 
 // computeBackupFileName computes the backup file name based.
 // If no file name is provided, it derives a backup on the current context
+// stored in the current working directory.
 func computeBackupFileName(cmd *cobra.Command, args []string) (string, error) {
 	if len(args) > 0 {
 		return args[0], nil
@@ -426,13 +455,12 @@ func computeBackupFileName(cmd *cobra.Command, args []string) (string, error) {
 		return "", fmt.Errorf("failed to determine current zed context: %w", err)
 	}
 
-	ex, err := os.Executable()
+	cwd, err := os.Getwd()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to determine current working directory: %w", err)
 	}
-	exPath := filepath.Dir(ex)
 
-	backupFileName := filepath.Join(exPath, token.Name+".zedbackup")
+	backupFileName := filepath.Join(cwd, token.Name+".zedbackup")
 
 	return backupFileName, nil
 }
@@ -543,7 +571,19 @@ func backupParseRevisionCmdFunc(cmd *cobra.Command, out io.Writer, args []string
 	return err
 }
 
-func backupRedactCmdFunc(cmd *cobra.Command, args []string) error {
+func backupRedactCmdFunc(cmd *cobra.Command, args []string) (err error) {
+	filename := args[0] + ".redacted"
+	// Defer the success message so it runs only after all writers/closers
+	// have completed without error. Defers run LIFO, so registering this
+	// first ensures it fires after every close defer registered below.
+	// The completed flag prevents printing during panic unwinding.
+	completed := false
+	defer func() {
+		if completed && err == nil {
+			printBackupFileLocation(filename)
+		}
+	}()
+
 	decoder, closer, err := decoderFromArgs(cmd, args...)
 	if err != nil {
 		return fmt.Errorf("error creating restore file decoder: %w", err)
@@ -551,7 +591,6 @@ func backupRedactCmdFunc(cmd *cobra.Command, args []string) error {
 	defer CloseAndJoin(&err, closer)
 	defer CloseAndJoin(&err, decoder)
 
-	filename := args[0] + ".redacted"
 	writer, _, err := createBackupFile(filename, doNotReturnIfExists)
 	if err != nil {
 		return err
@@ -631,6 +670,7 @@ func backupRedactCmdFunc(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 	}
 
+	completed = true
 	return nil
 }
 
