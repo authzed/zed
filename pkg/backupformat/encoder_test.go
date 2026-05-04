@@ -436,6 +436,51 @@ func TestNewFileEncoder(t *testing.T) {
 	}
 }
 
+func TestFileEncoderStreamingToStdout(t *testing.T) {
+	// Redirect stdout to a temp file so the encoder writes there instead of
+	// the test runner's stdout. Don't run in parallel: it mutates os.Stdout.
+	tempDir := t.TempDir()
+	fakeStdout, err := os.Create(filepath.Join(tempDir, "fake-stdout"))
+	require.NoError(t, err)
+
+	origStdout := os.Stdout
+	os.Stdout = fakeStdout
+	t.Cleanup(func() {
+		os.Stdout = origStdout
+		_ = fakeStdout.Close()
+	})
+
+	enc, existed, err := NewFileEncoder("-")
+	require.NoError(t, err)
+	require.False(t, existed)
+
+	require.NoError(t, enc.WriteSchema("definition user {}", "tok"))
+
+	rel := &v1.Relationship{
+		Resource: &v1.ObjectReference{ObjectType: "user", ObjectId: "1"},
+		Relation: "...",
+		Subject:  &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "2"}},
+	}
+	// Append must not try to create a lockfile next to "-".
+	require.NoError(t, enc.Append(rel, "cursor-1"))
+
+	_, statErr := os.Stat("-.lock")
+	require.True(t, os.IsNotExist(statErr), "no lockfile should be created when streaming to stdout")
+
+	// Resume isn't possible on a stream — Cursor must surface a clear error.
+	_, err = enc.Cursor()
+	require.ErrorContains(t, err, "stdout")
+
+	enc.MarkComplete()
+	// Close must not Sync/Close stdout, which would error with
+	// "inappropriate ioctl for device" on most platforms.
+	require.NoError(t, enc.Close())
+
+	info, err := os.Stat(fakeStdout.Name())
+	require.NoError(t, err)
+	require.Positive(t, info.Size(), "encoded data should have been written to stdout")
+}
+
 func TestWithProgress(t *testing.T) {
 	tests := []struct {
 		name   string
