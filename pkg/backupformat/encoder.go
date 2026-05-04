@@ -196,6 +196,10 @@ type OcfFileEncoder struct {
 	file             *os.File
 	lastSyncedCursor string
 	completed        bool
+	// isStream is true when the underlying file is a stream (e.g. os.Stdout)
+	// for which lockfile-based progress tracking and Sync/Close are not
+	// applicable.
+	isStream bool
 	*OcfEncoder
 }
 
@@ -204,6 +208,9 @@ func (fe *OcfFileEncoder) lockFileName() string {
 }
 
 func (fe *OcfFileEncoder) Cursor() (string, error) {
+	if fe.isStream {
+		return "", errors.New("resume is not supported when streaming to stdout")
+	}
 	cursorBytes, err := os.ReadFile(fe.lockFileName())
 	if os.IsNotExist(err) {
 		return "", errors.New("completed backup file already exists")
@@ -218,7 +225,8 @@ func NewFileEncoder(filename string) (e *OcfFileEncoder, existed bool, err error
 	backupExisted := filename != "-" && err == nil
 
 	var f *os.File
-	if filename == "-" {
+	isStream := filename == "-"
+	if isStream {
 		f = os.Stdout
 	} else {
 		var err error
@@ -228,12 +236,17 @@ func NewFileEncoder(filename string) (e *OcfFileEncoder, existed bool, err error
 		}
 	}
 
-	return &OcfFileEncoder{file: f, OcfEncoder: &OcfEncoder{w: f}}, backupExisted, nil
+	return &OcfFileEncoder{file: f, isStream: isStream, OcfEncoder: &OcfEncoder{w: f}}, backupExisted, nil
 }
 
 func (fe *OcfFileEncoder) Append(r *v1.Relationship, cursor string) error {
 	if err := fe.OcfEncoder.Append(r, cursor); err != nil {
 		return fmt.Errorf("error storing relationship: %w", err)
+	}
+
+	// Streamed destinations (e.g. stdout) cannot be checkpointed.
+	if fe.isStream {
+		return nil
 	}
 
 	if cursor != fe.lastSyncedCursor { // Only write to disk when necessary
@@ -251,23 +264,31 @@ func (fe *OcfFileEncoder) MarkComplete() { fe.completed = true }
 func (fe *OcfFileEncoder) Close() error {
 	// Don't throw any errors if the file is nil when flushing/closing.
 	safeClose := func() error {
-		if fe.file != nil && fe.enc != nil {
-			fe.OcfEncoder.Close()
-			return errors.Join(fe.file.Sync(), fe.file.Close())
+		if fe.file == nil || fe.enc == nil {
+			return nil
 		}
-		return nil
+		fe.OcfEncoder.Close()
+		// Stdout is owned by the process; Sync would fail with
+		// "inappropriate ioctl for device" and we must not close it.
+		if fe.isStream {
+			return nil
+		}
+		return errors.Join(fe.file.Sync(), fe.file.Close())
 	}
 
-	removeCompleted := func(filename string) error {
+	removeCompleted := func() error {
+		if fe.isStream {
+			return nil
+		}
 		if fe.completed {
-			return os.Remove(filename)
+			return os.Remove(fe.lockFileName())
 		}
 		return nil
 	}
 
 	return errors.Join(
 		safeClose(),
-		removeCompleted(fe.lockFileName()),
+		removeCompleted(),
 	)
 }
 
