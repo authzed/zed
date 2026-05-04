@@ -361,6 +361,16 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		err = os.WriteFile(testContextPath, cfgBytes, 0o600)
 		require.NoError(t, err)
 
+		// Switch into a temp directory so the default backup is created
+		// there instead of leaving a file behind in the working directory.
+		tempDir := t.TempDir()
+		originalWd, err := os.Getwd()
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tempDir))
+		t.Cleanup(func() {
+			_ = os.Chdir(originalWd)
+		})
+
 		name := uuid.NewString()
 		client.DefaultStorage = func() (storage.ConfigStore, storage.SecretStore) {
 			return &testConfigStore{currentToken: name},
@@ -369,10 +379,11 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		err = backupCreateCmdFunc(cmd, nil)
 		require.NoError(t, err)
 
-		currentPath, err := os.Executable()
+		// Use os.Getwd to capture the path as the command would resolve it,
+		// since on some platforms the temp dir may be reached via a symlink.
+		actualWd, err := os.Getwd()
 		require.NoError(t, err)
-		exPath := filepath.Dir(currentPath)
-		expectedBackupFile := filepath.Join(exPath, name+".zedbackup")
+		expectedBackupFile := filepath.Join(actualWd, name+".zedbackup")
 		require.FileExists(t, expectedBackupFile)
 		validateBackup(t, expectedBackupFile, testSchema, resp.WrittenAt, expectedRels)
 	})
