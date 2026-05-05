@@ -193,13 +193,22 @@ func (e *OcfEncoder) Close() error {
 // format, while also persisting it to a file and maintaining a lockfile that
 // tracks the progress so that it can be resumed if stopped.
 type OcfFileEncoder struct {
-	file             *os.File
-	lastSyncedCursor string
-	completed        bool
-	// isStream is true when the underlying file is a stream (e.g. os.Stdout)
+	// file is the destination the encoder writes to. For regular backups this
+	// is a file on disk; when streaming it is os.Stdout.
+	file *os.File
+	// fileIsStream is true when the underlying file is a stream (e.g. os.Stdout)
 	// for which lockfile-based progress tracking and Sync/Close are not
 	// applicable.
-	isStream bool
+	fileIsStream bool
+	// lastSyncedCursor is the most recent cursor value written to the lockfile.
+	// It is used to avoid redundant lockfile writes when the cursor has not
+	// advanced since the previous Append call.
+	lastSyncedCursor string
+	// completed indicates that the backup finished successfully. When true,
+	// Close removes the lockfile because no resume is needed.
+	completed bool
+	// OcfEncoder is the embedded AVRO OCF encoder that performs the actual
+	// serialization of relationships into the file.
 	*OcfEncoder
 }
 
@@ -208,7 +217,7 @@ func (fe *OcfFileEncoder) lockFileName() string {
 }
 
 func (fe *OcfFileEncoder) Cursor() (string, error) {
-	if fe.isStream {
+	if fe.fileIsStream {
 		return "", errors.New("resume is not supported when streaming to stdout")
 	}
 	cursorBytes, err := os.ReadFile(fe.lockFileName())
@@ -236,7 +245,7 @@ func NewFileEncoder(filename string) (e *OcfFileEncoder, existed bool, err error
 		}
 	}
 
-	return &OcfFileEncoder{file: f, isStream: isStream, OcfEncoder: &OcfEncoder{w: f}}, backupExisted, nil
+	return &OcfFileEncoder{file: f, fileIsStream: isStream, OcfEncoder: &OcfEncoder{w: f}}, backupExisted, nil
 }
 
 func (fe *OcfFileEncoder) Append(r *v1.Relationship, cursor string) error {
@@ -244,8 +253,8 @@ func (fe *OcfFileEncoder) Append(r *v1.Relationship, cursor string) error {
 		return fmt.Errorf("error storing relationship: %w", err)
 	}
 
-	// Streamed destinations (e.g. stdout) cannot be checkpointed.
-	if fe.isStream {
+	// Streaming destinations (e.g. stdout) can't be resumed, so skip writing the cursor lockfile.
+	if fe.fileIsStream {
 		return nil
 	}
 
@@ -270,14 +279,14 @@ func (fe *OcfFileEncoder) Close() error {
 		fe.OcfEncoder.Close()
 		// Stdout is owned by the process; Sync would fail with
 		// "inappropriate ioctl for device" and we must not close it.
-		if fe.isStream {
+		if fe.fileIsStream {
 			return nil
 		}
 		return errors.Join(fe.file.Sync(), fe.file.Close())
 	}
 
 	removeCompleted := func() error {
-		if fe.isStream {
+		if fe.fileIsStream {
 			return nil
 		}
 		if fe.completed {
