@@ -84,7 +84,7 @@ zed backup <filename> [flags]
 
 ### Children commands
 
-- [zed backup create](#reference-zed-backup-create)	 - Backup a permission system to a file
+- [zed backup create](#reference-zed-backup-create)	 - Back up a permission system to a file, or to stdout by passing "-"
 - [zed backup parse-relationships](#reference-zed-backup-parse-relationships)	 - Extract the relationships from a backup file
 - [zed backup parse-revision](#reference-zed-backup-parse-revision)	 - Extract the revision from a backup file
 - [zed backup parse-schema](#reference-zed-backup-parse-schema)	 - Extract the schema from a backup file
@@ -94,10 +94,10 @@ zed backup <filename> [flags]
 
 ## Reference: `zed backup create`
 
-Backup a permission system to a file
+Back up a permission system to a file, or to stdout by passing "-"
 
 ```
-zed backup create <filename> [flags]
+zed backup create <filename-or-dash> [flags]
 ```
 
 ### Options

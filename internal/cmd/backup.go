@@ -65,8 +65,8 @@ func registerBackupCmd(rootCmd *cobra.Command) {
 	}
 
 	backupCreateCmd := &cobra.Command{
-		Use:   "create <filename>",
-		Short: "Backup a permission system to a file",
+		Use:   "create <filename-or-dash>",
+		Short: "Back up a permission system to a file, or to stdout by passing \"-\"",
 		Args:  commands.ValidationWrapper(cobra.MaximumNArgs(1)),
 		RunE:  withErrorHandling(backupCreateCmdFunc),
 	}
