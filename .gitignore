@@ -1,6 +1,7 @@
 dist/
 temp/
 docs/merged.md
+completions/
 
 # Local-only files
 go.work
