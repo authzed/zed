@@ -1,5 +1,8 @@
 ---
 version: 2
+before:
+  hooks:
+    - "go run mage.go gen:completions"
 builds:
   - id: "linux-amd64-gnu"
     goos: ["linux"]
@@ -108,6 +111,19 @@ nfpms:
     epoch: &epoch "0"
     ids: ["linux-amd64-gnu", "linux-arm64-gnu"]
     formats: ["deb", "rpm"]
+    contents: &nfpm_contents
+      - src: "./completions/zed.bash"
+        dst: "/usr/share/bash-completion/completions/zed"
+        file_info:
+          mode: 0644
+      - src: "./completions/zed.fish"
+        dst: "/usr/share/fish/vendor_completions.d/zed.fish"
+        file_info:
+          mode: 0644
+      - src: "./completions/zed.zsh"
+        dst: "/usr/share/zsh/site-functions/_zed"
+        file_info:
+          mode: 0644
   - id: "musl"
     vendor: *vendor
     homepage: *homepage
@@ -117,6 +133,7 @@ nfpms:
     epoch: *epoch
     ids: ["linux-amd64-musl", "linux-arm64-musl"]
     formats: ["apk"]
+    contents: *nfpm_contents
 
 furies:
   - account: "authzed"
