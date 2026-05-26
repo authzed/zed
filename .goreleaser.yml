@@ -2,9 +2,9 @@
 version: 2
 before:
   hooks:
-    - sh -c "mkdir -p completions && go run ./cmd/zed completion bash > ./completions/zed.bash"
-    - sh -c "go run ./cmd/zed completion zsh > ./completions/zed.zsh"
-    - sh -c "go run ./cmd/zed completion fish > ./completions/zed.fish"
+    - 'sh -c "mkdir -p completions && go run ./cmd/zed completion bash > ./completions/zed.bash"'
+    - 'sh -c "go run ./cmd/zed completion zsh > ./completions/zed.zsh"'
+    - 'sh -c "go run ./cmd/zed completion fish > ./completions/zed.fish"'
 builds:
   - id: "linux-amd64-gnu"
     goos: ["linux"]
