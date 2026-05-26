@@ -4,14 +4,11 @@
 package main
 
 import (
-	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/jzelinskie/cobrautil/v2/cobrazerolog"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/spf13/cobra"
 
 	"github.com/authzed/zed/internal/cmd"
 )
@@ -49,40 +46,4 @@ func (g Gen) DocsForPublish() error {
 	}
 
 	return sh.RunV("bash", "-c", "cat docs/getting-started.md <(echo -e '\\n') docs/zed.md > docs/merged.md")
-}
-
-// Completions Generate shell completion scripts for bash, zsh, and fish
-func (g Gen) Completions() error {
-	targetDir := "completions"
-
-	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return err
-	}
-
-	rootCmd := cmd.InitialiseRootCmd(cobrazerolog.New())
-
-	generators := []struct {
-		shell    string
-		generate func(*cobra.Command, io.Writer) error
-	}{
-		{"bash", func(c *cobra.Command, w io.Writer) error { return c.GenBashCompletionV2(w, true) }},
-		{"zsh", func(c *cobra.Command, w io.Writer) error { return c.GenZshCompletion(w) }},
-		{"fish", func(c *cobra.Command, w io.Writer) error { return c.GenFishCompletion(w, true) }},
-	}
-
-	for _, gen := range generators {
-		path := filepath.Join(targetDir, "zed."+gen.shell)
-		f, err := os.Create(path)
-		if err != nil {
-			return err
-		}
-		if err := gen.generate(rootCmd, f); err != nil {
-			f.Close()
-			return err
-		}
-		if err := f.Close(); err != nil {
-			return err
-		}
-	}
-	return nil
 }
