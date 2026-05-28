@@ -212,21 +212,45 @@ type OcfFileEncoder struct {
 	*OcfEncoder
 }
 
+// ErrBackupAlreadyCompleted indicates a backup file is on disk and is marked
+// complete (via the sidecar completion sentinel). Callers should refuse to
+// overwrite it.
+var ErrBackupAlreadyCompleted = errors.New("backup file already exists and is marked complete")
+
+// ErrBackupUnresumable indicates a backup file exists but neither a resume
+// cursor nor a completion sentinel is present. Either the previous run died
+// before recording any progress, or the file was produced by an older zed
+// version that did not write a completion marker. The file may be complete
+// or partial; the encoder cannot tell. Delete the file to start fresh.
+var ErrBackupUnresumable = errors.New("backup file has no resume cursor or completion marker; if it was produced by an older zed version it may already be complete — delete it to start over")
+
 func (fe *OcfFileEncoder) lockFileName() string {
 	return fe.file.Name() + ".lock"
+}
+
+func (fe *OcfFileEncoder) doneFileName() string {
+	return fe.file.Name() + ".done"
 }
 
 func (fe *OcfFileEncoder) Cursor() (string, error) {
 	if fe.fileIsStream {
 		return "", errors.New("resume is not supported when streaming to stdout")
 	}
+	// A progress lockfile always indicates an in-progress backup that should
+	// resume from its cursor — even if a stale completion sentinel from a
+	// previous run is also present.
 	cursorBytes, err := os.ReadFile(fe.lockFileName())
-	if os.IsNotExist(err) {
-		return "", errors.New("completed backup file already exists")
-	} else if err != nil {
+	if err == nil {
+		return string(cursorBytes), nil
+	} else if !os.IsNotExist(err) {
 		return "", err
 	}
-	return string(cursorBytes), nil
+	if _, err := os.Stat(fe.doneFileName()); err == nil {
+		return "", ErrBackupAlreadyCompleted
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	return "", ErrBackupUnresumable
 }
 
 func NewFileEncoder(filename string) (e *OcfFileEncoder, existed bool, err error) {
@@ -242,6 +266,19 @@ func NewFileEncoder(filename string) (e *OcfFileEncoder, existed bool, err error
 		f, err = os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o644)
 		if err != nil {
 			return nil, backupExisted, fmt.Errorf("unable to open backup file: %w", err)
+		}
+		// When starting a fresh backup, remove any stale sidecar files from a
+		// previous backup at the same path. A stale .done would misreport the
+		// new run as already completed if it crashed before the first Append();
+		// a stale .lock would resume the new run from an old cursor pointing
+		// into the prior export's snapshot, silently skipping relationships.
+		if !backupExisted {
+			for _, sidecar := range []string{f.Name() + ".lock", f.Name() + ".done"} {
+				if rmErr := os.Remove(sidecar); rmErr != nil && !os.IsNotExist(rmErr) {
+					_ = f.Close()
+					return nil, backupExisted, fmt.Errorf("unable to clear stale sidecar %s: %w", sidecar, rmErr)
+				}
+			}
 		}
 	}
 
@@ -285,19 +322,28 @@ func (fe *OcfFileEncoder) Close() error {
 		return errors.Join(fe.file.Sync(), fe.file.Close())
 	}
 
-	removeCompleted := func() error {
+	finalizeCompleted := func() error {
 		if fe.fileIsStream {
 			return nil
 		}
-		if fe.completed {
-			return os.Remove(fe.lockFileName())
+		if !fe.completed {
+			return nil
+		}
+		// Write the completion sentinel before removing the progress lockfile so
+		// that a crash between the two leaves the backup as resumable rather
+		// than as a misleading "completed" state.
+		if err := atomic.WriteFile(fe.doneFileName(), bytes.NewBuffer(nil)); err != nil {
+			return fmt.Errorf("failed to write completion sentinel: %w", err)
+		}
+		if err := os.Remove(fe.lockFileName()); err != nil && !os.IsNotExist(err) {
+			return err
 		}
 		return nil
 	}
 
 	return errors.Join(
 		safeClose(),
-		removeCompleted(),
+		finalizeCompleted(),
 	)
 }
 
