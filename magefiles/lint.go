@@ -25,3 +25,8 @@ func (g Lint) Go() error {
 func (g Lint) Vulncheck() error {
 	return sh.RunV("go", "run", "golang.org/x/vuln/cmd/govulncheck", "./...")
 }
+
+// Goweight reports the per-dependency contribution to the zed binary size.
+func (g Lint) Goweight() error {
+	return sh.RunV("go", "run", "github.com/jondot/goweight", "./cmd/zed/main.go")
+}

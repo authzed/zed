@@ -32,6 +32,22 @@ jobs:
         with:
           args: "--ignore docs/zed.md" # auto-generated
 
+  goweight:
+    name: "Report Binary Size"
+    runs-on: "depot-ubuntu-latest-arm"
+    steps:
+      - uses: "actions/checkout@v6"
+      - uses: "authzed/actions/setup-go@main"
+      - name: "Run goweight"
+        run: |
+          {
+            echo "## Binary size by dependency"
+            echo
+            echo '```'
+            go run github.com/magefile/mage Lint:Goweight
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   codeql:
     name: "Analyze with CodeQL"
     runs-on: "depot-ubuntu-latest"
