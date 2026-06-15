@@ -1160,6 +1160,9 @@ func newSpiceDBServer(ctx context.Context) (server.RunnableServer, error) {
 		}),
 		server.WithHTTPGateway(util.HTTPServerConfig{HTTPEnabled: false}),
 		server.WithMetricsAPI(util.HTTPServerConfig{HTTPEnabled: false}),
+		// disable metrics
+		server.WithDispatchClusterMetricsEnabled(false),
+		server.WithDispatchClientMetricsEnabled(false),
 		// disable caching since it's all in memory
 		server.WithDispatchCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithNamespaceCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
