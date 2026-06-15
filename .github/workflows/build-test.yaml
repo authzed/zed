@@ -34,7 +34,7 @@ jobs:
       - uses: "authzed/actions/setup-go@main"
       - name: "Generate docs"
         run: "go run mage.go gen:docs"
-      - uses: "chainguard-dev/actions/nodiff@8bb24c24be6871bee44f19be55ea11e3b2aea3dd" # main
+      - uses: "chainguard-dev/actions/nodiff@5f020827ba80ff5d64d45116542d0c733e8e7e71" # main
         with:
           path: ""
           fixup-command: "mage gen:docs"
@@ -52,7 +52,7 @@ jobs:
       - name: "Unit tests with coverage"
         run: "go run mage.go test:runWithCoverage"
       - name: "Upload coverage to Codecov"
-        uses: "codecov/codecov-action@v6.0.0"
+        uses: "codecov/codecov-action@v7.0.0"
         with:
           files: "./coverage.txt"
           verbose: true
