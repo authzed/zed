@@ -108,7 +108,7 @@ func TestLookupResourcesCommand(t *testing.T) {
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
 	}()
-	conn, err := srv.GRPCDialContext(ctx)
+	conn, err := srv.NewClient()
 	require.NoError(t, err)
 
 	originalClient := client.NewClient
@@ -186,7 +186,7 @@ func TestLookupResourcesMaxRecursionDebug(t *testing.T) {
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
 	}()
-	conn, err := srv.GRPCDialContext(ctx)
+	conn, err := srv.NewClient()
 	require.NoError(t, err)
 
 	originalClient := client.NewClient

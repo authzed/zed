@@ -654,7 +654,7 @@ func TestBulkDeleteForcing(t *testing.T) {
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
 	}()
-	conn, err := srv.GRPCDialContext(ctx)
+	conn, err := srv.NewClient()
 	require.NoError(t, err)
 
 	originalClient := client.NewClient
@@ -703,7 +703,7 @@ func TestBulkDeleteManyForcing(t *testing.T) {
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
 	}()
-	conn, err := srv.GRPCDialContext(ctx)
+	conn, err := srv.NewClient()
 	require.NoError(t, err)
 
 	originalClient := client.NewClient
@@ -744,7 +744,7 @@ func TestBulkDeleteNotForcing(t *testing.T) {
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
 	}()
-	conn, err := srv.GRPCDialContext(ctx)
+	conn, err := srv.NewClient()
 	require.NoError(t, err)
 
 	originalClient := client.NewClient
@@ -853,7 +853,7 @@ func TestReadRelationshipsCursor(t *testing.T) {
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
 	}()
-	conn, err := srv.GRPCDialContext(ctx)
+	conn, err := srv.NewClient()
 	require.NoError(t, err)
 
 	originalClient := client.NewClient

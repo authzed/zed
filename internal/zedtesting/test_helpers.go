@@ -54,6 +54,7 @@ func NewTestServer(ctx context.Context, t *testing.T) server.RunnableServer {
 		server.WithDispatchCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithNamespaceCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithClusterDispatchCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
+		server.WithStoredSchemaCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithDatastore(ds),
 	}
 

@@ -69,7 +69,7 @@ func TestImportCmd(t *testing.T) {
 			go func() {
 				assert.NoError(t, srv.Run(ctx))
 			}()
-			conn, err := srv.GRPCDialContext(ctx)
+			conn, err := srv.NewClient()
 			require.NoError(err)
 			t.Cleanup(func() {
 				conn.Close()
@@ -120,7 +120,7 @@ func TestImportCmdRelationsOnly(t *testing.T) {
 	go func() {
 		assert.NoError(t, srv.Run(ctx))
 	}()
-	conn, err := srv.GRPCDialContext(ctx)
+	conn, err := srv.NewClient()
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		conn.Close()
