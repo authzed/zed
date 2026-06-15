@@ -103,7 +103,7 @@ func (smcp *spiceDBMCPServer) Run(portNumber int) error {
 	})
 
 	console.Printf("Establishing gRPC connection...\n")
-	conn, err := server.GRPCDialContext(ctx)
+	conn, err := server.NewClient()
 	if err != nil || conn == nil {
 		return fmt.Errorf("unable to get gRPC connection: %w", err)
 	}
@@ -1160,10 +1160,14 @@ func newSpiceDBServer(ctx context.Context) (server.RunnableServer, error) {
 		}),
 		server.WithHTTPGateway(util.HTTPServerConfig{HTTPEnabled: false}),
 		server.WithMetricsAPI(util.HTTPServerConfig{HTTPEnabled: false}),
+		// disable metrics
+		server.WithDispatchClusterMetricsEnabled(false),
+		server.WithDispatchClientMetricsEnabled(false),
 		// disable caching since it's all in memory
 		server.WithDispatchCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithNamespaceCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithClusterDispatchCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
+		server.WithStoredSchemaCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithDatastore(ds),
 		// enable expiration support for relationships
 		server.WithEnableRelationshipExpiration(true),

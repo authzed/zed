@@ -51,9 +51,14 @@ func NewTestServer(ctx context.Context, t *testing.T) server.RunnableServer {
 		}),
 		server.WithHTTPGateway(util.HTTPServerConfig{HTTPEnabled: false}),
 		server.WithMetricsAPI(util.HTTPServerConfig{HTTPEnabled: false}),
+		// disable metrics
+		server.WithDispatchClusterMetricsEnabled(false),
+		server.WithDispatchClientMetricsEnabled(false),
+		// disable caching since it's all in memory
 		server.WithDispatchCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithNamespaceCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithClusterDispatchCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
+		server.WithStoredSchemaCacheConfig(server.CacheConfig{Enabled: false, Metrics: false}),
 		server.WithDatastore(ds),
 	}
 

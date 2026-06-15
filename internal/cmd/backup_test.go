@@ -296,7 +296,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		// here because there isn't a good time or place to do so.
 		_ = srv.Run(ctx)
 	}()
-	conn, err := srv.GRPCDialContext(ctx)
+	conn, err := srv.NewClient()
 	require.NoError(t, err)
 
 	originalClient := client.NewClient
@@ -552,7 +552,7 @@ func TestBackupRestoreCmdFunc(t *testing.T) {
 		// here because there isn't a good time or place to do so.
 		_ = srv.Run(ctx)
 	}()
-	conn, err := srv.GRPCDialContext(ctx)
+	conn, err := srv.NewClient()
 	require.NoError(t, err)
 
 	originalClient := client.NewClient
@@ -877,7 +877,7 @@ func TestRevisionForServerless(t *testing.T) {
 	go func() {
 		errCh <- srv.Run(ctx)
 	}()
-	conn, err := srv.GRPCDialContext(ctx)
+	conn, err := srv.NewClient()
 	require.NoError(t, err)
 
 	c, err := zedtesting.ClientFromConn(conn)(nil)

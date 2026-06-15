@@ -163,12 +163,12 @@ func runZedCommand(rootCmd *cobra.Command, requestContextJSON string, stringPara
 	}
 
 	// Collect the updated schema and relationships.
-	headRev, err := devCtx.DataLayer.HeadRevision(ctx)
+	headRev, schemaHash, err := devCtx.DataLayer.HeadRevision(ctx)
 	if err != nil {
 		return zedCommandResult{Error: err.Error()}
 	}
 
-	reader := devCtx.DataLayer.SnapshotReader(headRev)
+	reader := devCtx.DataLayer.SnapshotReader(headRev, schemaHash)
 	relationships := []*core.RelationTuple{}
 
 	schemaReader, err := reader.ReadSchema(ctx)

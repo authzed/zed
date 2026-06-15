@@ -25,7 +25,7 @@ func createTestServer(t *testing.T) *spiceDBMCPServer {
 	}()
 
 	// Get gRPC connection
-	conn, err := server.GRPCDialContext(ctx)
+	conn, err := server.NewClient()
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 
