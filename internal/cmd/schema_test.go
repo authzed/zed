@@ -304,15 +304,18 @@ caveat new_caveat(condition int) {
 	condition == 2
 }`
 
-	var output strings.Builder
-	err := schemaDiffInner(
+	sd, err := computeLocalDiff(
 		strings.NewReader(beforeSchema),
 		strings.NewReader(afterSchema),
 		"before.zed",
 		"after.zed",
-		&output,
 	)
+	require.NoError(t, err)
 
+	resp := localDiffToResponse(sd)
+
+	var output strings.Builder
+	err = printDiffSchemaResponse(resp, &output)
 	require.NoError(t, err)
 
 	result := output.String()
@@ -322,6 +325,156 @@ caveat new_caveat(condition int) {
 	require.Contains(t, result, "Changed definition: shared_resource")
 	require.Contains(t, result, "Added caveat: new_caveat")
 	require.Contains(t, result, "Removed caveat: old_caveat")
+}
+
+func TestLocalDiffToResponse(t *testing.T) {
+	t.Parallel()
+
+	beforeSchema := `definition user {}
+
+definition old_resource {
+	relation viewer: user
+}
+
+definition shared_resource {
+	relation viewer: user
+	permission view = viewer
+}
+
+caveat old_caveat(condition int) {
+	condition == 1
+}`
+
+	afterSchema := `definition user {}
+
+definition new_resource {
+	relation editor: user
+}
+
+definition shared_resource {
+	relation viewer: user
+	relation editor: user
+	permission view = viewer
+	permission edit = editor
+}
+
+caveat new_caveat(condition int) {
+	condition == 2
+}`
+
+	sd, err := computeLocalDiff(
+		strings.NewReader(beforeSchema),
+		strings.NewReader(afterSchema),
+		"before.zed",
+		"after.zed",
+	)
+	require.NoError(t, err)
+
+	resp := localDiffToResponse(sd)
+	require.NotEmpty(t, resp.GetDiffs())
+
+	var output strings.Builder
+	err = printDiffSchemaResponse(resp, &output)
+	require.NoError(t, err)
+
+	result := output.String()
+	require.Contains(t, result, "Added definition: new_resource")
+	require.Contains(t, result, "Removed definition: old_resource")
+	require.Contains(t, result, "Changed definition: shared_resource")
+	require.Contains(t, result, "added-relation: editor")
+	require.Contains(t, result, "added-permission: edit")
+	require.Contains(t, result, "Added caveat: new_caveat")
+	require.Contains(t, result, "Removed caveat: old_caveat")
+}
+
+func TestPrintDiffSchemaResponse(t *testing.T) {
+	t.Parallel()
+
+	resp := &v1.DiffSchemaResponse{
+		Diffs: []*v1.ReflectionSchemaDiff{
+			{Diff: &v1.ReflectionSchemaDiff_DefinitionAdded{
+				DefinitionAdded: &v1.ReflectionDefinition{Name: "new_resource"},
+			}},
+			{Diff: &v1.ReflectionSchemaDiff_DefinitionRemoved{
+				DefinitionRemoved: &v1.ReflectionDefinition{Name: "old_resource"},
+			}},
+			{Diff: &v1.ReflectionSchemaDiff_RelationAdded{
+				RelationAdded: &v1.ReflectionRelation{Name: "editor", ParentDefinitionName: "shared_resource"},
+			}},
+			{Diff: &v1.ReflectionSchemaDiff_PermissionAdded{
+				PermissionAdded: &v1.ReflectionPermission{Name: "edit", ParentDefinitionName: "shared_resource"},
+			}},
+			{Diff: &v1.ReflectionSchemaDiff_CaveatAdded{
+				CaveatAdded: &v1.ReflectionCaveat{Name: "new_caveat"},
+			}},
+			{Diff: &v1.ReflectionSchemaDiff_CaveatRemoved{
+				CaveatRemoved: &v1.ReflectionCaveat{Name: "old_caveat"},
+			}},
+			{Diff: &v1.ReflectionSchemaDiff_CaveatParameterTypeChanged{
+				CaveatParameterTypeChanged: &v1.ReflectionCaveatParameterTypeChange{
+					Parameter:    &v1.ReflectionCaveatParameter{Name: "amount", ParentCaveatName: "price_caveat", Type: "string"},
+					PreviousType: "int",
+				},
+			}},
+		},
+	}
+
+	var output strings.Builder
+	err := printDiffSchemaResponse(resp, &output)
+	require.NoError(t, err)
+
+	result := output.String()
+	require.Contains(t, result, "Added definition: new_resource")
+	require.Contains(t, result, "Removed definition: old_resource")
+	require.Contains(t, result, "Changed definition: shared_resource")
+	require.Contains(t, result, "added-relation: editor")
+	require.Contains(t, result, "added-permission: edit")
+	require.Contains(t, result, "Added caveat: new_caveat")
+	require.Contains(t, result, "Removed caveat: old_caveat")
+	require.Contains(t, result, "Changed caveat: price_caveat")
+	require.Contains(t, result, "parameter-type-changed: amount")
+}
+
+func TestSchemaDiffAPICmdFunc(t *testing.T) {
+	t.Parallel()
+
+	schemaContent := "definition user {}\n"
+	schemaFile := filepath.Join(t.TempDir(), "test.zed")
+	require.NoError(t, os.WriteFile(schemaFile, []byte(schemaContent), 0o600))
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := NewMockSchemaServiceClient(ctrl)
+	mockClient.EXPECT().
+		DiffSchema(gomock.Any(), &v1.DiffSchemaRequest{
+			ComparisonSchema: schemaContent,
+		}).
+		Return(&v1.DiffSchemaResponse{
+			Diffs: []*v1.ReflectionSchemaDiff{
+				{Diff: &v1.ReflectionSchemaDiff_DefinitionAdded{
+					DefinitionAdded: &v1.ReflectionDefinition{Name: "user"},
+				}},
+			},
+		}, nil).
+		Times(1)
+
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+		zedtesting.BoolFlag{FlagName: "json", FlagValue: false},
+	)
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = oldStdout })
+
+	err := schemaDiffAPICmdFunc(cmd, schemaFile, mockClient)
+	require.NoError(t, err)
+
+	w.Close()
+	var buf strings.Builder
+	_, _ = io.Copy(&buf, r)
+	require.Contains(t, buf.String(), "Added definition: user")
 }
 
 func TestSchemaCopyInner(t *testing.T) {
