@@ -118,6 +118,15 @@ func importSchema(ctx context.Context, client v1.SchemaServiceClient, schema str
 	return nil
 }
 
+// addPrefixIfAbsent prepends prefix to name unless name already carries a
+// definition prefix (i.e. already contains a "/").
+func addPrefixIfAbsent(name, prefix string) string {
+	if strings.Contains(name, "/") {
+		return name
+	}
+	return fmt.Sprintf("%s/%s", prefix, name)
+}
+
 func importRelationships(ctx context.Context, client v1.PermissionsServiceClient, relationships string, definitionPrefix string, batchSize int, workers int) error {
 	relationshipUpdates := make([]*v1.RelationshipUpdate, 0)
 	scanner := bufio.NewScanner(strings.NewReader(relationships))
@@ -135,12 +144,15 @@ func importRelationships(ctx context.Context, client v1.PermissionsServiceClient
 		}
 		log.Trace().Str("line", line).Send()
 
-		// Rewrite the prefix on the references, if any.
+		// Rewrite the prefix on the references, if any. Only prefix names that
+		// are not already prefixed, so importing relationships that already
+		// carry the prefix (e.g. from a prefixed schemaFile) does not double it
+		// (`studio/x` becoming `studio/studio/x`). See issue #460.
 		if len(definitionPrefix) > 0 {
-			rel.Resource.ObjectType = fmt.Sprintf("%s/%s", definitionPrefix, rel.Resource.ObjectType)
-			rel.Subject.Object.ObjectType = fmt.Sprintf("%s/%s", definitionPrefix, rel.Subject.Object.ObjectType)
+			rel.Resource.ObjectType = addPrefixIfAbsent(rel.Resource.ObjectType, definitionPrefix)
+			rel.Subject.Object.ObjectType = addPrefixIfAbsent(rel.Subject.Object.ObjectType, definitionPrefix)
 			if rel.OptionalCaveat != nil {
-				rel.OptionalCaveat.CaveatName = fmt.Sprintf("%s/%s", definitionPrefix, rel.OptionalCaveat.CaveatName)
+				rel.OptionalCaveat.CaveatName = addPrefixIfAbsent(rel.OptionalCaveat.CaveatName, definitionPrefix)
 			}
 		}
 
