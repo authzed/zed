@@ -234,26 +234,30 @@ func (h *HTMLCheckTraceRenderer) writeHeader() {
 	h.builder.WriteString(htmlHeaderPrefix)
 
 	// Write timestamp
-	fmt.Fprintf(&h.builder,
+	fmt.Fprintf(
+		&h.builder,
 		"        <p class=\"metadata-timestamp\">Generated: %s</p>\n",
 		html.EscapeString(h.options.Timestamp.Format("2006-01-02 15:04:05 MST")),
 	)
 
 	// Write optional metadata
 	if h.options.Command != "" {
-		fmt.Fprintf(&h.builder,
+		fmt.Fprintf(
+			&h.builder,
 			"        <p class=\"metadata-item\">Command: <code class=\"metadata-code\">%s</code></p>\n",
 			html.EscapeString(h.options.Command),
 		)
 	}
 	if h.options.SpiceDBServer != "" {
-		fmt.Fprintf(&h.builder,
+		fmt.Fprintf(
+			&h.builder,
 			"        <p class=\"metadata-item\">SpiceDB Server: %s</p>\n",
 			html.EscapeString(h.options.SpiceDBServer),
 		)
 	}
 	if h.options.SpiceDBVersion != "" {
-		fmt.Fprintf(&h.builder,
+		fmt.Fprintf(
+			&h.builder,
 			"        <p class=\"metadata-item\">SpiceDB Version: %s</p>\n",
 			html.EscapeString(h.options.SpiceDBVersion),
 		)
@@ -443,12 +447,14 @@ func (h *HTMLCheckTraceRenderer) renderCaveatInfo(caveatInfo *v1.CaveatEvalInfo)
 
 	h.builder.WriteString(`<div class="caveat-node">`)
 	fmt.Fprintf(&h.builder, `<span class="icon %s">%s</span> `, iconClass, icon)
-	fmt.Fprintf(&h.builder,
+	fmt.Fprintf(
+		&h.builder,
 		`<span class="caveat-expr%s">%s</span> `,
 		exprClass,
 		html.EscapeString(caveatInfo.Expression),
 	)
-	fmt.Fprintf(&h.builder,
+	fmt.Fprintf(
+		&h.builder,
 		`<span class="caveat-name">%s</span>`,
 		html.EscapeString(caveatInfo.CaveatName),
 	)
@@ -462,7 +468,8 @@ func (h *HTMLCheckTraceRenderer) renderCaveatInfo(caveatInfo *v1.CaveatEvalInfo)
 		contextJSON, err := json.MarshalIndent(contextMap, "", "  ")
 		if err != nil {
 			// Defensive: handle unexpected marshaling errors (no details wrapper for errors)
-			fmt.Fprintf(&h.builder,
+			fmt.Fprintf(
+				&h.builder,
 				`<div class="context-json">(error marshaling context: %s)</div>`,
 				html.EscapeString(err.Error()),
 			)
@@ -470,7 +477,8 @@ func (h *HTMLCheckTraceRenderer) renderCaveatInfo(caveatInfo *v1.CaveatEvalInfo)
 			// Wrap context in collapsible details element for large JSON payloads
 			// Only rendered when len(contextMap) > 0, so always has data
 			h.builder.WriteString(`<details open class="context-details"><summary class="context-summary">Context</summary>`)
-			fmt.Fprintf(&h.builder,
+			fmt.Fprintf(
+				&h.builder,
 				`<div class="context-json">%s</div>`,
 				html.EscapeString(string(contextJSON)),
 			)
@@ -483,7 +491,8 @@ func (h *HTMLCheckTraceRenderer) renderCaveatInfo(caveatInfo *v1.CaveatEvalInfo)
 
 	if caveatInfo.Result == v1.CaveatEvalInfo_RESULT_MISSING_SOME_CONTEXT {
 		if caveatInfo.PartialCaveatInfo != nil && len(caveatInfo.PartialCaveatInfo.MissingRequiredContext) > 0 {
-			fmt.Fprintf(&h.builder,
+			fmt.Fprintf(
+				&h.builder,
 				`<div class="missing-context">missing context: %s</div>`,
 				html.EscapeString(strings.Join(caveatInfo.PartialCaveatInfo.MissingRequiredContext, ", ")),
 			)
