@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release (e.g. v1.2.3)"
+        required: true
+        type: "string"
 
 jobs:
   github:
@@ -12,6 +18,7 @@ jobs:
       - uses: "actions/checkout@v6"
         with:
           fetch-depth: 0
+          ref: "${{ inputs.tag || github.ref }}"
       - name: "Install cross-compilers"
         run: |
           brew tap messense/macos-cross-toolchains
@@ -53,6 +60,7 @@ jobs:
       - uses: "actions/checkout@v6"
         with:
           fetch-depth: 0
+          ref: "${{ inputs.tag || github.ref }}"
       - uses: "authzed/actions/docker-login@main"
         with:
           quayio_token: "${{ secrets.QUAYIO_PASSWORD }}"
