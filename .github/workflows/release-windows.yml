@@ -4,6 +4,12 @@ on:  # yamllint disable-line rule:truthy
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release (e.g. v1.2.3)"
+        required: true
+        type: "string"
 permissions:
   contents: "write"
   packages: "write"
@@ -14,6 +20,7 @@ jobs:
       - uses: "actions/checkout@v6"
         with:
           fetch-depth: 0
+          ref: "${{ inputs.tag || github.ref }}"
       - uses: "authzed/actions/setup-go@main"
       - uses: "nowsprinting/check-version-format-action@v5"
         id: "version"
