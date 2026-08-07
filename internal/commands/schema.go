@@ -1,14 +1,10 @@
 package commands
 
 import (
-	"context"
-
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 
@@ -62,23 +58,4 @@ func schemaReadCmdFunc(cmd *cobra.Command, _ []string) error {
 
 	console.Println(stringz.Join("\n\n", resp.SchemaText))
 	return nil
-}
-
-// ReadSchema calls read schema for the client and returns the schema found.
-func ReadSchema(ctx context.Context, client v1.SchemaServiceClient) (string, error) {
-	request := &v1.ReadSchemaRequest{}
-	log.Trace().Interface("request", request).Msg("requesting schema read")
-
-	resp, err := client.ReadSchema(ctx, request)
-	if err != nil {
-		errStatus, ok := status.FromError(err)
-		if !ok || errStatus.Code() != codes.NotFound {
-			return "", err
-		}
-
-		log.Debug().Msg("no schema defined")
-		return "", nil
-	}
-
-	return resp.SchemaText, nil
 }

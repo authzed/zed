@@ -57,10 +57,7 @@ func registerImportCmd(rootCmd *cobra.Command) {
 			if err != nil {
 				return err
 			}
-			prefix, err := determinePrefixForSchema(cmd.Context(), cobrautil.MustGetString(cmd, "schema-definition-prefix"), client, nil)
-			if err != nil {
-				return err
-			}
+			prefix := cobrautil.MustGetString(cmd, "schema-definition-prefix")
 			log.Trace().Msgf("using prefix: %s", prefix)
 			return importCmdFunc(cmd, client, client, prefix, args[0])
 		},
