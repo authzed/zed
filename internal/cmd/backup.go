@@ -474,7 +474,7 @@ func isCanceled(err error) bool {
 }
 
 func openRestoreFile(filename string) (*os.File, int64, error) {
-	if filename == "" {
+	if filename == "" || filename == "-" {
 		log.Trace().Str("filename", "(stdin)").Send()
 		return os.Stdin, -1, nil
 	}
