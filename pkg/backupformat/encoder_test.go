@@ -481,6 +481,129 @@ func TestFileEncoderStreamingToStdout(t *testing.T) {
 	require.Positive(t, info.Size(), "encoded data should have been written to stdout")
 }
 
+func TestOcfFileEncoder_CursorOnCompletedBackup(t *testing.T) {
+	tempDir := t.TempDir()
+	filename := filepath.Join(tempDir, "completed.zedbackup")
+
+	enc, existed, err := NewFileEncoder(filename)
+	require.NoError(t, err)
+	require.False(t, existed)
+	require.NoError(t, enc.WriteSchema("definition user {}", "tok"))
+	rel := &v1.Relationship{
+		Resource: &v1.ObjectReference{ObjectType: "doc", ObjectId: "1"},
+		Relation: "viewer",
+		Subject:  &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "alice"}},
+	}
+	require.NoError(t, enc.Append(rel, "cursor-1"))
+	enc.MarkComplete()
+	require.NoError(t, enc.Close())
+
+	// Re-open the same filename: Cursor must report it as already completed,
+	// distinct from an incomplete/orphan file.
+	enc2, existed, err := NewFileEncoder(filename)
+	require.NoError(t, err)
+	require.True(t, existed)
+	t.Cleanup(func() { _ = enc2.Close() })
+
+	_, err = enc2.Cursor()
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrBackupAlreadyCompleted)
+}
+
+func TestOcfFileEncoder_CursorOnOrphanBackup(t *testing.T) {
+	tempDir := t.TempDir()
+	filename := filepath.Join(tempDir, "orphan.zedbackup")
+
+	// Reproduce the production failure: the previous run wrote the OCF header
+	// via WriteSchema but the export stream died before the first relationship
+	// Append(), so no lockfile was ever written.
+	enc, _, err := NewFileEncoder(filename)
+	require.NoError(t, err)
+	require.NoError(t, enc.WriteSchema("definition user {}", "tok"))
+	require.NoError(t, enc.Close())
+
+	require.NoFileExists(t, filename+".lock")
+	require.NoFileExists(t, filename+".done")
+
+	enc2, existed, err := NewFileEncoder(filename)
+	require.NoError(t, err)
+	require.True(t, existed)
+	t.Cleanup(func() { _ = enc2.Close() })
+
+	_, err = enc2.Cursor()
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrBackupUnresumable, "orphan file must not be reported as completed")
+	require.NotErrorIs(t, err, ErrBackupAlreadyCompleted)
+}
+
+func TestOcfFileEncoder_StaleDoneSentinelClearedOnFreshRun(t *testing.T) {
+	tempDir := t.TempDir()
+	filename := filepath.Join(tempDir, "reused.zedbackup")
+
+	// Simulate a prior completed backup at the same path, then the user
+	// deleted only the .zedbackup file (not the .done sentinel) before
+	// starting a fresh run.
+	require.NoError(t, os.WriteFile(filename+".done", nil, 0o644))
+	require.FileExists(t, filename+".done")
+
+	enc, existed, err := NewFileEncoder(filename)
+	require.NoError(t, err)
+	require.False(t, existed)
+	t.Cleanup(func() { _ = enc.Close() })
+
+	require.NoFileExists(t, filename+".done",
+		"stale completion sentinel must be cleared when starting a fresh backup")
+}
+
+func TestOcfFileEncoder_StaleLockfileClearedOnFreshRun(t *testing.T) {
+	tempDir := t.TempDir()
+	filename := filepath.Join(tempDir, "reused.zedbackup")
+
+	// Simulate a prior failed backup at the same path: a .lock with a stale
+	// cursor was left behind. The user deleted the .zedbackup but did not
+	// know about the .lock sidecar. Without cleanup, a subsequent fresh run
+	// that itself fails before the first Append() would resume from this
+	// stale cursor against an unrelated snapshot — silently skipping rows.
+	staleCursor := "stale-cursor-from-prior-snapshot"
+	require.NoError(t, os.WriteFile(filename+".lock", []byte(staleCursor), 0o644))
+	require.FileExists(t, filename+".lock")
+
+	enc, existed, err := NewFileEncoder(filename)
+	require.NoError(t, err)
+	require.False(t, existed)
+	t.Cleanup(func() { _ = enc.Close() })
+
+	require.NoFileExists(t, filename+".lock",
+		"stale lockfile must be cleared when starting a fresh backup")
+}
+
+func TestOcfFileEncoder_CursorOnInterruptedBackup(t *testing.T) {
+	tempDir := t.TempDir()
+	filename := filepath.Join(tempDir, "resumable.zedbackup")
+
+	enc, _, err := NewFileEncoder(filename)
+	require.NoError(t, err)
+	require.NoError(t, enc.WriteSchema("definition user {}", "tok"))
+	rel := &v1.Relationship{
+		Resource: &v1.ObjectReference{ObjectType: "doc", ObjectId: "1"},
+		Relation: "viewer",
+		Subject:  &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "user", ObjectId: "alice"}},
+	}
+	require.NoError(t, enc.Append(rel, "cursor-mid-export"))
+	// Simulate a mid-export failure: don't call MarkComplete; close the file but
+	// the lockfile is left behind because completed == false.
+	require.NoError(t, enc.Close())
+
+	enc2, existed, err := NewFileEncoder(filename)
+	require.NoError(t, err)
+	require.True(t, existed)
+	t.Cleanup(func() { _ = enc2.Close() })
+
+	cursor, err := enc2.Cursor()
+	require.NoError(t, err)
+	require.Equal(t, "cursor-mid-export", cursor)
+}
+
 func TestWithProgress(t *testing.T) {
 	tests := []struct {
 		name   string
