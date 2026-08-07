@@ -15,7 +15,7 @@ jobs:
     name: "Build Binary"
     runs-on: "depot-ubuntu-latest-arm"
     steps:
-      - uses: "actions/checkout@v6"
+      - uses: "actions/checkout@v7"
       - uses: "authzed/actions/setup-go@main"
       - uses: "authzed/actions/go-build@main"
 
@@ -23,18 +23,18 @@ jobs:
     name: "Build Container Image"
     runs-on: "depot-ubuntu-latest-arm"
     steps:
-      - uses: "actions/checkout@v6"
+      - uses: "actions/checkout@v7"
       - uses: "authzed/actions/docker-build@main"
 
   ensure-docs-uptodate:
     name: "Ensure Docs are up to date"
     runs-on: "depot-ubuntu-latest-arm"
     steps:
-      - uses: "actions/checkout@v6"
+      - uses: "actions/checkout@v7"
       - uses: "authzed/actions/setup-go@main"
       - name: "Generate docs"
         run: "go run mage.go gen:docs"
-      - uses: "chainguard-dev/actions/nodiff@8bb24c24be6871bee44f19be55ea11e3b2aea3dd" # main
+      - uses: "chainguard-dev/actions/nodiff@fabe4ed3f66ceb5f8ec86ed7ae6d0c945ca362fb" # main
         with:
           path: ""
           fixup-command: "mage gen:docs"
@@ -47,12 +47,12 @@ jobs:
         os: ["depot-ubuntu-latest-arm", "windows-latest"]
 
     steps:
-      - uses: "actions/checkout@v6"
+      - uses: "actions/checkout@v7"
       - uses: "authzed/actions/setup-go@main"
       - name: "Unit tests with coverage"
         run: "go run mage.go test:runWithCoverage"
       - name: "Upload coverage to Codecov"
-        uses: "codecov/codecov-action@v6.0.0"
+        uses: "codecov/codecov-action@v7.0.0"
         with:
           files: "./coverage.txt"
           verbose: true
@@ -63,7 +63,7 @@ jobs:
     name: "WASM Tests"
     runs-on: "depot-ubuntu-24.04-4"
     steps:
-      - uses: "actions/checkout@v6"
+      - uses: "actions/checkout@v7"
       - uses: "authzed/actions/setup-go@main"
         with:
           # NOTE: This needs to match the toolchain version, or else
