@@ -44,6 +44,36 @@ func normalizeNewlines(s string) string {
 	return strings.ReplaceAll(s, "\r\n", "\n")
 }
 
+// unixNotExistPattern and windowsNotExistPattern match the OS-specific wording
+// Go's os package returns for a missing file. The word-wrapped error box pads
+// each physical line to a fixed width, so the matched phrase (and its
+// surrounding padding, stripped separately below) can span a line break.
+var (
+	unixNotExistPattern    = regexp.MustCompile(`no\s+such\s+file\s+or\s+directory`)
+	windowsNotExistPattern = regexp.MustCompile(`The\s+system\s+cannot\s+find\s+the\s+file\s+specified\.`)
+)
+
+// normalizeFileNotFoundErr rewrites the OS-specific "file not found" wording
+// embedded in wrapped error output to a single canonical phrase, so tests
+// asserting on this text are stable across platforms.
+func normalizeFileNotFoundErr(s string) string {
+	s = unixNotExistPattern.ReplaceAllString(s, "no such file or directory")
+	s = windowsNotExistPattern.ReplaceAllString(s, "no such file or directory")
+	return s
+}
+
+// stripTrailingLineWhitespace trims trailing spaces/tabs from each line. The
+// canonicalization above can leave stale padding behind (the padding width
+// was computed for the original, differently-sized OS message), so trailing
+// whitespace is no longer meaningful for comparison purposes.
+func stripTrailingLineWhitespace(s string) string {
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimRight(l, " \t")
+	}
+	return strings.Join(lines, "\n")
+}
+
 func TestValidatePreRun(t *testing.T) {
 	t.Parallel()
 
@@ -395,7 +425,10 @@ complete - 0 relationships loaded, 0 assertions run, 0 expected relations valida
 			res, shouldError, err := validateCmdFunc(cmd, tc.files)
 			if tc.expectErr == "" {
 				require.NoError(err)
-				require.Equal(normalizeNewlines(stripDuration(tc.expectStr)), normalizeNewlines(stripDuration(res)))
+				normalize := func(s string) string {
+					return stripTrailingLineWhitespace(normalizeFileNotFoundErr(normalizeNewlines(stripDuration(s))))
+				}
+				require.Equal(normalize(tc.expectStr), normalize(res))
 			} else {
 				require.Error(err)
 				require.Contains(err.Error(), tc.expectErr)

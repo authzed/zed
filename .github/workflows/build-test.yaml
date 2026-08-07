@@ -44,7 +44,7 @@ jobs:
     runs-on: "${{ matrix.os }}"
     strategy:
       matrix:
-        os: ["depot-ubuntu-latest-arm"] # TODO(miparnisari): add "windows-latest" after fixing the tests
+        os: ["depot-ubuntu-latest-arm", "windows-latest"]
 
     steps:
       - uses: "actions/checkout@v6"
@@ -69,7 +69,7 @@ jobs:
           # NOTE: This needs to match the toolchain version, or else
           # go env gopath won't point at the right install location for the
           # wasm tool.
-          go-version: "1.26.4"
+          go-version: "1.26.5"
       - name: "Disable AppArmor"
         if:
           "runner.os == 'Linux'"

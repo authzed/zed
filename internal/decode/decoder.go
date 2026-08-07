@@ -109,13 +109,7 @@ func FetchFromURL(u *url.URL) ([]byte, error) {
 
 func FetchFromFile(u *url.URL) ([]byte, error) {
 	filePath := filepath.Clean(u.Path)
-
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	return io.ReadAll(file)
+	return os.ReadFile(filePath)
 }
 
 func FetchFromHTTP(u *url.URL) ([]byte, error) {
@@ -199,12 +193,23 @@ func UnmarshalYAMLValidationFile(contents []byte) (*validationfile.ValidationFil
 	return &validationFile, nil
 }
 
+// windowsDriveLetterPattern matches a Windows absolute path such as
+// `C:\foo\bar.yaml` or `C:/foo/bar.yaml`. Without this check, url.Parse
+// misinterprets the drive letter as a URL scheme (e.g. "c"), since a single
+// letter followed by a colon is syntactically a valid URI scheme.
+var windowsDriveLetterPattern = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
+
 // ValidationFileFromFilename takes a filename and a desired/expected FileType and
 // returns the decoded file.
 func ValidationFileFromFilename(filename string, fileType FileType, mustDefineSchema bool) (decoderResult *DecoderResult, err error) {
-	u, err := url.Parse(filename)
-	if err != nil {
-		return nil, err
+	var u *url.URL
+	if windowsDriveLetterPattern.MatchString(filename) {
+		u = &url.URL{Path: filename}
+	} else {
+		u, err = url.Parse(filename)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	sourceType, err := SourceTypeFromURL(u)
@@ -291,11 +296,7 @@ func ResolveSchemaFileIfPresent(filename string, validationFile *validationfile.
 	if validationFile.SchemaFile != "" {
 		schemaPath := filepath.Clean(filepath.Join(filepath.Dir(filename), validationFile.SchemaFile))
 
-		file, err := os.Open(schemaPath)
-		if err != nil {
-			return err
-		}
-		schemaBytes, err := io.ReadAll(file)
+		schemaBytes, err := os.ReadFile(schemaPath)
 		if err != nil {
 			return err
 		}
