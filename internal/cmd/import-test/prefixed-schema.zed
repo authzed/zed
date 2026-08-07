@@ -1,0 +1,10 @@
+definition prefixtest/user {}
+
+caveat prefixtest/somecaveat(allowed bool) {
+	allowed == true
+}
+
+definition prefixtest/resource {
+	relation viewer: prefixtest/user | prefixtest/user with prefixtest/somecaveat
+	permission view = viewer
+}
