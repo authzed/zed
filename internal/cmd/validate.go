@@ -55,13 +55,13 @@ func registerValidateCmd(cmd *cobra.Command) {
 		zed validate authzed-x7izWU8_2Gw3.yaml
 
 	From a gist:
-		zed validate https://gist.github.com/ecordell/8e3b613a677e3c844742cf24421c08b6
+		zed validate https://gist.github.com/YOUR_USERNAME/YOUR_GIST_ID
 
 	From a playground link:
-		zed validate https://play.authzed.com/s/iksdFvCtvnkR/schema
+		zed validate https://play.authzed.com/s/YOUR_SHARE_ID/schema
 
 	From pastebin:
-		zed validate https://pastebin.com/8qU45rVK`,
+		zed validate https://pastebin.com/YOUR_PASTE_ID`,
 		Args:              commands.ValidationWrapper(cobra.MinimumNArgs(1)),
 		ValidArgsFunction: commands.FileExtensionCompletions("zed", "yaml", "yml", "zaml"),
 		PreRunE:           validatePreRunE,
