@@ -209,7 +209,11 @@ type OcfFileEncoder struct {
 	completed bool
 	// OcfEncoder is the embedded AVRO OCF encoder that performs the actual
 	// serialization of relationships into the file.
-	*OcfEncoder
+	ocfEncoder *OcfEncoder
+}
+
+func (fe *OcfFileEncoder) WriteSchema(schema, revision string) error {
+	return fe.ocfEncoder.WriteSchema(schema, revision)
 }
 
 func (fe *OcfFileEncoder) lockFileName() string {
@@ -245,11 +249,11 @@ func NewFileEncoder(filename string) (e *OcfFileEncoder, existed bool, err error
 		}
 	}
 
-	return &OcfFileEncoder{file: f, fileIsStream: isStream, OcfEncoder: &OcfEncoder{w: f}}, backupExisted, nil
+	return &OcfFileEncoder{file: f, fileIsStream: isStream, ocfEncoder: &OcfEncoder{w: f}}, backupExisted, nil
 }
 
 func (fe *OcfFileEncoder) Append(r *v1.Relationship, cursor string) error {
-	if err := fe.OcfEncoder.Append(r, cursor); err != nil {
+	if err := fe.ocfEncoder.Append(r, cursor); err != nil {
 		return fmt.Errorf("error storing relationship: %w", err)
 	}
 
@@ -273,16 +277,19 @@ func (fe *OcfFileEncoder) MarkComplete() { fe.completed = true }
 func (fe *OcfFileEncoder) Close() error {
 	// Don't throw any errors if the file is nil when flushing/closing.
 	safeClose := func() error {
-		if fe.file == nil || fe.enc == nil {
+		if fe.file == nil {
 			return nil
 		}
-		fe.OcfEncoder.Close()
+		var flushErr error
+		if fe.ocfEncoder != nil && fe.ocfEncoder.enc != nil {
+			flushErr = fe.ocfEncoder.Close()
+		}
 		// Stdout is owned by the process; Sync would fail with
 		// "inappropriate ioctl for device" and we must not close it.
 		if fe.fileIsStream {
-			return nil
+			return flushErr
 		}
-		return errors.Join(fe.file.Sync(), fe.file.Close())
+		return errors.Join(flushErr, fe.file.Sync(), fe.file.Close())
 	}
 
 	removeCompleted := func() error {
@@ -302,7 +309,7 @@ func (fe *OcfFileEncoder) Close() error {
 }
 
 func (fe *OcfFileEncoder) MarshalZerologObject(e *zerolog.Event) {
-	e.EmbedObject(fe.OcfEncoder).
+	e.EmbedObject(fe.ocfEncoder).
 		Str("file", fe.file.Name()).
 		Str("lockFile", fe.lockFileName())
 }

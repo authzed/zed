@@ -426,7 +426,7 @@ func TestNewFileEncoder(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.NotNil(t, enc)
-			require.NotNil(t, enc.OcfEncoder)
+			require.NotNil(t, enc.ocfEncoder)
 			if tt.filename != "-" {
 				enc.Close()
 				os.Remove(tt.filename)

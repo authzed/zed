@@ -1,1 +1,16 @@
 docs/zed.md linguist-generated=true
+
+# Schema/validation-file fixtures are parsed byte-for-byte (schema DSL error
+# messages report line/column position), and several tests compare their
+# contents against hardcoded LF string literals. Without this, Windows
+# checkouts with core.autocrlf=true would convert them to CRLF and break
+# both the comparisons and the reported positions.
+#
+# *.zed is covered repo-wide since the extension is unique to this DSL. YAML
+# fixtures are scoped by directory instead, since *.yaml/*.yml would
+# otherwise also match unrelated CI/config files (workflows, dependabot,
+# goreleaser, etc.) that have no reason to be forced to LF.
+*.zed text eol=lf
+internal/cmd/validate-test/**/*.yaml text eol=lf
+internal/cmd/import-test/*.yaml text eol=lf
+internal/schemaexamples/schemas/**/*.yaml text eol=lf
