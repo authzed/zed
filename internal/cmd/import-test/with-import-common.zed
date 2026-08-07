@@ -1,0 +1,6 @@
+definition user {}
+
+caveat mycaveat(day_of_week string) {
+    day_of_week == "friday"
+}
+
