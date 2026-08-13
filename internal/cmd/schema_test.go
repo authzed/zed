@@ -23,64 +23,6 @@ import (
 	"github.com/authzed/zed/internal/zedtesting"
 )
 
-func TestDeterminePrefixForSchema(t *testing.T) {
-	tests := []struct {
-		name            string
-		existingSchema  string
-		specifiedPrefix string
-		expectedPrefix  string
-	}{
-		{
-			"empty schema",
-			"",
-			"",
-			"",
-		},
-		{
-			"no prefix, none specified",
-			`definition user {}`,
-			"",
-			"",
-		},
-		{
-			"no prefix, one specified",
-			`definition user {}`,
-			"test",
-			"test",
-		},
-		{
-			"prefix found",
-			`definition test/user {}`,
-			"",
-			"test",
-		},
-		{
-			"multiple prefixes found",
-			`definition test/user {}
-			
-			definition something/resource {}`,
-			"",
-			"",
-		},
-		{
-			"multiple prefixes found, one specified",
-			`definition test/user {}
-			
-			definition something/resource {}`,
-			"foobar",
-			"foobar",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			found, err := determinePrefixForSchema(t.Context(), test.specifiedPrefix, nil, &test.existingSchema)
-			require.NoError(t, err)
-			require.Equal(t, test.expectedPrefix, found)
-		})
-	}
-}
-
 func TestRewriteSchema(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -366,6 +308,7 @@ func TestSchemaWrite(t *testing.T) {
 	testCases := map[string]struct {
 		schemaMakerFn       func() ([]string, error)
 		terminalChecker     *mockTermChecker
+		existingSchema      string
 		expectErr           string
 		expectSchemaWritten string
 	}{
@@ -396,6 +339,20 @@ definition resource {
 			},
 			terminalChecker:     &mockTermChecker{returnVal: false},
 			expectSchemaWritten: "definition user{}\ndefinition document { relation read: user }",
+		},
+		`existing_prefixed_schema_does_not_prefix`: {
+			schemaMakerFn: func() ([]string, error) {
+				return []string{
+					filepath.Join("write-schema-test", "basic.zed"),
+				}, nil
+			},
+			existingSchema: `definition someprefix/user {}`,
+			expectSchemaWritten: `definition user {}
+definition resource {
+  relation view: user
+  permission viewer = view
+}`,
+			terminalChecker: &mockTermChecker{returnVal: false},
 		},
 		`schema_from_stdin_but_terminal`: {
 			schemaMakerFn: func() ([]string, error) {
@@ -450,11 +407,13 @@ definition resource {
 			defer ctrl.Finish()
 			mockClient := NewMockSchemaServiceClient(ctrl)
 
-			// ReadSchema is always called at least once
+			// Writing never consults the existing schema: the prefix is applied only when
+			// explicitly specified via --schema-definition-prefix. Serving the existing schema
+			// here ensures a reintroduced prefix inference would be caught by the assertions below.
 			mockClient.EXPECT().
 				ReadSchema(gomock.Any(), gomock.Any()).
-				Return(&v1.ReadSchemaResponse{SchemaText: ""}, nil).
-				MaxTimes(2) // sometimes we read for prefix determination
+				Return(&v1.ReadSchemaResponse{SchemaText: tc.existingSchema}, nil).
+				AnyTimes()
 
 			// Set up WriteSchema expectations based on test case
 			var receivedSchema string

@@ -57,10 +57,7 @@ func registerImportCmd(rootCmd *cobra.Command) {
 			if err != nil {
 				return err
 			}
-			prefix, err := determinePrefixForSchema(cmd.Context(), cobrautil.MustGetString(cmd, "schema-definition-prefix"), client, nil)
-			if err != nil {
-				return err
-			}
+			prefix := cobrautil.MustGetString(cmd, "schema-definition-prefix")
 			log.Trace().Msgf("using prefix: %s", prefix)
 			return importCmdFunc(cmd, client, client, prefix, args[0])
 		},
@@ -71,7 +68,7 @@ func registerImportCmd(rootCmd *cobra.Command) {
 	importCmd.Flags().Int("workers", 1, "number of concurrent batching workers")
 	importCmd.Flags().Bool("schema", true, "import schema")
 	importCmd.Flags().Bool("relationships", true, "import relationships")
-	importCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before importing")
+	importCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before importing; no prefix is added unless specified")
 }
 
 func importCmdFunc(cmd *cobra.Command, schemaClient v1.SchemaServiceClient, relationshipsClient v1.PermissionsServiceClient, prefix, filename string) error {
