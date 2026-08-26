@@ -287,10 +287,17 @@ func redactRewriteChildren(children []*core.SetOperation_Child, redactionMap *Re
 			t.TupleToUserset.Tupleset.Relation = redactionMap.Relations[t.TupleToUserset.Tupleset.Relation]
 			t.TupleToUserset.ComputedUserset.Relation = redactionMap.Relations[t.TupleToUserset.ComputedUserset.Relation]
 
+		case *core.SetOperation_Child_FunctionedTupleToUserset:
+			t.FunctionedTupleToUserset.Tupleset.Relation = redactionMap.Relations[t.FunctionedTupleToUserset.Tupleset.Relation]
+			t.FunctionedTupleToUserset.ComputedUserset.Relation = redactionMap.Relations[t.FunctionedTupleToUserset.ComputedUserset.Relation]
+
 		case *core.SetOperation_Child_XNil:
 			// nothing to do
 
 		case *core.SetOperation_Child_XThis:
+			// nothing to do
+
+		case *core.SetOperation_Child_XSelf:
 			// nothing to do
 
 		default:

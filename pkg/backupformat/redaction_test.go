@@ -217,6 +217,38 @@ func TestRedactSchema(t *testing.T) {
 			},
 		},
 		{
+			name: "any and all operators",
+			opts: RedactionOptions{
+				RedactDefinitions: true,
+				RedactRelations:   true,
+				RedactObjectIDs:   true,
+			},
+			in: `
+			definition user {}
+
+			definition resource {
+				relation viewer: user
+				relation upstream: resource
+				permission readany = viewer + upstream.any(readany)
+				permission readall = viewer + upstream.all(readall)
+			}`,
+			out: "definition def0 {}\n\ndefinition def1 {\n\trelation rel2: def0\n\trelation rel3: def1\n\tpermission rel4 = rel2 + rel3.any(rel4)\n\tpermission rel5 = rel2 + rel3.all(rel5)\n}",
+			redactionMap: RedactionMap{
+				Definitions: map[string]string{
+					"user":     "def0",
+					"resource": "def1",
+				},
+				Caveats: map[string]string{},
+				Relations: map[string]string{
+					"viewer":   "rel2",
+					"upstream": "rel3",
+					"readany":  "rel4",
+					"readall":  "rel5",
+				},
+				ObjectIDs: map[string]string{},
+			},
+		},
+		{
 			name: "same relation name in different definitions",
 			opts: RedactionOptions{
 				RedactDefinitions: true,
