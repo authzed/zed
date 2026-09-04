@@ -17,25 +17,67 @@ import (
 	"github.com/authzed/authzed-go/pkg/requestmeta"
 )
 
+const (
+	resourceFormat     = "`<type>:<id>`"
+	subjectFormat      = "`<type>:<id>` or `<type>:<id>#<relation>`"
+	resourceTypeFormat = "`<type>`"
+	subjectTypeFormat  = "`<type>` or `<type>#<relation>`"
+)
+
+// invalidArgError returns a ValidationError describing an argument that is not
+// in the expected format, so that the command's usage is printed alongside it.
+func invalidArgError(kind, value, format string) error {
+	return ValidationError{error: fmt.Errorf("invalid %s %q: expected format %s", kind, value, format)}
+}
+
+// ParseResource parses the given resource string into its object type and
+// object ID, if valid.
+func ParseResource(s string) (objectType, objectID string, err error) {
+	if err := stringz.SplitExact(s, ":", &objectType, &objectID); err != nil {
+		return "", "", invalidArgError("resource", s, resourceFormat)
+	}
+	if objectType == "" || objectID == "" {
+		return "", "", invalidArgError("resource", s, resourceFormat)
+	}
+	return objectType, objectID, nil
+}
+
 // ParseSubject parses the given subject string into its namespace, object ID
 // and relation, if valid.
 func ParseSubject(s string) (namespace, id, relation string, err error) {
-	err = stringz.SplitExact(s, ":", &namespace, &id)
-	if err != nil {
-		return namespace, id, relation, err
+	if err := stringz.SplitExact(s, ":", &namespace, &id); err != nil {
+		return "", "", "", invalidArgError("subject", s, subjectFormat)
 	}
-	err = stringz.SplitExact(id, "#", &id, &relation)
-	if err != nil {
-		relation = ""
-		err = nil
+	if strings.Contains(id, "#") {
+		if err := stringz.SplitExact(id, "#", &id, &relation); err != nil || relation == "" {
+			return "", "", "", invalidArgError("subject", s, subjectFormat)
+		}
 	}
-	return namespace, id, relation, err
+	if namespace == "" || id == "" {
+		return "", "", "", invalidArgError("subject", s, subjectFormat)
+	}
+	return namespace, id, relation, nil
 }
 
-// ParseType parses a type reference of the form `namespace#relaion`.
-func ParseType(s string) (namespace, relation string) {
+// ParseResourceType parses a bare type reference of the form `namespace`.
+func ParseResourceType(s string) (namespace string, err error) {
+	if s == "" || strings.ContainsAny(s, ":#") {
+		return "", invalidArgError("resource type", s, resourceTypeFormat)
+	}
+	return s, nil
+}
+
+// ParseType parses a type reference of the form `namespace#relation`, where the
+// relation is optional.
+func ParseType(s string) (namespace, relation string, err error) {
+	if strings.Contains(s, ":") {
+		return "", "", invalidArgError("subject type", s, subjectTypeFormat)
+	}
 	namespace, relation, _ = strings.Cut(s, "#")
-	return namespace, relation
+	if namespace == "" {
+		return "", "", invalidArgError("subject type", s, subjectTypeFormat)
+	}
+	return namespace, relation, nil
 }
 
 // GetCaveatContext returns the entered caveat caveat, if any.
