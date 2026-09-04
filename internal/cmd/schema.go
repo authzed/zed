@@ -7,11 +7,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/ccoveille/go-safecast/v2"
 	"github.com/jzelinskie/cobrautil/v2"
-	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -95,11 +93,11 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 
 	schemaCmd.AddCommand(schemaCopyCmd)
 	schemaCopyCmd.Flags().Bool("json", false, "output as JSON")
-	schemaCopyCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before writing")
+	schemaCopyCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before writing; no prefix is added unless specified")
 
 	schemaCmd.AddCommand(schemaWriteCmd)
 	schemaWriteCmd.Flags().Bool("json", false, "output as JSON")
-	schemaWriteCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before writing")
+	schemaWriteCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before writing; no prefix is added unless specified")
 
 	schemaCmd.AddCommand(schemaDiffCmd)
 
@@ -230,12 +228,7 @@ func schemaCopyInner(ctx context.Context, srcClient, destClient v1.SchemaService
 	}
 	log.Trace().Interface("response", readResp).Msg("read schema")
 
-	prefix, err := determinePrefixForSchema(ctx, definitionPrefix, nil, &readResp.SchemaText)
-	if err != nil {
-		return nil, err
-	}
-
-	schemaText, err := rewriteSchema(ctx, readResp.SchemaText, prefix)
+	schemaText, err := rewriteSchema(ctx, readResp.SchemaText, definitionPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -284,11 +277,7 @@ func schemaWriteCmdImpl(cmd *cobra.Command, args []string, client v1.SchemaServi
 		return errors.New("attempted to write empty schema")
 	}
 
-	prefix, err := determinePrefixForSchema(cmd.Context(), cobrautil.MustGetString(cmd, "schema-definition-prefix"), client, nil)
-	if err != nil {
-		return err
-	}
-
+	prefix := cobrautil.MustGetString(cmd, "schema-definition-prefix")
 	schemaText, err := rewriteSchema(cmd.Context(), string(schemaBytes), prefix)
 	if err != nil {
 		return err
@@ -332,62 +321,6 @@ func rewriteSchema(ctx context.Context, existingSchemaText string, definitionPre
 
 	generated, _, err := generator.GenerateSchema(ctx, compiled.OrderedDefinitions)
 	return generated, err
-}
-
-// determinePrefixForSchema determines the prefix to be applied to a schema that will be written.
-//
-// If specifiedPrefix is non-empty, it is returned immediately.
-// If existingSchema is non-nil, it is parsed for the prefix.
-// Otherwise, the client is used to retrieve the existing schema (if any), and the prefix is retrieved from there.
-func determinePrefixForSchema(ctx context.Context, specifiedPrefix string, client v1.SchemaServiceClient, existingSchema *string) (string, error) {
-	if specifiedPrefix != "" {
-		return specifiedPrefix, nil
-	}
-
-	var schemaText string
-	if existingSchema != nil {
-		schemaText = *existingSchema
-	} else {
-		readSchemaText, err := commands.ReadSchema(ctx, client)
-		if err != nil {
-			return "", nil
-		}
-		schemaText = readSchemaText
-	}
-
-	// If there is no schema found, return the empty string.
-	if schemaText == "" {
-		return "", nil
-	}
-
-	// Otherwise, compile the schema and grab the prefixes of the namespaces defined.
-	found, err := compiler.Compile(
-		compiler.InputSchema{Source: input.Source("schema"), SchemaString: schemaText},
-		compiler.AllowUnprefixedObjectType(),
-		compiler.SkipValidation(),
-	)
-	if err != nil {
-		return "", err
-	}
-
-	foundPrefixes := make([]string, 0, len(found.OrderedDefinitions))
-	for _, def := range found.OrderedDefinitions {
-		if strings.Contains(def.GetName(), "/") {
-			parts := strings.Split(def.GetName(), "/")
-			foundPrefixes = append(foundPrefixes, parts[0])
-		} else {
-			foundPrefixes = append(foundPrefixes, "")
-		}
-	}
-
-	prefixes := stringz.Dedup(foundPrefixes)
-	if len(prefixes) == 1 {
-		prefix := prefixes[0]
-		log.Debug().Str("prefix", prefix).Msg("found schema definition prefix")
-		return prefix, nil
-	}
-
-	return "", nil
 }
 
 func schemaCompileOuter(cmd *cobra.Command, args []string) (bool, error) {
