@@ -590,6 +590,88 @@ func TestBackupRestoreCmdFunc(t *testing.T) {
 	require.Equal(t, "test/resource:1#reader@test/user:1", tuple.MustV1StringRelationship(rrResp.Relationship))
 }
 
+func TestOpenRestoreFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile, err := os.CreateTemp(tmpDir, "backup-*.zed")
+	if err != nil {
+		t.Fatalf("failed to create temp file for testing: %v", err)
+	}
+
+	dummyContent := []byte("dummy-data")
+	if _, err := tmpFile.Write(dummyContent); err != nil {
+		t.Fatalf("failed to write to temp file: %v", err)
+	}
+	err = tmpFile.Close()
+	if err != nil {
+		t.Fatalf("failed to close file: %v", err)
+	}
+
+	tests := []struct {
+		name         string
+		filename     string
+		expectError  bool
+		expectedSize int64
+	}{
+		{
+			name:         "empty filename defaults to stdin",
+			filename:     "",
+			expectError:  false,
+			expectedSize: -1,
+		},
+		{
+			name:         "dash filename defaults to stdin",
+			filename:     "-",
+			expectError:  false,
+			expectedSize: -1,
+		},
+		{
+			name:         "valid file returns file descriptor and correct size",
+			filename:     tmpFile.Name(),
+			expectError:  false,
+			expectedSize: int64(len(dummyContent)),
+		},
+		{
+			name:         "invalid file returns error",
+			filename:     "nonexistent_file.zed",
+			expectError:  true,
+			expectedSize: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, size, err := openRestoreFile(tt.filename)
+
+			if f != nil && f != os.Stdin {
+				defer func(f *os.File) {
+					err := f.Close()
+					if err != nil {
+						t.Fatalf("failed to close file: %v", err)
+					}
+				}(f)
+			}
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if size != tt.expectedSize {
+					t.Errorf("expected size %d, got %d", tt.expectedSize, size)
+				}
+				if tt.filename == "" || tt.filename == "-" {
+					if f != os.Stdin {
+						t.Errorf("expected os.Stdin")
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestPrintBackupFileLocation(t *testing.T) {
 	previous := console.Errorf
 	t.Cleanup(func() {
