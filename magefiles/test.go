@@ -17,5 +17,5 @@ func (g Test) Run() error {
 
 // RunWithCoverage runs unit tests and measures coverage (useful for CI)
 func (g Test) RunWithCoverage() error {
-	return sh.RunV("go", "test", "-race", "-count=1", "-timeout=10m", "-covermode=atomic", "-coverprofile=coverage.txt", "./...")
+	return sh.RunV("go", "test", "-race", "-count=1", "-timeout=10m", "-covermode=atomic", "-coverpkg=./...", "-coverprofile=coverage.txt", "./...")
 }
