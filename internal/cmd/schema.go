@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -105,6 +106,7 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 
 	schemaCmd.AddCommand(schemaCompileCmd)
 	schemaCompileCmd.Flags().String("out", "", "output filepath; omitting writes to stdout")
+	schemaCompileCmd.Flags().Bool("json", false, "output schema as JSON")
 }
 
 func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {
@@ -392,6 +394,7 @@ func determinePrefixForSchema(ctx context.Context, specifiedPrefix string, clien
 
 func schemaCompileOuter(cmd *cobra.Command, args []string) (bool, error) {
 	outputFilepath := cobrautil.MustGetString(cmd, "out")
+	asJson := cobrautil.MustGetBool(cmd, "json")
 
 	var outputFile *os.File
 	var toStdout bool
@@ -413,12 +416,12 @@ func schemaCompileOuter(cmd *cobra.Command, args []string) (bool, error) {
 		}()
 	}
 
-	return toStdout, schemaCompileInner(cmd.Context(), args, outputFile)
+	return toStdout, schemaCompileInner(cmd.Context(), args, asJson, outputFile)
 }
 
 // Compiles an input schema written in the new composable schema syntax
 // and produces it as a fully-realized schema
-func schemaCompileInner(ctx context.Context, args []string, writer io.Writer) error {
+func schemaCompileInner(ctx context.Context, args []string, asJson bool, writer io.Writer) error {
 	inputFilepath := args[0]
 	inputSourceFolder := filepath.Dir(inputFilepath)
 	schemaBytes, err := os.ReadFile(inputFilepath)
@@ -448,6 +451,21 @@ func schemaCompileInner(ctx context.Context, args []string, writer io.Writer) er
 
 	// Add a newline at the end for hygiene's sake
 	terminated := generated + "\n"
+
+	if asJson {
+		output := struct {
+			SchemaText string `json:"schemaText"`
+		}{
+			SchemaText: terminated,
+		}
+
+		jsonOutput, err := json.Marshal(output)
+		if err != nil {
+			return err
+		}
+
+		terminated = string(jsonOutput)
+	}
 
 	_, err = fmt.Fprint(writer, terminated)
 	if err != nil {
