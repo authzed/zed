@@ -1,0 +1,3 @@
+relationships: |-
+  prefixtest/resource:doc1#viewer@prefixtest/user:alice
+  prefixtest/resource:doc2#viewer@prefixtest/user:bob[prefixtest/somecaveat]

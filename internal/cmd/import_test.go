@@ -17,6 +17,17 @@ import (
 
 var fullyConsistent = &v1.Consistency{Requirement: &v1.Consistency_FullyConsistent{FullyConsistent: true}}
 
+func TestAddPrefixIfAbsent(t *testing.T) {
+	// Unprefixed names get the prefix.
+	require.Equal(t, "studio/permissions", addPrefixIfAbsent("permissions", "studio"))
+	require.Equal(t, "studio/user", addPrefixIfAbsent("user", "studio"))
+	// Already-prefixed names are left alone (regression for #460: importing
+	// relationships that already carry the prefix must not double it).
+	require.Equal(t, "studio/permissions", addPrefixIfAbsent("studio/permissions", "studio"))
+	// A different existing prefix is also preserved, not stacked.
+	require.Equal(t, "other/permissions", addPrefixIfAbsent("other/permissions", "studio"))
+}
+
 func TestImportCmd(t *testing.T) {
 	testcases := map[string]struct {
 		importSchema bool
@@ -180,4 +191,76 @@ func TestImportCmdRelationsOnly(t *testing.T) {
 		require.Contains(t, schemaResp.SchemaText, `relation user: user`)
 		require.Contains(t, schemaResp.SchemaText, `permission view = user`)
 	})
+}
+
+// TestImportCmdRelationsOnlyAlreadyPrefixed is a regression test for #460:
+// importing relationships that are already prefixed (e.g. from a prefixed
+// schemaFile) with --schema=false must not double the auto-detected prefix
+// (`prefixtest/resource` becoming `prefixtest/prefixtest/resource`).
+func TestImportCmdRelationsOnlyAlreadyPrefixed(t *testing.T) {
+	cmd := zedtesting.CreateTestCobraCommandWithFlagValue(
+		t,
+		zedtesting.StringFlag{FlagName: "schema-definition-prefix"},
+		zedtesting.BoolFlag{FlagName: "schema", FlagValue: false},
+		zedtesting.BoolFlag{FlagName: "relationships", FlagValue: true},
+		zedtesting.IntFlag{FlagName: "batch-size", FlagValue: 100},
+		zedtesting.IntFlag{FlagName: "workers", FlagValue: 1},
+	)
+
+	ctx := t.Context()
+	srv := zedtesting.NewTestServer(ctx, t)
+	go func() {
+		assert.NoError(t, srv.Run(ctx))
+	}()
+	conn, err := srv.NewClient()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		conn.Close()
+	})
+
+	c, err := zedtesting.ClientFromConn(conn)(cmd)
+	require.NoError(t, err)
+
+	// Write a prefixed schema so prefix auto-detection returns "prefixtest".
+	schemaBytes, err := os.ReadFile(filepath.Join("import-test", "prefixed-schema.zed"))
+	require.NoError(t, err)
+	_, err = c.WriteSchema(ctx, &v1.WriteSchemaRequest{Schema: string(schemaBytes)})
+	require.NoError(t, err)
+
+	// Mirror the import command: auto-detect the prefix from the running
+	// server, then import already-prefixed relationships with --schema=false.
+	prefix, err := determinePrefixForSchema(ctx, "", c, nil)
+	require.NoError(t, err)
+	require.Equal(t, "prefixtest", prefix)
+
+	f := filepath.Join("import-test", "prefixed-relations-validation-file.yaml")
+	require.NoError(t, importCmdFunc(cmd, c, c, prefix, f))
+
+	// The relationship must land at prefixtest/resource, not the doubled
+	// prefixtest/prefixtest/resource (which would fail with FailedPrecondition).
+	resp, err := c.CheckPermission(ctx, &v1.CheckPermissionRequest{
+		Consistency: fullyConsistent,
+		Subject:     &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "prefixtest/user", ObjectId: "alice"}},
+		Permission:  "view",
+		Resource:    &v1.ObjectReference{ObjectType: "prefixtest/resource", ObjectId: "doc1"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION, resp.Permissionship)
+
+	// The already-prefixed caveat name must also be preserved (not doubled to
+	// prefixtest/prefixtest/somecaveat). With the caveat context satisfied, the
+	// caveated relationship grants the permission.
+	caveatedResp, err := c.CheckPermission(ctx, &v1.CheckPermissionRequest{
+		Consistency: fullyConsistent,
+		Subject:     &v1.SubjectReference{Object: &v1.ObjectReference{ObjectType: "prefixtest/user", ObjectId: "bob"}},
+		Permission:  "view",
+		Resource:    &v1.ObjectReference{ObjectType: "prefixtest/resource", ObjectId: "doc2"},
+		Context: func() *structpb.Struct {
+			s, serr := structpb.NewStruct(map[string]any{"allowed": true})
+			require.NoError(t, serr)
+			return s
+		}(),
+	})
+	require.NoError(t, err)
+	require.Equal(t, v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION, caveatedResp.Permissionship)
 }
