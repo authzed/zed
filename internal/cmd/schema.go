@@ -19,6 +19,9 @@ import (
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/caveats/types"
 	"github.com/authzed/spicedb/pkg/diff"
+	caveatdiff "github.com/authzed/spicedb/pkg/diff/caveats"
+	nsdiff "github.com/authzed/spicedb/pkg/diff/namespace"
+	corev1 "github.com/authzed/spicedb/pkg/proto/core/v1"
 	"github.com/authzed/spicedb/pkg/schemadsl/compiler"
 	"github.com/authzed/spicedb/pkg/schemadsl/generator"
 	"github.com/authzed/spicedb/pkg/schemadsl/input"
@@ -68,10 +71,16 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 	}
 
 	schemaDiffCmd := &cobra.Command{
-		Use:   "diff <before file> <after file>",
-		Short: "Diff two schema files",
-		Args:  commands.ValidationWrapper(cobra.ExactArgs(2)),
-		RunE:  schemaDiffCmdFunc,
+		Use:   "diff <file> [file]",
+		Short: "Diff a schema file against the current schema or another file",
+		Long: `Compare schema files to find differences.
+
+With one argument, the provided schema file is diffed against the schema
+stored in the current context's permissions system via the API.
+
+With two arguments, the two local schema files are diffed against each other.`,
+		Args: commands.ValidationWrapper(cobra.RangeArgs(1, 2)),
+		RunE: schemaDiffCmdFunc,
 	}
 
 	schemaCompileCmd := &cobra.Command{
@@ -102,12 +111,21 @@ func registerAdditionalSchemaCmds(schemaCmd *cobra.Command) {
 	schemaWriteCmd.Flags().String("schema-definition-prefix", "", "prefix to add to the schema's definition(s) before writing")
 
 	schemaCmd.AddCommand(schemaDiffCmd)
+	schemaDiffCmd.Flags().Bool("json", false, "output as JSON")
 
 	schemaCmd.AddCommand(schemaCompileCmd)
 	schemaCompileCmd.Flags().String("out", "", "output filepath; omitting writes to stdout")
 }
 
-func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {
+func schemaDiffCmdFunc(cmd *cobra.Command, args []string) error {
+	if len(args) == 1 {
+		c, err := client.NewClient(cmd)
+		if err != nil {
+			return err
+		}
+		return schemaDiffAPICmdFunc(cmd, args[0], c)
+	}
+
 	beforeReader, err := os.Open(args[0])
 	if err != nil {
 		return fmt.Errorf("failed to open before schema file: %w", err)
@@ -118,24 +136,159 @@ func schemaDiffCmdFunc(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to open after schema file: %w", err)
 	}
 
-	return schemaDiffInner(
-		beforeReader,
-		afterReader,
-		args[0],
-		args[1],
-		os.Stdout,
-	)
+	schemaDiff, err := computeLocalDiff(beforeReader, afterReader, args[0], args[1])
+	if err != nil {
+		return err
+	}
+
+	resp := localDiffToResponse(schemaDiff)
+
+	if cobrautil.MustGetBool(cmd, "json") {
+		prettyProto, err := commands.PrettyProto(resp)
+		if err != nil {
+			return fmt.Errorf("failed to convert diff to JSON: %w", err)
+		}
+		console.Println(string(prettyProto))
+		return nil
+	}
+
+	return printDiffSchemaResponse(resp, os.Stdout)
 }
 
-func schemaDiffInner(beforeReader, afterReader io.Reader, beforeSource, afterSource string, writer io.Writer) error {
+func schemaDiffAPICmdFunc(cmd *cobra.Command, schemaFile string, c v1.SchemaServiceClient) error {
+	schemaBytes, err := os.ReadFile(schemaFile)
+	if err != nil {
+		return fmt.Errorf("failed to read schema file: %w", err)
+	}
+
+	request := &v1.DiffSchemaRequest{
+		ComparisonSchema: string(schemaBytes),
+	}
+
+	resp, err := c.DiffSchema(cmd.Context(), request)
+	if err != nil {
+		return err
+	}
+
+	if cobrautil.MustGetBool(cmd, "json") {
+		prettyProto, err := commands.PrettyProto(resp)
+		if err != nil {
+			return fmt.Errorf("failed to convert diff to JSON: %w", err)
+		}
+		console.Println(string(prettyProto))
+		return nil
+	}
+
+	return printDiffSchemaResponse(resp, os.Stdout)
+}
+
+type diffDelta struct {
+	deltaType string
+	name      string
+}
+
+// printDiffSchemaResponse formats a DiffSchemaResponse for human-readable output.
+// Output is grouped by definition/caveat to match the original local diff format.
+func printDiffSchemaResponse(resp *v1.DiffSchemaResponse, writer io.Writer) error {
+	var addedDefs, removedDefs, addedCaveats, removedCaveats []string
+	changedDefsOrder := make([]string, 0)
+	changedDefs := make(map[string][]diffDelta)
+	changedCaveatsOrder := make([]string, 0)
+	changedCaveats := make(map[string][]diffDelta)
+
+	addDefDelta := func(defName string, delta diffDelta) {
+		if _, ok := changedDefs[defName]; !ok {
+			changedDefsOrder = append(changedDefsOrder, defName)
+		}
+		changedDefs[defName] = append(changedDefs[defName], delta)
+	}
+	addCaveatDelta := func(caveatName string, delta diffDelta) {
+		if _, ok := changedCaveats[caveatName]; !ok {
+			changedCaveatsOrder = append(changedCaveatsOrder, caveatName)
+		}
+		changedCaveats[caveatName] = append(changedCaveats[caveatName], delta)
+	}
+
+	for _, d := range resp.GetDiffs() {
+		switch t := d.GetDiff().(type) {
+		case *v1.ReflectionSchemaDiff_DefinitionAdded:
+			addedDefs = append(addedDefs, t.DefinitionAdded.GetName())
+		case *v1.ReflectionSchemaDiff_DefinitionRemoved:
+			removedDefs = append(removedDefs, t.DefinitionRemoved.GetName())
+		case *v1.ReflectionSchemaDiff_DefinitionDocCommentChanged:
+			addDefDelta(t.DefinitionDocCommentChanged.GetName(), diffDelta{string(nsdiff.NamespaceCommentsChanged), ""})
+		case *v1.ReflectionSchemaDiff_RelationAdded:
+			addDefDelta(t.RelationAdded.GetParentDefinitionName(), diffDelta{string(nsdiff.AddedRelation), t.RelationAdded.GetName()})
+		case *v1.ReflectionSchemaDiff_RelationRemoved:
+			addDefDelta(t.RelationRemoved.GetParentDefinitionName(), diffDelta{string(nsdiff.RemovedRelation), t.RelationRemoved.GetName()})
+		case *v1.ReflectionSchemaDiff_RelationDocCommentChanged:
+			addDefDelta(t.RelationDocCommentChanged.GetParentDefinitionName(), diffDelta{string(nsdiff.ChangedRelationComment), t.RelationDocCommentChanged.GetName()})
+		case *v1.ReflectionSchemaDiff_RelationSubjectTypeAdded:
+			addDefDelta(t.RelationSubjectTypeAdded.GetRelation().GetParentDefinitionName(), diffDelta{string(nsdiff.RelationAllowedTypeAdded), t.RelationSubjectTypeAdded.GetRelation().GetName()})
+		case *v1.ReflectionSchemaDiff_RelationSubjectTypeRemoved:
+			addDefDelta(t.RelationSubjectTypeRemoved.GetRelation().GetParentDefinitionName(), diffDelta{string(nsdiff.RelationAllowedTypeRemoved), t.RelationSubjectTypeRemoved.GetRelation().GetName()})
+		case *v1.ReflectionSchemaDiff_PermissionAdded:
+			addDefDelta(t.PermissionAdded.GetParentDefinitionName(), diffDelta{string(nsdiff.AddedPermission), t.PermissionAdded.GetName()})
+		case *v1.ReflectionSchemaDiff_PermissionRemoved:
+			addDefDelta(t.PermissionRemoved.GetParentDefinitionName(), diffDelta{string(nsdiff.RemovedPermission), t.PermissionRemoved.GetName()})
+		case *v1.ReflectionSchemaDiff_PermissionDocCommentChanged:
+			addDefDelta(t.PermissionDocCommentChanged.GetParentDefinitionName(), diffDelta{string(nsdiff.ChangedPermissionComment), t.PermissionDocCommentChanged.GetName()})
+		case *v1.ReflectionSchemaDiff_PermissionExprChanged:
+			addDefDelta(t.PermissionExprChanged.GetParentDefinitionName(), diffDelta{string(nsdiff.ChangedPermissionImpl), t.PermissionExprChanged.GetName()})
+		case *v1.ReflectionSchemaDiff_CaveatAdded:
+			addedCaveats = append(addedCaveats, t.CaveatAdded.GetName())
+		case *v1.ReflectionSchemaDiff_CaveatRemoved:
+			removedCaveats = append(removedCaveats, t.CaveatRemoved.GetName())
+		case *v1.ReflectionSchemaDiff_CaveatDocCommentChanged:
+			addCaveatDelta(t.CaveatDocCommentChanged.GetName(), diffDelta{string(caveatdiff.CaveatCommentsChanged), ""})
+		case *v1.ReflectionSchemaDiff_CaveatExprChanged:
+			addCaveatDelta(t.CaveatExprChanged.GetName(), diffDelta{string(caveatdiff.CaveatExpressionChanged), ""})
+		case *v1.ReflectionSchemaDiff_CaveatParameterAdded:
+			addCaveatDelta(t.CaveatParameterAdded.GetParentCaveatName(), diffDelta{string(caveatdiff.AddedParameter), t.CaveatParameterAdded.GetName()})
+		case *v1.ReflectionSchemaDiff_CaveatParameterRemoved:
+			addCaveatDelta(t.CaveatParameterRemoved.GetParentCaveatName(), diffDelta{string(caveatdiff.RemovedParameter), t.CaveatParameterRemoved.GetName()})
+		case *v1.ReflectionSchemaDiff_CaveatParameterTypeChanged:
+			addCaveatDelta(t.CaveatParameterTypeChanged.GetParameter().GetParentCaveatName(), diffDelta{string(caveatdiff.ParameterTypeChanged), t.CaveatParameterTypeChanged.GetParameter().GetName()})
+		}
+	}
+
+	for _, ns := range addedDefs {
+		fmt.Fprintf(writer, "Added definition: %s\n", ns)
+	}
+	for _, ns := range removedDefs {
+		fmt.Fprintf(writer, "Removed definition: %s\n", ns)
+	}
+	for _, nsName := range changedDefsOrder {
+		fmt.Fprintf(writer, "Changed definition: %s\n", nsName)
+		for _, delta := range changedDefs[nsName] {
+			fmt.Fprintf(writer, "\t %s: %s\n", delta.deltaType, delta.name)
+		}
+	}
+	for _, caveat := range addedCaveats {
+		fmt.Fprintf(writer, "Added caveat: %s\n", caveat)
+	}
+	for _, caveat := range removedCaveats {
+		fmt.Fprintf(writer, "Removed caveat: %s\n", caveat)
+	}
+	for _, caveatName := range changedCaveatsOrder {
+		fmt.Fprintf(writer, "Changed caveat: %s\n", caveatName)
+		for _, delta := range changedCaveats[caveatName] {
+			fmt.Fprintf(writer, "\t %s: %s\n", delta.deltaType, delta.name)
+		}
+	}
+
+	return nil
+}
+
+func computeLocalDiff(beforeReader, afterReader io.Reader, beforeSource, afterSource string) (*diff.SchemaDiff, error) {
 	beforeBytes, err := io.ReadAll(beforeReader)
 	if err != nil {
-		return fmt.Errorf("failed to read before schema: %w", err)
+		return nil, fmt.Errorf("failed to read before schema: %w", err)
 	}
 
 	afterBytes, err := io.ReadAll(afterReader)
 	if err != nil {
-		return fmt.Errorf("failed to read after schema: %w", err)
+		return nil, fmt.Errorf("failed to read after schema: %w", err)
 	}
 
 	before, err := compiler.Compile(
@@ -143,7 +296,7 @@ func schemaDiffInner(beforeReader, afterReader io.Reader, beforeSource, afterSou
 		compiler.AllowUnprefixedObjectType(),
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	after, err := compiler.Compile(
@@ -151,41 +304,214 @@ func schemaDiffInner(beforeReader, afterReader io.Reader, beforeSource, afterSou
 		compiler.AllowUnprefixedObjectType(),
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	dbefore := diff.NewDiffableSchemaFromCompiledSchema(before)
 	dafter := diff.NewDiffableSchemaFromCompiledSchema(after)
 
-	schemaDiff, err := diff.DiffSchemas(dbefore, dafter, types.Default.TypeSet)
-	if err != nil {
-		return err
+	return diff.DiffSchemas(dbefore, dafter, types.Default.TypeSet)
+}
+
+
+// localDiffToResponse converts a local diff.SchemaDiff to a DiffSchemaResponse proto,
+// producing the same JSON structure as the API for consistent --json output.
+func localDiffToResponse(sd *diff.SchemaDiff) *v1.DiffSchemaResponse {
+	var diffs []*v1.ReflectionSchemaDiff
+
+	for _, ns := range sd.AddedNamespaces {
+		diffs = append(diffs, &v1.ReflectionSchemaDiff{
+			Diff: &v1.ReflectionSchemaDiff_DefinitionAdded{
+				DefinitionAdded: &v1.ReflectionDefinition{Name: ns},
+			},
+		})
 	}
 
-	for _, ns := range schemaDiff.AddedNamespaces {
-		fmt.Fprintf(writer, "Added definition: %s\n", ns)
+	for _, ns := range sd.RemovedNamespaces {
+		diffs = append(diffs, &v1.ReflectionSchemaDiff{
+			Diff: &v1.ReflectionSchemaDiff_DefinitionRemoved{
+				DefinitionRemoved: &v1.ReflectionDefinition{Name: ns},
+			},
+		})
 	}
 
-	for _, ns := range schemaDiff.RemovedNamespaces {
-		fmt.Fprintf(writer, "Removed definition: %s\n", ns)
-	}
-
-	for nsName, ns := range schemaDiff.ChangedNamespaces {
-		fmt.Fprintf(writer, "Changed definition: %s\n", nsName)
+	for nsName, ns := range sd.ChangedNamespaces {
 		for _, delta := range ns.Deltas() {
-			fmt.Fprintf(writer, "\t %s: %s\n", delta.Type, delta.RelationName)
+			diffs = append(diffs, namespaceDeltaToDiff(nsName, delta)...)
 		}
 	}
 
-	for _, caveat := range schemaDiff.AddedCaveats {
-		fmt.Fprintf(writer, "Added caveat: %s\n", caveat)
+	for _, caveat := range sd.AddedCaveats {
+		diffs = append(diffs, &v1.ReflectionSchemaDiff{
+			Diff: &v1.ReflectionSchemaDiff_CaveatAdded{
+				CaveatAdded: &v1.ReflectionCaveat{Name: caveat},
+			},
+		})
 	}
 
-	for _, caveat := range schemaDiff.RemovedCaveats {
-		fmt.Fprintf(writer, "Removed caveat: %s\n", caveat)
+	for _, caveat := range sd.RemovedCaveats {
+		diffs = append(diffs, &v1.ReflectionSchemaDiff{
+			Diff: &v1.ReflectionSchemaDiff_CaveatRemoved{
+				CaveatRemoved: &v1.ReflectionCaveat{Name: caveat},
+			},
+		})
 	}
 
-	return nil
+	for caveatName, caveatDiff := range sd.ChangedCaveats {
+		for _, delta := range caveatDiff.Deltas() {
+			diffs = append(diffs, caveatDeltaToDiff(caveatName, delta)...)
+		}
+	}
+
+	return &v1.DiffSchemaResponse{Diffs: diffs}
+}
+
+func namespaceDeltaToDiff(nsName string, delta nsdiff.Delta) []*v1.ReflectionSchemaDiff {
+	switch delta.Type {
+	case nsdiff.AddedRelation:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_RelationAdded{
+				RelationAdded: &v1.ReflectionRelation{Name: delta.RelationName, ParentDefinitionName: nsName},
+			},
+		}}
+	case nsdiff.RemovedRelation:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_RelationRemoved{
+				RelationRemoved: &v1.ReflectionRelation{Name: delta.RelationName, ParentDefinitionName: nsName},
+			},
+		}}
+	case nsdiff.AddedPermission:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_PermissionAdded{
+				PermissionAdded: &v1.ReflectionPermission{Name: delta.RelationName, ParentDefinitionName: nsName},
+			},
+		}}
+	case nsdiff.RemovedPermission:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_PermissionRemoved{
+				PermissionRemoved: &v1.ReflectionPermission{Name: delta.RelationName, ParentDefinitionName: nsName},
+			},
+		}}
+	case nsdiff.ChangedPermissionImpl:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_PermissionExprChanged{
+				PermissionExprChanged: &v1.ReflectionPermission{Name: delta.RelationName, ParentDefinitionName: nsName},
+			},
+		}}
+	case nsdiff.ChangedPermissionComment:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_PermissionDocCommentChanged{
+				PermissionDocCommentChanged: &v1.ReflectionPermission{Name: delta.RelationName, ParentDefinitionName: nsName},
+			},
+		}}
+	case nsdiff.ChangedRelationComment:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_RelationDocCommentChanged{
+				RelationDocCommentChanged: &v1.ReflectionRelation{Name: delta.RelationName, ParentDefinitionName: nsName},
+			},
+		}}
+	case nsdiff.NamespaceCommentsChanged:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_DefinitionDocCommentChanged{
+				DefinitionDocCommentChanged: &v1.ReflectionDefinition{Name: nsName},
+			},
+		}}
+	case nsdiff.RelationAllowedTypeAdded:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_RelationSubjectTypeAdded{
+				RelationSubjectTypeAdded: &v1.ReflectionRelationSubjectTypeChange{
+					Relation:           &v1.ReflectionRelation{Name: delta.RelationName, ParentDefinitionName: nsName},
+					ChangedSubjectType: allowedRelationToTypeRef(delta.AllowedType),
+				},
+			},
+		}}
+	case nsdiff.RelationAllowedTypeRemoved:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_RelationSubjectTypeRemoved{
+				RelationSubjectTypeRemoved: &v1.ReflectionRelationSubjectTypeChange{
+					Relation:           &v1.ReflectionRelation{Name: delta.RelationName, ParentDefinitionName: nsName},
+					ChangedSubjectType: allowedRelationToTypeRef(delta.AllowedType),
+				},
+			},
+		}}
+	default:
+		return nil
+	}
+}
+
+func allowedRelationToTypeRef(ar *corev1.AllowedRelation) *v1.ReflectionTypeReference {
+	if ar == nil {
+		return nil
+	}
+	ref := &v1.ReflectionTypeReference{
+		SubjectDefinitionName: ar.GetNamespace(),
+	}
+	if ar.GetRequiredCaveat() != nil {
+		ref.OptionalCaveatName = ar.GetRequiredCaveat().GetCaveatName()
+	}
+	switch t := ar.GetRelationOrWildcard().(type) {
+	case *corev1.AllowedRelation_Relation:
+		ref.Typeref = &v1.ReflectionTypeReference_OptionalRelationName{OptionalRelationName: t.Relation}
+	case *corev1.AllowedRelation_PublicWildcard_:
+		ref.Typeref = &v1.ReflectionTypeReference_IsPublicWildcard{IsPublicWildcard: true}
+	default:
+		ref.Typeref = &v1.ReflectionTypeReference_IsTerminalSubject{IsTerminalSubject: true}
+	}
+	return ref
+}
+
+func caveatDeltaToDiff(caveatName string, delta caveatdiff.Delta) []*v1.ReflectionSchemaDiff {
+	switch delta.Type {
+	case caveatdiff.CaveatCommentsChanged:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_CaveatDocCommentChanged{
+				CaveatDocCommentChanged: &v1.ReflectionCaveat{Name: caveatName},
+			},
+		}}
+	case caveatdiff.CaveatExpressionChanged:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_CaveatExprChanged{
+				CaveatExprChanged: &v1.ReflectionCaveat{Name: caveatName},
+			},
+		}}
+	case caveatdiff.AddedParameter:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_CaveatParameterAdded{
+				CaveatParameterAdded: &v1.ReflectionCaveatParameter{Name: delta.ParameterName, ParentCaveatName: caveatName},
+			},
+		}}
+	case caveatdiff.RemovedParameter:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_CaveatParameterRemoved{
+				CaveatParameterRemoved: &v1.ReflectionCaveatParameter{Name: delta.ParameterName, ParentCaveatName: caveatName},
+			},
+		}}
+	case caveatdiff.ParameterTypeChanged:
+		return []*v1.ReflectionSchemaDiff{{
+			Diff: &v1.ReflectionSchemaDiff_CaveatParameterTypeChanged{
+				CaveatParameterTypeChanged: &v1.ReflectionCaveatParameterTypeChange{
+					Parameter:    &v1.ReflectionCaveatParameter{Name: delta.ParameterName, ParentCaveatName: caveatName, Type: caveatTypeRefToString(delta.CurrentType)},
+					PreviousType: caveatTypeRefToString(delta.PreviousType),
+				},
+			},
+		}}
+	default:
+		return nil
+	}
+}
+
+func caveatTypeRefToString(ref *corev1.CaveatTypeReference) string {
+	if ref == nil {
+		return ""
+	}
+	if len(ref.GetChildTypes()) == 0 {
+		return ref.GetTypeName()
+	}
+	children := make([]string, 0, len(ref.GetChildTypes()))
+	for _, child := range ref.GetChildTypes() {
+		children = append(children, caveatTypeRefToString(child))
+	}
+	return ref.GetTypeName() + "<" + strings.Join(children, ", ") + ">"
 }
 
 func schemaCopyCmdFunc(cmd *cobra.Command, args []string) error {
