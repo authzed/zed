@@ -12,7 +12,6 @@ import (
 	"unicode"
 
 	"github.com/jzelinskie/cobrautil/v2"
-	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -212,11 +211,11 @@ func buildRelationshipsFilter(cmd *cobra.Command, args []string) (*v1.Relationsh
 	filter := &v1.RelationshipFilter{ResourceType: args[0]}
 
 	if strings.Contains(args[0], ":") {
-		var resourceID string
-		err := stringz.SplitExact(args[0], ":", &filter.ResourceType, &resourceID)
+		resourceType, resourceID, err := ParseResource(args[0])
 		if err != nil {
 			return nil, err
 		}
+		filter.ResourceType = resourceType
 
 		if strings.HasSuffix(resourceID, "%") {
 			filter.OptionalResourceIdPrefix = strings.TrimSuffix(resourceID, "%")

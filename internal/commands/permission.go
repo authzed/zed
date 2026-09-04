@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/jzelinskie/cobrautil/v2"
-	"github.com/jzelinskie/stringz"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -150,8 +149,7 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 }
 
 func checkCmdFunc(cmd *cobra.Command, args []string) error {
-	var objectNS, objectID string
-	err := stringz.SplitExact(args[0], ":", &objectNS, &objectID)
+	objectNS, objectID, err := ParseResource(args[0])
 	if err != nil {
 		return err
 	}
@@ -362,8 +360,7 @@ func checkBulkCmdFunc(cmd *cobra.Command, args []string) error {
 func expandCmdFunc(cmd *cobra.Command, args []string) error {
 	relation := args[0]
 
-	var objectNS, objectID string
-	err := stringz.SplitExact(args[1], ":", &objectNS, &objectID)
+	objectNS, objectID, err := ParseResource(args[1])
 	if err != nil {
 		return err
 	}
@@ -413,8 +410,13 @@ func expandCmdFunc(cmd *cobra.Command, args []string) error {
 var newLookupResourcesPageCallbackForTests func(readByPage uint)
 
 func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
-	objectNS := args[0]
+	objectNS, err := ParseResourceType(args[0])
+	if err != nil {
+		return err
+	}
+
 	relation := args[1]
+
 	subjectNS, subjectID, subjectRel, err := ParseSubject(args[2])
 	if err != nil {
 		return err
@@ -546,15 +548,17 @@ func handleLookupResourcesErr(err error) error {
 }
 
 func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
-	var objectNS, objectID string
-	err := stringz.SplitExact(args[0], ":", &objectNS, &objectID)
+	objectNS, objectID, err := ParseResource(args[0])
 	if err != nil {
 		return err
 	}
 
 	permission := args[1]
 
-	subjectType, subjectRelation := ParseType(args[2])
+	subjectType, subjectRelation, err := ParseType(args[2])
+	if err != nil {
+		return err
+	}
 
 	caveatContext, err := GetCaveatContext(cmd)
 	if err != nil {
