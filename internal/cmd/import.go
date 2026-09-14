@@ -82,7 +82,7 @@ func importCmdFunc(cmd *cobra.Command, schemaClient v1.SchemaServiceClient, rela
 	}
 
 	if cobrautil.MustGetBool(cmd, "schema") {
-		if err := importSchema(cmd.Context(), schemaClient, p.Schema.Schema, prefix); err != nil {
+		if err := importSchema(cmd.Context(), schemaClient, p.Schema.Schema, prefix, p.RootSchemaDir); err != nil {
 			return fmt.Errorf("error importing schema: %w", err)
 		}
 	}
@@ -98,11 +98,12 @@ func importCmdFunc(cmd *cobra.Command, schemaClient v1.SchemaServiceClient, rela
 	return err
 }
 
-func importSchema(ctx context.Context, client v1.SchemaServiceClient, schema string, definitionPrefix string) error {
+func importSchema(ctx context.Context, client v1.SchemaServiceClient, schema string, definitionPrefix string, rootSchemaDir string) error {
 	log.Info().Msg("importing schema")
 
-	// Recompile the schema with the specified prefix.
-	schemaText, err := rewriteSchema(ctx, schema, definitionPrefix)
+	// Compile with the schema's root directory so any `import` statements resolve, and
+	// (optionally) apply the definition prefix.
+	schemaText, err := rewriteSchema(ctx, schema, definitionPrefix, rootSchemaDir)
 	if err != nil {
 		return err
 	}

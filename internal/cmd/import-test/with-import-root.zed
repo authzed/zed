@@ -1,0 +1,10 @@
+use import
+
+import "with-import-common.zed"
+
+definition resource {
+    relation writer: user
+    relation reader: user with mycaveat
+    permission write = writer
+    permission view = reader + write
+}
