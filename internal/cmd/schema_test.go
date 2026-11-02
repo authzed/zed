@@ -74,7 +74,7 @@ func TestDeterminePrefixForSchema(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			found, err := determinePrefixForSchema(t.Context(), test.specifiedPrefix, nil, &test.existingSchema)
+			found, err := determinePrefixForSchema(test.specifiedPrefix, test.existingSchema)
 			require.NoError(t, err)
 			require.Equal(t, test.expectedPrefix, found)
 		})
@@ -450,11 +450,11 @@ definition resource {
 			defer ctrl.Finish()
 			mockClient := NewMockSchemaServiceClient(ctrl)
 
-			// ReadSchema is always called at least once
+			// ReadSchema must never be called: the schema is written as given,
+			// without inferring a definition prefix from the existing schema.
 			mockClient.EXPECT().
 				ReadSchema(gomock.Any(), gomock.Any()).
-				Return(&v1.ReadSchemaResponse{SchemaText: ""}, nil).
-				MaxTimes(2) // sometimes we read for prefix determination
+				Times(0)
 
 			// Set up WriteSchema expectations based on test case
 			var receivedSchema string

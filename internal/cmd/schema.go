@@ -230,7 +230,7 @@ func schemaCopyInner(ctx context.Context, srcClient, destClient v1.SchemaService
 	}
 	log.Trace().Interface("response", readResp).Msg("read schema")
 
-	prefix, err := determinePrefixForSchema(ctx, definitionPrefix, nil, &readResp.SchemaText)
+	prefix, err := determinePrefixForSchema(definitionPrefix, readResp.SchemaText)
 	if err != nil {
 		return nil, err
 	}
@@ -284,12 +284,7 @@ func schemaWriteCmdImpl(cmd *cobra.Command, args []string, client v1.SchemaServi
 		return errors.New("attempted to write empty schema")
 	}
 
-	prefix, err := determinePrefixForSchema(cmd.Context(), cobrautil.MustGetString(cmd, "schema-definition-prefix"), client, nil)
-	if err != nil {
-		return err
-	}
-
-	schemaText, err := rewriteSchema(cmd.Context(), string(schemaBytes), prefix)
+	schemaText, err := rewriteSchema(cmd.Context(), string(schemaBytes), cobrautil.MustGetString(cmd, "schema-definition-prefix"))
 	if err != nil {
 		return err
 	}
@@ -337,32 +332,20 @@ func rewriteSchema(ctx context.Context, existingSchemaText string, definitionPre
 // determinePrefixForSchema determines the prefix to be applied to a schema that will be written.
 //
 // If specifiedPrefix is non-empty, it is returned immediately.
-// If existingSchema is non-nil, it is parsed for the prefix.
-// Otherwise, the client is used to retrieve the existing schema (if any), and the prefix is retrieved from there.
-func determinePrefixForSchema(ctx context.Context, specifiedPrefix string, client v1.SchemaServiceClient, existingSchema *string) (string, error) {
+// Otherwise, the existing schema is parsed for the prefix.
+func determinePrefixForSchema(specifiedPrefix string, existingSchema string) (string, error) {
 	if specifiedPrefix != "" {
 		return specifiedPrefix, nil
 	}
 
-	var schemaText string
-	if existingSchema != nil {
-		schemaText = *existingSchema
-	} else {
-		readSchemaText, err := commands.ReadSchema(ctx, client)
-		if err != nil {
-			return "", nil
-		}
-		schemaText = readSchemaText
-	}
-
 	// If there is no schema found, return the empty string.
-	if schemaText == "" {
+	if existingSchema == "" {
 		return "", nil
 	}
 
 	// Otherwise, compile the schema and grab the prefixes of the namespaces defined.
 	found, err := compiler.Compile(
-		compiler.InputSchema{Source: input.Source("schema"), SchemaString: schemaText},
+		compiler.InputSchema{Source: input.Source("schema"), SchemaString: existingSchema},
 		compiler.AllowUnprefixedObjectType(),
 		compiler.SkipValidation(),
 	)
