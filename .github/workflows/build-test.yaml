@@ -70,12 +70,15 @@ jobs:
           # go env gopath won't point at the right install location for the
           # wasm tool.
           go-version: "1.26.5"
-      - name: "Disable AppArmor"
-        if:
-          "runner.os == 'Linux'"
-          # Disable AppArmor for Ubuntu 23.10+.
-          # https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md
-        run: "echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns"
+      # Disable AppArmor userns restriction for Ubuntu 23.10+, when present.
+      # https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md
+      - name: "Allow Chromium user namespaces"
+        if: "runner.os == 'Linux'"
+        shell: "bash"
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
       - name: "Install wasmbrowsertest"
         run: "go install github.com/agnivade/wasmbrowsertest@latest"
       # cleanenv is a util provided by the wasmbrowsertest package that removes
