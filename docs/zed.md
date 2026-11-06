@@ -509,7 +509,7 @@ zed import <url> [flags]
       --batch-size int                    import batch size (default 1000)
       --relationships                     import relationships (default true)
       --schema                            import schema (default true)
-      --schema-definition-prefix string   prefix to add to the schema's definition(s) before importing
+      --schema-definition-prefix string   prefix to add to the schema's definition(s) before importing; no prefix is added unless specified
       --workers int                       number of concurrent batching workers (default 1)
 ```
 
@@ -1233,7 +1233,7 @@ zed schema copy <src context> <dest context> [flags]
 
 ```
       --json                              output as JSON
-      --schema-definition-prefix string   prefix to add to the schema's definition(s) before writing
+      --schema-definition-prefix string   prefix to add to the schema's definition(s) before writing; no prefix is added unless specified
 ```
 
 ### Options Inherited From Parent Flags
@@ -1344,7 +1344,7 @@ zed schema write <file?> [flags]
 
 ```
       --json                              output as JSON
-      --schema-definition-prefix string   prefix to add to the schema's definition(s) before writing
+      --schema-definition-prefix string   prefix to add to the schema's definition(s) before writing; no prefix is added unless specified
 ```
 
 ### Options Inherited From Parent Flags
