@@ -345,7 +345,7 @@ func TestBackupCreateCmdFunc(t *testing.T) {
 		})
 
 		err = backupCreateCmdFunc(cmd, []string{tempFile})
-		require.ErrorContains(t, err, "already exists")
+		require.ErrorIs(t, err, backupformat.ErrBackupUnresumable)
 	})
 
 	t.Run("derives backup file name from context if not provided", func(t *testing.T) {
