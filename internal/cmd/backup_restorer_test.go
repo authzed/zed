@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -23,9 +24,11 @@ var (
 	errUnrecoverable      = status.Error(codes.Internal, "unrecoverable")
 	errRetryable          = status.Error(codes.Unavailable, "serialization")
 	errConflict           = status.Error(codes.AlreadyExists, "conflict")
+	errPoolExhausted      = status.Error(codes.ResourceExhausted, "error acquiring connection from pool: failed to acquire in time: consider increasing write pool size and/or datastore capacity")
 	oneUnrecoverableError = []error{errUnrecoverable}
 	oneRetryableError     = []error{errRetryable}
 	oneConflictError      = []error{errConflict}
+	onePoolExhaustedError = []error{errPoolExhausted}
 )
 
 func TestRestorer(t *testing.T) {
@@ -52,6 +55,8 @@ func TestRestorer(t *testing.T) {
 		{"fails on conflict if touchOnConflict=false && skipOnConflict=false", 1, 1, Fail, false, oneConflictError, nil, nil, testRelationships},
 		{"fails on unexpected commit error", 1, 1, Fail, false, nil, oneUnrecoverableError, nil, testRelationships},
 		{"retries commit retryable errors", 1, 1, Fail, false, nil, oneRetryableError, nil, testRelationships},
+		{"retries commit when the datastore write pool is exhausted", 1, 1, Fail, false, nil, onePoolExhaustedError, nil, testRelationships},
+		{"returns error on pool exhaustion if retries are disabled", 1, 1, Fail, true, nil, onePoolExhaustedError, nil, testRelationships},
 		{"retries on conflict when fallback WriteRelationships fails", 1, 1, Touch, false, nil, oneConflictError, oneRetryableError, testRelationships},
 		{"returns error on retryable error if retries are disabled", 1, 1, Fail, true, nil, oneRetryableError, nil, testRelationships},
 		{"fails fast if conflict-triggered touch fails with an unrecoverable error", 1, 1, Touch, false, nil, oneConflictError, oneUnrecoverableError, testRelationships},
@@ -253,4 +258,76 @@ func (m *mockClientForRestore) ImportBulkRelationships(_ context.Context, _ ...g
 func (m *mockClientForRestore) WriteSchema(_ context.Context, wsr *v1.WriteSchemaRequest, _ ...grpc.CallOption) (*v1.WriteSchemaResponse, error) {
 	require.Equal(m.t, m.schema, wsr.Schema, "unexpected schema in write schema request")
 	return &v1.WriteSchemaResponse{}, nil
+}
+
+func TestIsRetryableError(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{"nil", nil, false},
+		{"unavailable", status.Error(codes.Unavailable, "unavailable"), true},
+		{"deadline exceeded", status.Error(codes.DeadlineExceeded, "deadline"), true},
+		{"context deadline exceeded", context.DeadlineExceeded, true},
+		{
+			"datastore write pool exhausted",
+			status.Error(codes.ResourceExhausted, "error acquiring connection from pool: failed to acquire in time: consider increasing write pool size and/or datastore capacity"),
+			true,
+		},
+		{
+			"memory pressure rejection",
+			status.Error(codes.ResourceExhausted, "server rejected the request because memory usage is too high"),
+			true,
+		},
+		// Message-size failures are permanent. Strings below are verbatim from
+		// google.golang.org/grpc rpc_util.go, stream.go and server.go.
+		{
+			"received message larger than max",
+			status.Error(codes.ResourceExhausted, "grpc: received message larger than max (1234 vs. 45)"),
+			false,
+		},
+		{
+			"received message larger than machine max",
+			status.Error(codes.ResourceExhausted, "grpc: received message larger than max length allowed on current machine (1234 vs. 45)"),
+			false,
+		},
+		{
+			"server trying to send message larger than max",
+			status.Error(codes.ResourceExhausted, "grpc: trying to send message larger than max (1234 vs. 45)"),
+			false,
+		},
+		{
+			"client trying to send message larger than max",
+			status.Error(codes.ResourceExhausted, "trying to send message larger than max (1234 vs. 45)"),
+			false,
+		},
+		{
+			"message after decompression larger than max",
+			status.Error(codes.ResourceExhausted, "grpc: message after decompression larger than max (1234 vs. 45)"),
+			false,
+		},
+		{
+			"received message after decompression larger than max",
+			status.Error(codes.ResourceExhausted, "grpc: received message after decompression larger than max 45"),
+			false,
+		},
+		{
+			"message too large",
+			status.Error(codes.ResourceExhausted, "grpc: message too large (1234 bytes)"),
+			false,
+		},
+		{
+			"wrapped oversized message",
+			fmt.Errorf("error committing batches: %w", status.Error(codes.ResourceExhausted, "grpc: trying to send message larger than max (1234 vs. 45)")),
+			false,
+		},
+		{"crdb serialization", status.Error(codes.Unknown, "restart transaction: retryable error"), true},
+		{"internal", status.Error(codes.Internal, "internal"), false},
+		{"conflict", status.Error(codes.AlreadyExists, "conflict"), false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, isRetryableError(tt.err))
+		})
+	}
 }
