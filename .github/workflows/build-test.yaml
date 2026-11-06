@@ -75,7 +75,11 @@ jobs:
           "runner.os == 'Linux'"
           # Disable AppArmor for Ubuntu 23.10+.
           # https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md
-        run: "echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns"
+          # Some runner images don't expose this sysctl; skip when absent.
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+          fi
       - name: "Install wasmbrowsertest"
         run: "go install github.com/agnivade/wasmbrowsertest@latest"
       # cleanenv is a util provided by the wasmbrowsertest package that removes
@@ -87,6 +91,8 @@ jobs:
       - name: "Run WASM Tests"
         # There's a whole bunch of vars in the environment that aren't needed for running this test, so we clear them out.
         # NOTE: if you need to do this in the future, I recommend bashing into the container and running `env | sort | less`
+        # NOTE: Go's wasm_exec.js caps argv+env at ~8KB, so the env must stay small.
+        # Don't strip DEPOT_*: GOCACHEPROG is `depot gocache`, which needs them.
         # NOTE: wasmbrowsertest can have flaky websocket timeouts, so we retry up to 3 times
         uses: "nick-fields/retry@v4"
         with:
@@ -103,5 +109,17 @@ jobs:
             -remove-prefix RUNNER_ \
             -remove-prefix HOMEBREW_ \
             -remove-prefix runner_ \
+            -remove-prefix ACTIONS_ \
+            -remove-prefix NX_ \
+            -remove-prefix SCCACHE_ \
+            -remove-prefix TURBO_ \
+            -remove-prefix GOROOT_ \
+            -remove-prefix GOLANGCI_LINT_ \
+            -remove-prefix SELENIUM_ \
+            -remove-prefix CHROMEWEBDRIVER \
+            -remove-prefix GECKOWEBDRIVER \
+            -remove-prefix VCPKG_ \
+            -remove-prefix AZURE_ \
+            -remove-prefix PSModulePath \
             -- \
             go test ./pkg/wasm/... -exec $(go env GOPATH)/bin/wasmbrowsertest
