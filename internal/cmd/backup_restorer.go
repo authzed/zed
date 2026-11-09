@@ -56,6 +56,14 @@ var (
 	}
 )
 
+// gRPC reports oversized messages as ResourceExhausted, which retrying cannot
+// resolve. These substrings cover the message-size templates gRPC emits on the
+// send side, the receive side, and after decompression.
+var permanentResourceExhaustedMessages = []string{
+	"larger than max",
+	"message too large",
+}
+
 type restorer struct {
 	decoder               backupformat.Decoder
 	client                client.Client
@@ -375,6 +383,15 @@ func isRetryableError(err error) bool {
 	}
 
 	if isGRPCCode(err, codes.Unavailable, codes.DeadlineExceeded) {
+		return true
+	}
+
+	// ResourceExhausted covers transient server-side backpressure, such as a
+	// datastore connection that cannot be acquired within the write connection
+	// acquisition timeout. Oversized messages report the same code but are
+	// permanent.
+	if isGRPCCode(err, codes.ResourceExhausted) &&
+		!isContainsErrorString(err, permanentResourceExhaustedMessages...) {
 		return true
 	}
 
