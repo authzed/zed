@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="zed">
+    <title>SpiceDB Permission Check Trace</title>
+    <style>* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 20px;
+    line-height: 1.6;
+}
+
+.header {
+    background: #2d2d30;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #007acc;
+}
+
+.header h1 {
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: #4ec9b0;
+}
+
+.header p {
+    color: #858585;
+    font-size: 14px;
+}
+
+.permission-tree {
+    background: #252526;
+    padding: 20px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+details {
+    margin: 4px 0;
+}
+
+details > summary {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+    list-style: none;
+}
+
+details > summary::-webkit-details-marker {
+    display: none;
+}
+
+details > summary:hover {
+    background: #2d2d30;
+}
+
+details > summary::before {
+    content: '▶';
+    display: inline-block;
+    width: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: #858585;
+    transition: transform 0.2s;
+}
+
+details[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.leaf-node {
+    margin: 4px 0;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.leaf-node:hover {
+    background: #2d2d30;
+}
+
+.icon {
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.icon.has-permission { color: #4ec9b0; }
+.icon.no-permission { color: #f48771; }
+.icon.conditional { color: #c586c0; }
+.icon.unspecified { color: #dcdcaa; }
+.icon.cycle { color: #ce9178; }
+
+.resource {
+    color: #d4d4d4;
+}
+
+.resource.faint {
+    color: #858585;
+}
+
+.permission {
+    color: #4ec9b0;
+    font-weight: bold;
+}
+
+.relation {
+    color: #ce9178;
+    font-weight: bold;
+}
+
+.permission.faint, .relation.faint {
+    color: #858585;
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    margin-left: 8px;
+}
+
+.badge.cached {
+    background: #264f78;
+    color: #9cdcfe;
+}
+
+.badge.cached-spicedb {
+    background: #264f78;
+    color: #9cdcfe;
+}
+
+.badge.cached-materialize {
+    background: #3e2c56;
+    color: #c586c0;
+}
+
+.badge.cycle {
+    background: #533830;
+    color: #ce9178;
+}
+
+.timing {
+    color: #858585;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.children {
+    margin-left: 24px;
+    border-left: 1px solid #3e3e42;
+    padding-left: 12px;
+}
+
+.caveat-node {
+    margin: 8px 0 8px 24px;
+    padding: 12px;
+    background: #2d2d30;
+    border-radius: 4px;
+    border-left: 3px solid #c586c0;
+}
+
+.caveat-expr {
+    font-style: italic;
+    color: #d4d4d4;
+    margin-bottom: 8px;
+}
+
+.caveat-expr.faint {
+    color: #858585;
+}
+
+.caveat-name {
+    color: #c586c0;
+    font-weight: bold;
+}
+
+.context-json {
+    background: #1e1e1e;
+    padding: 12px;
+    border-radius: 4px;
+    margin-top: 8px;
+    overflow-x: auto;
+    font-size: 13px;
+    white-space: pre;
+    color: #ce9178;
+}
+
+.missing-context {
+    color: #c586c0;
+    margin-top: 8px;
+    font-style: italic;
+}
+
+.no-context {
+    color: #858585;
+    font-style: italic;
+    margin-top: 8px;
+}
+
+.subject-node {
+    color: #c586c0;
+    margin-left: 24px;
+    padding: 6px;
+}
+
+.legend {
+    background: #2d2d30;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 20px;
+    font-size: 12px;
+}
+
+.legend h3 {
+    color: #4ec9b0;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bulk-separator {
+    margin: 30px 0;
+    border-top: 2px solid #3e3e42;
+}
+
+.bulk-check-header {
+    color: #4ec9b0;
+    margin-bottom: 15px;
+}
+
+.metadata-timestamp {
+    color: #858585;
+    font-size: 12px;
+    margin-top: 8px;
+}
+
+.metadata-item {
+    color: #858585;
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+.metadata-code {
+    background: #2d2d30;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.error-node {
+    color: #f48771;
+    padding: 8px;
+}
+
+@media (prefers-color-scheme: light) {
+    body {
+        background: #ffffff;
+        color: #333333;
+    }
+
+    .header {
+        background: #f3f3f3;
+        border-left-color: #0078d4;
+    }
+
+    .header h1 {
+        color: #0078d4;
+    }
+
+    .header p {
+        color: #666666;
+    }
+
+    .permission-tree {
+        background: #f9f9f9;
+    }
+
+    details > summary:hover, .leaf-node:hover {
+        background: #f0f0f0;
+    }
+
+    .resource {
+        color: #333333;
+    }
+
+    .resource.faint {
+        color: #999999;
+    }
+
+    .caveat-node {
+        background: #f3f3f3;
+    }
+
+    .context-json {
+        background: #ffffff;
+        border: 1px solid #e0e0e0;
+    }
+
+    .children {
+        border-left-color: #e0e0e0;
+    }
+
+    .legend {
+        background: #f3f3f3;
+    }
+}
+</style>
+</head>
+<body>
+    <div class="header">
+        <h1>SpiceDB Permission Check Trace</h1>
+        <p>Interactive visualization of permission resolution • Click to expand/collapse</p>
+        <p class="metadata-timestamp">Generated: 2025-10-21 15:18:38 EDT</p>
+        <p class="metadata-item">Command: <code class="metadata-code">zed permission check document:internal-roadmap view user:charlie --explain --context &#39;{&#34;department&#34;:&#34;engineering&#34;,&#34;clearance_level&#34;:3}&#39;</code></p>
+        <p class="metadata-item">SpiceDB Server: grpc.authzed.com:443</p>
+        <p class="metadata-item">SpiceDB Version: v1.35.0</p>
+    </div>
+<div class="permission-tree">
+<details open aria-label="document:internal-roadmap view"><summary role="button" tabindex="0"><span class="icon has-permission">✓</span><span class="resource">document:internal-roadmap</span><span class="permission">view</span><span class="timing">12ms</span></summary><div class="children" role="group"><div class="caveat-node"><span class="icon has-permission">✓</span> <span class="caveat-expr">department == &#34;engineering&#34; &amp;&amp; clearance_level &gt;= 3</span> <span class="caveat-name">engineering_clearance</span><div class="context-json">{
+  &#34;clearance_level&#34;: 3,
+  &#34;department&#34;: &#34;engineering&#34;,
+  &#34;is_fulltime&#34;: true
+}</div></div></div></details></div>
+
+    <div class="legend">
+        <h3>Legend</h3>
+        <div class="legend-grid">
+            <div class="legend-item">
+                <span class="icon has-permission">✓</span>
+                <span>Has Permission</span>
+            </div>
+            <div class="legend-item">
+                <span class="icon no-permission">⨉</span>
+                <span>No Permission</span>
+            </div>
+            <div class="legend-item">
+                <span class="icon conditional">?</span>
+                <span>Conditional/Missing Context</span>
+            </div>
+            <div class="legend-item">
+                <span class="icon cycle">!</span>
+                <span>Cycle Detected</span>
+            </div>
+            <div class="legend-item">
+                <span class="permission">green</span>
+                <span>Permission</span>
+            </div>
+            <div class="legend-item">
+                <span class="relation">orange</span>
+                <span>Relation</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
