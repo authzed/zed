@@ -25,13 +25,13 @@ func registerImportCmd(rootCmd *cobra.Command) {
 		Short: "Imports schema and relationships from a file or url",
 		Example: `
 	From a gist:
-		zed import https://gist.github.com/ecordell/8e3b613a677e3c844742cf24421c08b6
+		zed import https://gist.github.com/YOUR_USERNAME/YOUR_GIST_ID
 
 	From a playground link:
-		zed import https://play.authzed.com/s/iksdFvCtvnkR/schema
+		zed import https://play.authzed.com/s/YOUR_SHARE_ID/schema
 
 	From pastebin:
-		zed import https://pastebin.com/8qU45rVK
+		zed import https://pastebin.com/YOUR_PASTE_ID
 
 	From a devtools instance:
 		zed import https://localhost:8443/download
