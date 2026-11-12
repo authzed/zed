@@ -3,8 +3,10 @@ package storage
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/99designs/keyring"
@@ -148,11 +150,52 @@ var _ SecretStore = (*KeychainSecretStore)(nil)
 const (
 	svcName                   = "zed"
 	keyringEntryName          = svcName + " secrets"
-	envRecommendation         = "If your platform doesn't have a native keychain manager (e.g. macOS, Linux+GNOME/KDE), ZED_KEYRING_PASSWORD is what's used to encrypt files on disk to store credentials. The first time you create a context, it'll prompt you to create a keyring password to encrypt that configuration. \n"
+	envRecommendation         = "If your platform doesn't have a native keychain manager (e.g. macOS, Linux+GNOME/KDE), ZED_KEYRING_PASSWORD is what's used to encrypt files on disk to store credentials. The first time you create a context, it'll prompt you to create a keyring password to encrypt that configuration. ZED_KEYRING_BACKEND can be used to explicitly select a keyring backend (e.g. \"file\") if the one zed picks automatically doesn't work for your environment. \n"
 	keyringDoesNotExistPrompt = "Keyring file does not already exist.\nEnter a new non-empty passphrase for the new keyring file: "
 	keyringPrompt             = "Enter passphrase to unlock zed keyring: "
 	emptyKeyringPasswordError = "your passphrase must not be empty"
 )
+
+// keyringBackendsByName maps the user-facing names accepted by
+// ZED_KEYRING_BACKEND to their corresponding keyring.BackendType.
+var keyringBackendsByName = map[string]keyring.BackendType{
+	"file":           keyring.FileBackend,
+	"secret-service": keyring.SecretServiceBackend,
+	"kwallet":        keyring.KWalletBackend,
+	"keychain":       keyring.KeychainBackend,
+	"pass":           keyring.PassBackend,
+	"keyctl":         keyring.KeyCtlBackend,
+}
+
+// allowedBackendsFromEnv determines the keyring.Config.AllowedBackends value
+// based on ZED_KEYRING_BACKEND and ZED_KEYRING_PASSWORD.
+//
+// ZED_KEYRING_PASSWORD is only honored by keyring's file backend, so on
+// Linux hosts where a D-Bus session bus is reachable but can't actually
+// service secret-service requests (e.g. over SSH), that backend gets
+// selected first and ZED_KEYRING_PASSWORD is silently ignored. If
+// ZED_KEYRING_PASSWORD is set, restrict to the file backend unless the user
+// has explicitly requested a different backend via ZED_KEYRING_BACKEND.
+func allowedBackendsFromEnv() ([]keyring.BackendType, error) {
+	if name, ok := os.LookupEnv("ZED_KEYRING_BACKEND"); ok {
+		backend, ok := keyringBackendsByName[name]
+		if !ok {
+			valid := make([]string, 0, len(keyringBackendsByName))
+			for n := range keyringBackendsByName {
+				valid = append(valid, n)
+			}
+			sort.Strings(valid)
+			return nil, fmt.Errorf("invalid ZED_KEYRING_BACKEND %q: valid options are %s", name, strings.Join(valid, ", "))
+		}
+		return []keyring.BackendType{backend}, nil
+	}
+
+	if password, ok := os.LookupEnv("ZED_KEYRING_PASSWORD"); ok && password != "" {
+		return []keyring.BackendType{keyring.FileBackend}, nil
+	}
+
+	return nil, nil
+}
 
 func fileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
@@ -183,9 +226,15 @@ func (k *KeychainSecretStore) keyring() (keyring.Keyring, error) {
 
 	keyringPath := filepath.Join(k.ConfigPath, "keyring.jwt")
 
+	allowedBackends, err := allowedBackendsFromEnv()
+	if err != nil {
+		return nil, err
+	}
+
 	ring, err := keyring.Open(keyring.Config{
-		ServiceName: "zed",
-		FileDir:     keyringPath,
+		ServiceName:     "zed",
+		FileDir:         keyringPath,
+		AllowedBackends: allowedBackends,
 		FilePasswordFunc: func(_ string) (string, error) {
 			if password, ok := os.LookupEnv("ZED_KEYRING_PASSWORD"); ok {
 				return password, nil

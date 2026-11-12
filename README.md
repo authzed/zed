@@ -158,7 +158,7 @@ zed permission check --endpoint my.authzed.domain:443 document:firstdoc writer u
 ### Headless usage
 
 If you provide all context values (e.g. `ZED_ENDPOINT`, `ZED_TOKEN`) as environment variables or flags (e.g. `--endpoint`, `--token`), you do not need to set a context.
-You can also provide the `ZED_KEYRING_PASSWORD` environment variable to access an existing context in a non-interactive way.
+You can also provide the `ZED_KEYRING_PASSWORD` environment variable to access an existing context in a non-interactive way. Setting `ZED_KEYRING_PASSWORD` restricts zed to the file keyring backend, since that's the only backend that honors it; use `ZED_KEYRING_BACKEND` (e.g. `file`, `secret-service`, `kwallet`, `keychain`, `pass`, `keyctl`) to explicitly select a different backend instead.
 
 ```sh
 zed schema read --endpoint grpc.authzed.com:443 --token tc_zed_my_laptop_deadbeefdeadbeef
