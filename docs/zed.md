@@ -776,6 +776,7 @@ zed permission lookup-resources <type> <permission> <subject:id> [flags]
       --debug                           send debug header to spicedb. useful for debugging recursion depth errors
       --json                            output as JSON
       --page-limit uint32               limit of relations returned per page
+      --response-batch-size uint32      if > 0, request up to this many resources per response message (batched LookupResources API); 0 preserves one-resource-per-message
       --show-cursor                     display the cursor token after pagination (default true)
 ```
 

@@ -135,6 +135,7 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	lookupResourcesCmd.Flags().Bool("json", false, "output as JSON")
 	lookupResourcesCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
 	lookupResourcesCmd.Flags().Uint32("page-limit", 0, "limit of relations returned per page")
+	lookupResourcesCmd.Flags().Uint32("response-batch-size", 0, "if > 0, request up to this many resources per response message (batched LookupResources API); 0 preserves one-resource-per-message")
 	lookupResourcesCmd.Flags().String("cursor", "", "resume pagination from a specific cursor token")
 	lookupResourcesCmd.Flags().Bool("show-cursor", true, "display the cursor token after pagination")
 	lookupResourcesCmd.Flags().Bool("debug", false, "send debug header to spicedb. useful for debugging recursion depth errors")
@@ -460,11 +461,12 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 				},
 				OptionalRelation: subjectRel,
 			},
-			Context:        caveatContext,
-			Consistency:    consistency,
-			OptionalLimit:  pageLimit,
-			OptionalCursor: cursor,
-			WithDebug:      cobrautil.MustGetBool(cmd, "debug"),
+			Context:                   caveatContext,
+			Consistency:               consistency,
+			OptionalLimit:             pageLimit,
+			OptionalCursor:            cursor,
+			OptionalResponseBatchSize: cobrautil.MustGetUint32(cmd, "response-batch-size"),
+			WithDebug:                 cobrautil.MustGetBool(cmd, "debug"),
 		}
 		log.Trace().Interface("request", request).Uint32("page-limit", pageLimit).Send()
 
@@ -484,8 +486,6 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 			case err != nil:
 				return handleLookupResourcesErr(err)
 			default:
-				count++
-				totalCount++
 				if cobrautil.MustGetBool(cmd, "json") {
 					prettyProto, err := PrettyProto(resp)
 					if err != nil {
@@ -495,8 +495,24 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 					console.Println(string(prettyProto))
 				}
 
-				console.Println(prettyLookupPermissionship(resp.ResourceObjectId, resp.Permissionship, resp.PartialCaveatInfo))
-				cursor = resp.AfterResultCursor
+				if batched := resp.GetBatched(); batched != nil {
+					// Batched shape: one message carries multiple resources plus a
+					// single resume cursor for the whole batch.
+					for _, result := range batched.Results {
+						count++
+						totalCount++
+						console.Println(prettyLookupPermissionship(result.ResourceObjectId, result.Permissionship, result.PartialCaveatInfo))
+					}
+					if batched.AfterCursor != nil {
+						cursor = batched.AfterCursor
+					}
+				} else {
+					// Singular shape: one resource per message (default / old server).
+					count++
+					totalCount++
+					console.Println(prettyLookupPermissionship(resp.ResourceObjectId, resp.Permissionship, resp.PartialCaveatInfo))
+					cursor = resp.AfterResultCursor
+				}
 			}
 		}
 

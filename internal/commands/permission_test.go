@@ -155,7 +155,7 @@ func TestLookupResourcesCommand(t *testing.T) {
 	}()
 
 	// test no page size, server computes returns all resources in one go
-	cmd := testLookupResourcesCommand(t, 0, false)
+	cmd := testLookupResourcesCommand(t, 0, 0, false)
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
 	require.Equal(t, 10, count)
@@ -164,7 +164,7 @@ func TestLookupResourcesCommand(t *testing.T) {
 	// use page size same as number of elements
 	count = 0
 	receivedPageSizes = nil
-	cmd = testLookupResourcesCommand(t, 10, false)
+	cmd = testLookupResourcesCommand(t, 10, 0, false)
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
 	require.Equal(t, 10, count)
@@ -173,11 +173,22 @@ func TestLookupResourcesCommand(t *testing.T) {
 	// use odd page size
 	count = 0
 	receivedPageSizes = nil
-	cmd = testLookupResourcesCommand(t, 3, false)
+	cmd = testLookupResourcesCommand(t, 3, 0, false)
 	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
 	require.NoError(t, err)
 	require.Equal(t, 10, count)
 	require.Equal(t, []uint{3, 3, 3, 1}, receivedPageSizes)
+
+	// Request batching against a server that does not support it (this test
+	// server is an older SpiceDB that ignores optional_response_batch_size and
+	// replies with the singular one-resource-per-message shape). zed must fall
+	// back to reading the singular field and still return every resource.
+	count = 0
+	receivedPageSizes = nil
+	cmd = testLookupResourcesCommand(t, 0, 5, false)
+	err = lookupResourcesCmdFunc(cmd, []string{"test/resource", "read", "test/user:1"})
+	require.NoError(t, err)
+	require.Equal(t, 10, count, "singular fallback must return every resource when batching is unsupported")
 }
 
 func TestLookupResourcesMaxRecursionDebug(t *testing.T) {
@@ -243,7 +254,7 @@ func TestLookupResourcesMaxRecursionDebug(t *testing.T) {
 	}
 
 	// test no page size, server computes returns all resources in one go
-	cmd := testLookupResourcesCommand(t, 0, true)
+	cmd := testLookupResourcesCommand(t, 0, 0, true)
 	err = lookupResourcesCmdFunc(cmd, []string{"resource", "view", "user:someuser"})
 
 	outputString := output.String()
@@ -254,7 +265,7 @@ func TestLookupResourcesMaxRecursionDebug(t *testing.T) {
 	require.Contains(t, outputString, "- folder:a#view", "should contain reference to cycle member")
 }
 
-func testLookupResourcesCommand(t *testing.T, limit uint32, debug bool) *cobra.Command {
+func testLookupResourcesCommand(t *testing.T, limit uint32, batchSize uint32, debug bool) *cobra.Command {
 	return zedtesting.CreateTestCobraCommandWithFlagValue(t,
 		zedtesting.BoolFlag{FlagName: "consistency-full", FlagValue: true},
 		zedtesting.StringFlag{FlagName: "consistency-at-least"},
@@ -263,6 +274,7 @@ func testLookupResourcesCommand(t *testing.T, limit uint32, debug bool) *cobra.C
 		zedtesting.StringFlag{FlagName: "revision"},
 		zedtesting.StringFlag{FlagName: "caveat-context"},
 		zedtesting.UintFlag32{FlagName: "page-limit", FlagValue: limit},
+		zedtesting.UintFlag32{FlagName: "response-batch-size", FlagValue: batchSize},
 		zedtesting.BoolFlag{FlagName: "json"},
 		zedtesting.StringFlag{FlagName: "cursor"},
 		zedtesting.BoolFlag{FlagName: "show-cursor", FlagValue: false},
