@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -38,6 +39,19 @@ func registerConsistencyFlags(flags *pflag.FlagSet) {
 	flags.String("consistency-at-least", "", "evaluate at least as consistent as the provided zedtoken")
 	flags.Bool("consistency-min-latency", false, "evaluate at the zedtoken preferred by the database")
 	flags.Bool("consistency-full", false, "evaluate at the newest zedtoken in the database")
+}
+
+func registerDispatchStrategyFlag(flags *pflag.FlagSet) {
+	flags.String("dispatch-strategy", "", "experimental: a secondary dispatch CEL expression, such as \"prefer_secondary(['tiger'], duration('50ms'))\", that replaces SpiceDB's secondary dispatch strategy for this request; SpiceDB must run with --experimental-dispatch-secondary-allow-strategy-override")
+}
+
+// withDispatchStrategy returns ctx with the strategy override of the --dispatch-strategy flag, if
+// set.
+func withDispatchStrategy(ctx context.Context, cmd *cobra.Command) context.Context {
+	if expr := cobrautil.MustGetString(cmd, "dispatch-strategy"); expr != "" {
+		return requestmeta.WithDispatchStrategy(ctx, expr)
+	}
+	return ctx
 }
 
 func consistencyFromCmd(cmd *cobra.Command) (c *v1.Consistency, err error) {
@@ -120,12 +134,14 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	checkCmd.Flags().Bool("error-on-no-permission", false, "if true, zed will return exit code 1 if subject does not have unconditional permission")
 	checkCmd.Flags().String("caveat-context", "", "the caveat context to send along with the check, in JSON form")
 	registerConsistencyFlags(checkCmd.Flags())
+	registerDispatchStrategyFlag(checkCmd.Flags())
 
 	permissionCmd.AddCommand(checkBulkCmd)
 	checkBulkCmd.Flags().Bool("json", false, "output as JSON")
 	checkBulkCmd.Flags().Bool("explain", false, "requests debug information from SpiceDB and prints out a trace of the requests")
 	checkBulkCmd.Flags().Bool("schema", false, "requests debug information from SpiceDB and prints out the schema used")
 	registerConsistencyFlags(checkBulkCmd.Flags())
+	registerDispatchStrategyFlag(checkBulkCmd.Flags())
 
 	permissionCmd.AddCommand(expandCmd)
 	expandCmd.Flags().Bool("json", false, "output as JSON")
@@ -140,11 +156,13 @@ func RegisterPermissionCmd(rootCmd *cobra.Command) *cobra.Command {
 	lookupResourcesCmd.Flags().Bool("show-cursor", true, "display the cursor token after pagination")
 	lookupResourcesCmd.Flags().Bool("debug", false, "send debug header to spicedb. useful for debugging recursion depth errors")
 	registerConsistencyFlags(lookupResourcesCmd.Flags())
+	registerDispatchStrategyFlag(lookupResourcesCmd.Flags())
 
 	permissionCmd.AddCommand(lookupSubjectsCmd)
 	lookupSubjectsCmd.Flags().Bool("json", false, "output as JSON")
 	lookupSubjectsCmd.Flags().String("caveat-context", "", "the caveat context to send along with the lookup, in JSON form")
 	registerConsistencyFlags(lookupSubjectsCmd.Flags())
+	registerDispatchStrategyFlag(lookupSubjectsCmd.Flags())
 
 	return permissionCmd
 }
@@ -195,7 +213,7 @@ func checkCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("request", request).Send()
 
-	ctx := cmd.Context()
+	ctx := withDispatchStrategy(cmd.Context(), cmd)
 	if cobrautil.MustGetBool(cmd, "explain") || cobrautil.MustGetBool(cmd, "schema") {
 		log.Info().Msg("debugging requested on check")
 		ctx = requestmeta.AddRequestHeaders(ctx, requestmeta.RequestDebugInformation)
@@ -303,7 +321,7 @@ func checkBulkCmdFunc(cmd *cobra.Command, args []string) error {
 
 	log.Trace().Interface("request", bulk).Send()
 
-	ctx := cmd.Context()
+	ctx := withDispatchStrategy(cmd.Context(), cmd)
 	c, err := client.NewClient(cmd)
 	if err != nil {
 		return err
@@ -439,7 +457,7 @@ func lookupResourcesCmdFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctx := cmd.Context()
+	ctx := withDispatchStrategy(cmd.Context(), cmd)
 	if cobrautil.MustGetBool(cmd, "debug") {
 		// Just let the user know that we're in this mode.
 		log.Info().Msg("debugging requested on LookupResources")
@@ -603,7 +621,7 @@ func lookupSubjectsCmdFunc(cmd *cobra.Command, args []string) error {
 	}
 	log.Trace().Interface("request", request).Send()
 
-	respStream, err := client.LookupSubjects(cmd.Context(), request)
+	respStream, err := client.LookupSubjects(withDispatchStrategy(cmd.Context(), cmd), request)
 	if err != nil {
 		return err
 	}

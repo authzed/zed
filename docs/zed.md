@@ -648,6 +648,7 @@ zed permission bulk <resource:id#permission@subject:id> <resource:id#permission@
       --consistency-at-least string     evaluate at least as consistent as the provided zedtoken
       --consistency-full                evaluate at the newest zedtoken in the database
       --consistency-min-latency         evaluate at the zedtoken preferred by the database
+      --dispatch-strategy string        experimental: a secondary dispatch CEL expression, such as "prefer_secondary(['tiger'], duration('50ms'))", that replaces SpiceDB's secondary dispatch strategy for this request; SpiceDB must run with --experimental-dispatch-secondary-allow-strategy-override
       --explain                         requests debug information from SpiceDB and prints out a trace of the requests
       --json                            output as JSON
       --schema                          requests debug information from SpiceDB and prints out the schema used
@@ -690,6 +691,7 @@ zed permission check <resource:id> <permission> <subject:id> [flags]
       --consistency-at-least string     evaluate at least as consistent as the provided zedtoken
       --consistency-full                evaluate at the newest zedtoken in the database
       --consistency-min-latency         evaluate at the zedtoken preferred by the database
+      --dispatch-strategy string        experimental: a secondary dispatch CEL expression, such as "prefer_secondary(['tiger'], duration('50ms'))", that replaces SpiceDB's secondary dispatch strategy for this request; SpiceDB must run with --experimental-dispatch-secondary-allow-strategy-override
       --error-on-no-permission          if true, zed will return exit code 1 if subject does not have unconditional permission
       --explain                         requests debug information from SpiceDB and prints out a trace of the requests
       --json                            output as JSON
@@ -774,6 +776,7 @@ zed permission lookup-resources <type> <permission> <subject:id> [flags]
       --consistency-min-latency         evaluate at the zedtoken preferred by the database
       --cursor string                   resume pagination from a specific cursor token
       --debug                           send debug header to spicedb. useful for debugging recursion depth errors
+      --dispatch-strategy string        experimental: a secondary dispatch CEL expression, such as "prefer_secondary(['tiger'], duration('50ms'))", that replaces SpiceDB's secondary dispatch strategy for this request; SpiceDB must run with --experimental-dispatch-secondary-allow-strategy-override
       --json                            output as JSON
       --page-limit uint32               limit of relations returned per page
       --response-batch-size uint32      if > 0, request up to this many resources per response message (batched LookupResources API); 0 preserves one-resource-per-message
@@ -817,6 +820,7 @@ zed permission lookup-subjects <resource:id> <permission> <subject_type#optional
       --consistency-at-least string     evaluate at least as consistent as the provided zedtoken
       --consistency-full                evaluate at the newest zedtoken in the database
       --consistency-min-latency         evaluate at the zedtoken preferred by the database
+      --dispatch-strategy string        experimental: a secondary dispatch CEL expression, such as "prefer_secondary(['tiger'], duration('50ms'))", that replaces SpiceDB's secondary dispatch strategy for this request; SpiceDB must run with --experimental-dispatch-secondary-allow-strategy-override
       --json                            output as JSON
 ```
 
