@@ -112,8 +112,6 @@ github.com/ashanbrown/forbidigo/v2 v2.3.0 h1:OZZDOchCgsX5gvToVtEBoV2UWbFfI6RKQTi
 github.com/ashanbrown/forbidigo/v2 v2.3.0/go.mod h1:5p6VmsG5/1xx3E785W9fouMxIOkvY2rRV9nMdWadd6c=
 github.com/ashanbrown/makezero/v2 v2.1.0 h1:snuKYMbqosNokUKm+R6/+vOPs8yVAi46La7Ck6QYSaE=
 github.com/ashanbrown/makezero/v2 v2.1.0/go.mod h1:aEGT/9q3S8DHeE57C88z2a6xydvgx8J5hgXIGWgo0MY=
-github.com/authzed/authzed-go v1.11.1-0.20261120130125-380614b108c9 h1:sKnDZxkAMX87JnkumryAfZyVEhnwJS2ZAO5TtsrlQJ8=
-github.com/authzed/authzed-go v1.11.1-0.20261120130125-380614b108c9/go.mod h1:oS45u7pbtfmSyEU+yt5MC4cC71rQGqqJmjK95GAbRFM=
 github.com/authzed/authzed-go v1.11.1-0.20261127115002-a63d5fb80238 h1:mYNUpVftv89a1n9A6IDw43QWL+TJftZd8fiRlTwG/+w=
 github.com/authzed/authzed-go v1.11.1-0.20261127115002-a63d5fb80238/go.mod h1:oS45u7pbtfmSyEU+yt5MC4cC71rQGqqJmjK95GAbRFM=
 github.com/authzed/cel-go v0.20.2 h1:GlmLecGry7Z8HU0k+hmaHHUV05ZHrsFxduXHtIePvck=
