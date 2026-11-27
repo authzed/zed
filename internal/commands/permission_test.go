@@ -14,7 +14,9 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 
+	"github.com/authzed/authzed-go/pkg/requestmeta"
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/spicedb/pkg/genutil/slicez"
 	"github.com/authzed/spicedb/pkg/spiceerrors"
@@ -73,6 +75,7 @@ func TestCheckErrorWithDebugInformation(t *testing.T) {
 	cmd.Flags().Bool("error-on-no-permission", false, "if true, zed will return exit code 1 if subject does not have unconditional permission")
 	cmd.Flags().String("caveat-context", "", "the caveat context to send along with the check, in JSON form")
 	registerConsistencyFlags(cmd.Flags())
+	registerDispatchStrategyFlag(cmd.Flags())
 
 	err := checkCmdFunc(cmd, []string{"object:1", "perm", "object:2"})
 	require.Error(t, err)
@@ -96,6 +99,7 @@ func TestCheckErrorWithInvalidDebugInformation(t *testing.T) {
 	cmd.Flags().Bool("error-on-no-permission", false, "if true, zed will return exit code 1 if subject does not have unconditional permission")
 	cmd.Flags().String("caveat-context", "", "the caveat context to send along with the check, in JSON form")
 	registerConsistencyFlags(cmd.Flags())
+	registerDispatchStrategyFlag(cmd.Flags())
 
 	err := checkCmdFunc(cmd, []string{"object:1", "perm", "object:2"})
 	require.Error(t, err)
@@ -278,5 +282,58 @@ func testLookupResourcesCommand(t *testing.T, limit uint32, batchSize uint32, de
 		zedtesting.BoolFlag{FlagName: "json"},
 		zedtesting.StringFlag{FlagName: "cursor"},
 		zedtesting.BoolFlag{FlagName: "show-cursor", FlagValue: false},
-		zedtesting.BoolFlag{FlagName: "debug", FlagValue: debug})
+		zedtesting.BoolFlag{FlagName: "debug", FlagValue: debug},
+		zedtesting.StringFlag{FlagName: "dispatch-strategy"})
+}
+
+// recordingCheckClient records the outgoing metadata of the checks it receives.
+type recordingCheckClient struct {
+	v1.SchemaServiceClient
+	v1.PermissionsServiceClient
+	v1.WatchServiceClient
+	v1.ExperimentalServiceClient
+
+	outgoing metadata.MD
+}
+
+func (m *recordingCheckClient) CheckPermission(ctx context.Context, _ *v1.CheckPermissionRequest, _ ...grpc.CallOption) (*v1.CheckPermissionResponse, error) {
+	m.outgoing, _ = metadata.FromOutgoingContext(ctx)
+	return &v1.CheckPermissionResponse{Permissionship: v1.CheckPermissionResponse_PERMISSIONSHIP_HAS_PERMISSION}, nil
+}
+
+func TestCheckDispatchStrategyFlag(t *testing.T) {
+	const override = "prefer_secondary(['tiger'], duration('50ms'))"
+
+	for _, tc := range []struct {
+		name     string
+		flag     string
+		expected []string
+	}{
+		{name: "unset", flag: "", expected: nil},
+		{name: "set", flag: override, expected: []string{override}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			recording := &recordingCheckClient{}
+			originalClient := client.NewClient
+			client.NewClient = func(*cobra.Command) (client.Client, error) { return recording, nil }
+			defer func() {
+				client.NewClient = originalClient
+			}()
+
+			cmd := zedtesting.CreateTestCobraCommandWithFlagValue(t,
+				zedtesting.BoolFlag{FlagName: "consistency-full", FlagValue: true},
+				zedtesting.StringFlag{FlagName: "consistency-at-least"},
+				zedtesting.BoolFlag{FlagName: "consistency-min-latency"},
+				zedtesting.StringFlag{FlagName: "consistency-at-exactly"},
+				zedtesting.StringFlag{FlagName: "caveat-context"},
+				zedtesting.BoolFlag{FlagName: "explain"},
+				zedtesting.BoolFlag{FlagName: "schema"},
+				zedtesting.BoolFlag{FlagName: "json"},
+				zedtesting.BoolFlag{FlagName: "error-on-no-permission"},
+				zedtesting.StringFlag{FlagName: "dispatch-strategy", FlagValue: tc.flag})
+
+			require.NoError(t, checkCmdFunc(cmd, []string{"document:1", "view", "user:1"}))
+			require.Equal(t, tc.expected, recording.outgoing.Get(string(requestmeta.RequestDispatchStrategyKey)))
+		})
+	}
 }

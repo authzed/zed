@@ -15,7 +15,7 @@ tool (
 require (
 	github.com/99designs/keyring v1.2.2
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
-	github.com/authzed/authzed-go v1.11.1-0.20261120130125-380614b108c9
+	github.com/authzed/authzed-go v1.11.1-0.20261127115002-a63d5fb80238
 	github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b
 	github.com/authzed/spicedb v1.56.1-0.20260807003957-bb9e61b5f956
 	github.com/brianvoe/gofakeit/v6 v6.28.0
